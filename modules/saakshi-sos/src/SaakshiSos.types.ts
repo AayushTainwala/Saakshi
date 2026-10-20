@@ -15,3 +15,33 @@ export type DirectSmsResult = {
   errorCode: number | null;
   error: string | null;
 };
+
+/** Android bug mode: a piece the recorder has closed (spec E8). */
+export type BugPieceClosedEvent = {
+  uri: string;
+  clip: number;
+  index: number;
+  startedAt: string;
+  endedAt: string;
+  endReason: 'stopped' | 'piece-complete' | 'error';
+  gapBeforeMs: number | null;
+  /** The crash-recovery marker's file name in the session's pending/ folder. */
+  marker: string;
+};
+
+export type BugRecorderOptions = {
+  /** Folders (file:// URIs) for the pieces and their crash-recovery markers. */
+  outputDir: string;
+  pendingDir: string;
+  pieceSeconds: number;
+  clip: number;
+  notificationTitle: string;
+  notificationText: string;
+};
+
+export type SaakshiSosEvents = {
+  /** iPhone: a control, the Action Button or a Shortcut asked for the code pad. */
+  onOpenCodePad: () => void;
+  onBugPieceClosed: (event: BugPieceClosedEvent) => void;
+  onBugRecorderError: (event: { message: string }) => void;
+};

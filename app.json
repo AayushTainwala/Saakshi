@@ -13,7 +13,8 @@
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "CFBundleAllowMixedLocalizations": true
+        "CFBundleAllowMixedLocalizations": true,
+        "NSSupportsLiveActivities": true
       },
       "entitlements": {
         "com.apple.developer.devicecheck.appattest-environment": "production"
@@ -68,7 +69,8 @@
           "enableBackgroundPlayback": false
         }
       ],
-      "./modules/saakshi-sos/app.plugin.js"
+      "./modules/saakshi-sos/app.plugin.js",
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true,
