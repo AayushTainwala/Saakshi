@@ -18,7 +18,7 @@ class SaakshiEvidenceModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("SaakshiEvidence")
 
-    Events("onRecorderReady", "onRecordingStarted", "onRecordingClosed", "onRecorderError", "onVolumeDown")
+    Events("onRecorderReady", "onRecordingStarted", "onRecordingClosed", "onRecorderError", "onVolumeDown", "onBodyCamStopped")
 
     OnCreate {
       CameraRecorder.listener = { name, body -> sendEvent(name, body) }
@@ -43,12 +43,13 @@ class SaakshiEvidenceModule : Module() {
         putExtra(BodyCamService.EXTRA_CLIP, config.clip)
         putExtra(BodyCamService.EXTRA_TITLE, options["notificationTitle"] as? String)
         putExtra(BodyCamService.EXTRA_TEXT, options["notificationText"] as? String)
+        putExtra(BodyCamService.EXTRA_STOP_LABEL, options["notificationStop"] as? String)
       }
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
     }
 
     AsyncFunction("bodyCamStop") {
-      appContext.reactContext?.let { context ->
+      appContext.reactContext?.takeIf { BodyCamService.running }?.let { context ->
         context.startService(Intent(context, BodyCamService::class.java).apply { action = BodyCamService.ACTION_STOP })
       }
       Unit

@@ -180,7 +180,9 @@
     "lock": "Lock screen",
     "stop": "Stop and save",
     "notificationTitle": "Saakshi is recording",
-    "notificationText": "Body-cam mode. Open Saakshi to stop."
+    "notificationText": "Body-cam mode. Open Saakshi to stop.",
+    "notificationStop": "Stop",
+    "notificationsOff": "Notifications are off for Saakshi, so the recording notice and its Stop button don't show in the notification shade. Recording carries on. To see it from outside Saakshi, pull down the notification shade and open Active apps at the bottom. Stopping Saakshi there closes the whole app; the piece being recorded is sealed the next time you open it."
   },
   "battery": {
     "warn": "Battery {{percent}}%. At 3% the recording will be stopped and saved.",
