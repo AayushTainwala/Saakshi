@@ -1,19 +1,21 @@
 /**
  * The quick-trigger code (spec S4): three digits typed on the code pad. Codes that are also
  * emergency or helpline numbers are refused, so that typing one is never confused with dialling
- * it. Indian numbers from G3 (Stream C verifies them in src/modules/helplines); 911, 999 and 000
- * because visitors may know them.
+ * it. 102, 108 and 112 are in the verified helpline list (helplines/helplines.json, Stream C). The
+ * others are refused to be safe, without having been verified here: 100, 101, 104 and 181 are
+ * commonly given as Indian police, fire, health and women's helpline numbers, and 000, 911 and 999
+ * as emergency numbers abroad that visitors may know.
  */
 export const CODE_LENGTH = 3;
 
 export const REFUSED_CODES: readonly string[] = [
-  '100', // police
-  '101', // fire
-  '102', // ambulance
-  '104', // health helpline in several states
-  '108', // emergency ambulance
-  '112', // Emergency Response Support System
-  '181', // women's helpline
+  '100',
+  '101',
+  '102',
+  '104',
+  '108',
+  '112',
+  '181',
   '000',
   '911',
   '999',

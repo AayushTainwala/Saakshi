@@ -9,6 +9,7 @@ on:
   pull_request:
     paths:
       - 'modules/**'
+      - 'targets/**'
       - 'app.json'
       - 'package.json'
       - 'package-lock.json'
