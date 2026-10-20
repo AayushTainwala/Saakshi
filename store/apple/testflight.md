@@ -10,7 +10,7 @@ Saakshi helps you protect yourself and your rights in India. Record photos and v
 
 ## Feedback email
 
-The owner's public developer email. (Owner question in docs/BUILD_HANDOFF.md.)
+`tainwala.aayush@gmail.com`
 
 ## Marketing URL and Privacy Policy URL
 

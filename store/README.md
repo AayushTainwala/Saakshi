@@ -46,4 +46,3 @@ Keep the keywords different between the two, because both may count for search i
 ## Not done yet
 
 - Screenshots and the Play feature graphic. They need the built app on a phone.
-- The owner's public contact email, for the privacy policy, TestFlight feedback and App Review contact. It's an owner question in docs/BUILD_HANDOFF.md.

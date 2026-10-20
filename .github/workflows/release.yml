@@ -304,10 +304,12 @@ jobs:
         env:
           TESTFLIGHT: ${{ vars.TESTFLIGHT_PUBLIC_LINK }}
           CODEBERG_REPO: ${{ vars.CODEBERG_REPO }}
+          IA_PREFIX: ${{ vars.IA_IDENTIFIER_PREFIX }}
         run: |
           set -euo pipefail
           mirror=()
           [ -n "$CODEBERG_REPO" ] && mirror=(--mirror "https://codeberg.org/$CODEBERG_REPO/releases/tag/$TAG")
+          [ -n "$IA_PREFIX" ] && mirror+=(--mirror "https://archive.org/details/$IA_PREFIX-${TAG#v}")
           node tools/release-notes.mjs --version "$VERSION" --build "${{ needs.apk.outputs.code }}" \
             --apk "${{ needs.apk.outputs.file }}" --sha256 "${{ needs.apk.outputs.sha256 }}" \
             --cert-sha256 "${{ needs.apk.outputs.cert }}" --repo "$GITHUB_REPOSITORY" \
@@ -377,3 +379,45 @@ jobs:
             curl -fsS -X POST -H "$auth" -F "attachment=@$f" "$api/$id/assets?name=$(basename "$f")" > /dev/null
           done
           echo "Mirrored to https://codeberg.org/$REPO/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
+
+  internet-archive:
+    # Optional mirror (docs/release/mirrors.md, section 3), approved by the owner on 21 Oct. Runs only
+    # when the repository variables IA_IDENTIFIER_PREFIX, IA_MEDIATYPE and IA_COLLECTION and the
+    # secrets IA_ACCESS_KEY_ID and IA_SECRET_ACCESS_KEY are set. Uses the official uploader
+    # (internetarchive, AGPL-3.0) in CI only; it never enters the app.
+    name: Mirror to the Internet Archive
+    needs: [prepare, apk, release]
+    if: needs.prepare.outputs.tag != '' && vars.IA_IDENTIFIER_PREFIX != ''
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.prepare.outputs.tag }}
+      PREFIX: ${{ vars.IA_IDENTIFIER_PREFIX }}
+      MEDIATYPE: ${{ vars.IA_MEDIATYPE }}
+      COLLECTION: ${{ vars.IA_COLLECTION }}
+      SHA256: ${{ needs.apk.outputs.sha256 }}
+      CERT: ${{ needs.apk.outputs.cert }}
+      IA_ACCESS_KEY_ID: ${{ secrets.IA_ACCESS_KEY_ID }}
+      IA_SECRET_ACCESS_KEY: ${{ secrets.IA_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+          path: dist
+      - name: Upload the release files
+        run: |
+          set -euo pipefail
+          for v in MEDIATYPE COLLECTION IA_ACCESS_KEY_ID IA_SECRET_ACCESS_KEY; do
+            [ -n "${!v}" ] || { echo "::error::$v is not set (docs/release/mirrors.md, section 3)."; exit 1; }
+          done
+          item="$PREFIX-${TAG#v}"
+          pipx install internetarchive==5.12.0
+          colon=$(echo "$CERT" | tr a-f A-F | sed 's/../&:/g; s/:$//')
+          ia upload "$item" dist/*.apk dist/SHA256SUMS dist/SIGNING-CERTIFICATE.txt --retries 10 \
+            --metadata="mediatype:$MEDIATYPE" \
+            --metadata="collection:$COLLECTION" \
+            --metadata="title:Saakshi ${TAG#v} for Android" \
+            --metadata="creator:Aayush Tainwala" \
+            --metadata="licenseurl:https://opensource.org/licenses/MIT" \
+            --metadata="subject:Saakshi" \
+            --metadata="description:Saakshi ${TAG#v}, Android APK. File SHA-256: $SHA256. Signing certificate SHA-256: $colon. Source and release notes: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+          echo "Mirrored to https://archive.org/details/$item" >> "$GITHUB_STEP_SUMMARY"

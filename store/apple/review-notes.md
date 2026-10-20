@@ -6,14 +6,14 @@ Paste the main block. Then add each optional block only if the build being revie
 
 Other fields in App Review Information:
 - **Sign-in required:** off. There is no account.
-- **Contact:** the owner's name, email and phone in international format (+91…).
+- **Contact:** Aayush Tainwala, `tainwala.aayush@gmail.com`, and a phone number in international format (+91…).
 
 ## Main block
 
 ```text
 Saakshi helps people in India protect themselves and their rights. It is personal record-keeping for the user and their lawyer, and a way to alert the user's own trusted contacts. It is not an emergency service, and it does not report anything to the police or anyone else (Guideline 1.7).
 
-No sign-in: every feature works without an account. No server: this version sends nothing to the developer, and has no analytics, ads or tracking.
+No sign-in: every feature works without an account. The only server is for live location (below), and only while the user shares; nothing else is sent to the developer, and there are no analytics, ads or tracking.
 
 PERMISSIONS
 - Camera: to take photos and video in the app's evidence camera (Record tab). Files stay in the app's own storage.
@@ -39,11 +39,11 @@ HOW TO TRY IT
 Source code: https://github.com/AayushTainwala/Saakshi
 ```
 
-## Optional: body-cam mode (if the build has it)
+## Body-cam mode (in builds from 21 Oct on: paste this too)
 
 ```text
 BODY-CAM MODE AND BACKGROUND AUDIO
-In body-cam mode the user wears the phone on the chest and records with the screen dark and touch locked. If the user leaves the app or takes a call, iOS stops the video; the app keeps recording sound only (background audio mode) so the record has no gap, and the orange indicator shows. The app warns before this happens, and logs every gap in the record. Try it: Record tab, Body-cam mode, Start; press volume down twice to unlock.
+In body-cam mode the user wears the phone on the chest and records with the screen dark and touch locked. iOS allows video only while the app is on screen, so if the user leaves the app, video stops; sound keeps recording in short pieces (background audio mode) and the orange indicator shows. The screen explains this before recording starts. A phone call can interrupt sound too. Every gap is logged in the record. Try it: Record tab, Body-cam mode, Start body-cam; press volume down twice to unlock.
 ```
 
 ## Optional: contacts permission (if the build asks for it)
@@ -54,9 +54,9 @@ If trusted contacts are picked with the system contact picker, no permission is 
 - Contacts: to pick trusted contacts from the address book. Only the chosen names and numbers are kept, on the phone.
 ```
 
-## Optional: R2 features (live location, bug mode, quick trigger)
+## R2 features (in builds from 21 Oct on: paste this too)
 
-Add when the build has Stream B's R2. It replaces "No server" in the main block for this build.
+Stream B's R2 is in `main` from 21 Oct, so every build from then on has these features.
 
 ```text
 R2 FEATURES

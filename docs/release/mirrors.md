@@ -13,8 +13,8 @@ The signing certificate fingerprint, not the host. Every release has the same ce
 | # | Host | What it holds | How it's updated | Status |
 |---|---|---|---|---|
 | 1 | **GitHub Releases** | APK, `SHA256SUMS`, `SIGNING-CERTIFICATE.txt`, notes | `release.yml`, on every `v*` tag | Built |
-| 2 | **Codeberg** (codeberg.org) | A copy of the code (`main` and each release tag), and the same release files and notes | `release.yml`, job `codeberg`, after each GitHub Release | Built, **switched off until the owner sets it up** (below); not yet run |
-| 3 | **Internet Archive** (archive.org) | One item per release with the APK and checksum files | By hand for now (below) | Plan |
+| 2 | **Codeberg** (codeberg.org) | A copy of the code (`main` and each release tag), and the same release files and notes | `release.yml`, job `codeberg`, after each GitHub Release | Approved by the owner (21 Oct). Built, **off until the owner sets it up** (below); not yet run |
+| 3 | **Internet Archive** (archive.org) | One item per release with the APK and checksum files | `release.yml`, job `internet-archive`, after each GitHub Release | Approved by the owner (21 Oct). Built, **off until the owner sets it up** (below); not yet run |
 | 4 | **Telegram channel or WhatsApp channel** run by the owner | The APK file and the fingerprints as a pinned post | By hand | Plan |
 | 5 | **IzzyOnDroid** (an F-Droid-format repository) | Pulls the APK from GitHub or Codeberg releases, so F-Droid and Neo Store users get updates | IzzyOnDroid's own bot | Blocked by size (below) |
 
@@ -39,14 +39,23 @@ The owner's one-time setup:
 
 ### 3. Internet Archive
 
-Archive.org items are hard to remove and get no attention from app stores. Upload by hand after each release:
-1. Make an account at archive.org.
-2. Go to archive.org → Upload. Make one item per release, for example `saakshi-1.0.0`, with:
-   - the APK, `SHA256SUMS` and `SIGNING-CERTIFICATE.txt`;
-   - the release notes as the description;
-   - the licence MIT.
+Archive.org items are hard to remove and get no attention from app stores.
 
-The official command-line uploader (`internetarchive`, `ia upload`) is **AGPL-3.0**. CLAUDE.md bars AGPL code from the app. A CI tool isn't part of the app, but I haven't automated it without the owner's say. IA's plain S3-style HTTP API could be called with `curl` instead. Its docs (https://archive.org/developers/) were unreachable from this session, so that is left for a later session.
+The job `internet-archive` in `release.yml` uploads one item per release, named `<prefix>-<version>` (for example `saakshi-app-1.0.0`). Each item holds the APK, `SHA256SUMS` and `SIGNING-CERTIFICATE.txt`, with the fingerprints in its description and the licence MIT. Its link goes into the GitHub Release notes. If the job fails, the GitHub Release is unaffected.
+
+It uses the official uploader, `internetarchive` 5.12.0 (`ia upload`). That tool is **AGPL-3.0**: the owner approved using it in CI on 21 Oct. It runs only on GitHub's build machine and never enters the app, which CLAUDE.md keeps free of AGPL code. The commands follow the tool's own docs (https://github.com/jjjake/internetarchive, `docs/source/cli.rst` and `configuration.rst`, read 21 Oct).
+
+The owner's one-time setup:
+1. Make an account at archive.org, then get your upload keys at https://archive.org/account/s3.php (the "IA-S3 keys").
+2. On GitHub, open Saakshi → Settings → Secrets and variables → Actions.
+   - **Secrets:** `IA_ACCESS_KEY_ID` (the access key) and `IA_SECRET_ACCESS_KEY` (the secret key).
+   - **Variables:** set all three:
+     - `IA_IDENTIFIER_PREFIX`: the start of every item's name, for example `saakshi-app`. Item names are shared by everyone on archive.org, so pick one nobody else uses.
+     - `IA_MEDIATYPE`: **cannot be changed after the first upload** (the tool's docs: "This cannot be changed afterwards"). I believe archive.org's value for apps is `software`, but I couldn't check it: archive.org is unreachable from this session. Confirm it at https://archive.org/developers/items.html before setting it.
+     - `IA_COLLECTION`: which archive.org collection the item goes in. The tool's docs name `test_collection` as the sandbox. Use that for a first trial, then change it to a permanent community collection listed on the same archive.org page.
+3. From the next tagged release, the job uploads the item. The job needs all five settings and fails with a clear message if one is missing.
+
+A note on the sandbox: the tool's docs call `test_collection` "the sandbox". They don't say how long items stay there, and I couldn't check archive.org, so don't rely on a trial item lasting.
 
 ### 4. Messaging channels
 
