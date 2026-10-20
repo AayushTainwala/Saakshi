@@ -161,6 +161,7 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
   - BNS s.37 read verbatim, with a correction (see owner questions);
   - Telecom Suspension Rules 2024: notification date recorded from a Gauhati HC order;
   - a conflicting P&H HC statement on the commencement S.O.s recorded;
+  - a review of High Court rulings on BSA s.63 on Indian Kanoon (`docs/research/hc-s63-review.md`; not exhaustive): none decides who may sign Part B, and they are split on late certificates;
   - NALSA's 15100 confirmed from NALSA's own pages.
 
   Still owed, because those sites can't be reached from here: the Schedule against the Gazette, the commencement and DPDP notifications, and the D.K. Basu and Arnesh paragraph numbers.
@@ -178,6 +179,7 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
 - **G5** (`digitalSafety.ts`): the iPhone and Android steps need trying on current phones (Samsung One UI 9 beta reportedly drops Lockdown from the power menu); the iPhone emergency-call warning; the what-to-take list (see the ID question above). Compare against the SSD text for the attribution.
 - **O1** (`offline.ts`): the claims that Briar has been independently audited (Cure53 2017; Radically Open Security via OTF 2023–24, from the research doc) and has no iPhone app; the link goes to briarproject.org only, as its Play Store status was not confirmed.
 - **law.md**: the leads in the check results are unverified and must not be relied on until the documents are opened.
+- **`docs/research/hc-s63-review.md`**: drawn from Indian Kanoon text, not certified copies; several rows are short orders without reasons.
 
 **Next:**
 - Open the official pages (or allow their domains in the environment's network settings) and finish the seven law.md checks and the helpline `page-read` checks.
