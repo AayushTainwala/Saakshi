@@ -4,8 +4,13 @@ The pickup file for build sessions. Each stream keeps its own section current: s
 
 ## Order
 
-1. **Stream A** starts alone and merges the shell (navigation, i18n, theming, module layout) to `main`.
-2. **Streams B, C and D** then start in parallel, each on its own branch from the updated `main`.
+1. **Stream A** starts first and merges the shell (navigation, i18n, theming, module layout) to `main`.
+2. **Streams C and D** may start before the shell is merged, on work that doesn't touch the app's code:
+   - C: helpline verification, the law-note checks, and drafting content in Markdown under `docs/content/`;
+   - D: `eas.json`, the GitHub Actions workflows, the credential steps, and store text in `store/`.
+
+   Each then rebases on `main` once the shell is merged, and moves its content into the app's structure.
+3. **Stream B** starts once the shell is merged, because its work is all app code.
 3. Each stream opens pull requests into `main`. The owner (or a review session) merges them.
 
 ## Owner questions
@@ -71,7 +76,7 @@ None yet. Streams add questions here as `- [ ] (Stream X) question`.
 
 ## Stream C: Content and Hindi
 
-**Status:** waits on Stream A's shell (for the i18n files).
+**Status:** may start now on the non-code work (see Order, step 2).
 
 **Start prompt** (model Opus, effort high):
 
@@ -95,7 +100,7 @@ None yet. Streams add questions here as `- [ ] (Stream X) question`.
 
 ## Stream D: Release
 
-**Status:** waits on Stream A's shell.
+**Status:** may start now on the pipeline and store text (see Order, step 2).
 
 **Start prompt** (model Sonnet, effort high):
 
