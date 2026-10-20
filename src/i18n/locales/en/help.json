@@ -1,4 +1,24 @@
 {
   "title": "Help",
-  "intro": "Helplines and legal aid."
+  "intro": "Helplines and legal aid.",
+  "helplines": {
+    "heading": "Helplines",
+    "call": "Call {{number}}",
+    "callHint": "Opens your phone's dialler",
+    "source": "Official source {{index}}",
+    "sourceHint": "Opens the government page this number was checked against"
+  },
+  "people": {
+    "heading": "Lawyers and medics",
+    "intro": "People who have agreed to be listed here. Saakshi does not arrange their help or answer for their work.",
+    "empty": "No one is listed yet.",
+    "lawyer": "Lawyer",
+    "medic": "Medic",
+    "languages": "Speaks: {{languages}}"
+  },
+  "status": {
+    "checking": "Checking for an updated list…",
+    "updated": "List updated {{date}}",
+    "failed": "Couldn't check for updates. Showing the list from {{date}}."
+  }
 }
