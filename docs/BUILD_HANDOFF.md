@@ -2,16 +2,13 @@
 
 The pickup file for build sessions. Each stream keeps its own section current: status, what was done, what's next, questions for the owner. Read [CLAUDE.md](../CLAUDE.md) first.
 
-## Order
+## Where things stand (21 Oct 2026)
 
-1. **Stream A** starts first and merges the shell (navigation, i18n, theming, module layout) to `main`.
-2. **Streams C and D** may start before the shell is merged, on work that doesn't touch the app's code:
-   - C: helpline verification, the law-note checks, and drafting content in Markdown under `docs/content/`;
-   - D: `eas.json`, the GitHub Actions workflows, the credential steps, and store text in `store/`.
-
-   Each then rebases on `main` once the shell is merged, and moves its content into the app's structure.
-3. **Stream B** starts once the shell is merged, because its work is all app code.
-3. Each stream opens pull requests into `main`. The owner (or a review session) merges them.
+- **Merged into `main`:** #1–#9. That is R1 and R2 as planned, apart from E3 and E7, plus the law checks against the Gazette of India (#9). Typecheck, lint, all tests and both native builds pass on `main`.
+- **Pace:** no 24-hour deadline (owner, 21 Oct). The next goal is a beta for about 50 testers on iPhone and Android; see BUILD_PLAN.md, section 1, "Road to the beta".
+- **First Release run (21 Oct, iOS only):** the owner set up iOS credentials and the App Store Connect API key with EAS (role App Manager). The EAS build succeeded; the **Submit to TestFlight step failed**. Its log is visible only to someone signed in to GitHub, so the cause isn't known yet. The owner is submitting that build from his Mac with `eas submit --platform ios --latest`. **Stream D:** find the cause and fix the workflow.
+- **Owner's phone testing:** round 1 on iPhone through TestFlight, with a checklist and his notes on a claude.ai page (https://claude.ai/artifact/BQU34AZ76SbRZpBKE5iyc6). Android follows when his phone arrives (about 23 Oct). The review session turns his notes into fix work for the streams.
+- **Streams:** each opens pull requests into `main`; the owner or a review session merges them.
 
 ## Owner questions
 
@@ -21,14 +18,14 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [x] (Stream A) **Segment length.** *Answered 20 Oct:* the evidence camera saves one file from start to stop, with no segments and no joining; the format must survive a sudden cut-off (check its cost on both platforms first and report in this handoff). Segments are for bug mode and body-cam mode only. SPEC E1, E8, body-cam mode.
 - [x] (Stream A) **Certificate language.** *Answered 20 Oct:* English only for now, with the Hindi help text kept. SPEC E4.
 - [x] (Stream A) **App Attest environment.** *Answered 20 Oct:* `production` confirmed.
-- [ ] (Stream D) **Play signing key.** When you first upload to Google Play, the Console asks who holds the app signing key. Two choices:
+- [x] (Stream D) **Play signing key.** *Answered 21 Oct:* (b), upload our EAS keystore as the app signing key. When you first upload to Google Play, the Console asks who holds the app signing key. Two choices:
   - **(a) Google makes its own key (the default).** The Play copy and the GitHub APK then have different signatures. Android won't install one over the other, so someone switching must uninstall first, which **deletes the recordings kept in the app**.
   - **(b) Upload our EAS keystore as the app signing key.** Both copies share one signature and the user can switch freely.
 
   I recommend (b). Decide before the first Play upload: it can't easily be changed afterwards. (b) needs the keystore backup (Stream D, step 4) and Google's key-export steps in the Console, which I couldn't read from here.
-- [ ] (Stream D) **Public contact email** for the privacy policy, TestFlight feedback, App Review contact and the Play developer page. Until then, the privacy policy points to GitHub issues.
-- [ ] (Stream D) **Play target audience.** I suggest 18 and over. Your call.
-- [ ] (Stream D) **Mirrors.**
+- [x] (Stream D) **Public contact email** *Answered 21 Oct:* tainwala.aayush@gmail.com. For the privacy policy, TestFlight feedback, App Review contact and the Play developer page. Until then, the privacy policy points to GitHub issues.
+- [x] (Stream D) **Play target audience.** I suggest 18 and over. *Answered 21 Oct:* 18 and over.
+- [x] (Stream D) **Mirrors.** *Answered 21 Oct:* yes to both: Codeberg first, and CI may use the Internet Archive's uploader.
   - Is Codeberg fine as the first mirror (docs/release/mirrors.md)?
   - The Internet Archive's official uploader is AGPL. May CI use it (it never enters the app), or should a later session use plain `curl` instead?
 - [x] (Stream B) **Phone backups.** Android backs up an app's files to the user's Google account unless the app turns this off (`android.allowBackup`), and iCloud backs up the documents directory. That would copy trusted contacts (and evidence) off the phone. Turn Android backup off for the whole app, keep it, or exclude only some files? This touches Stream A's evidence too. *Answered 20 Oct:* the user chooses whether anything is backed up and where: local only, or a cloud service of their own (Google Drive, iCloud or another). Nothing ever comes to us. So the app starts local-only, with the phone's automatic backups off for its files, and copies only where the user chooses. SPEC section 2. Work for Streams A and B: see Stream D, "For other streams".
@@ -48,6 +45,13 @@ Things that must be done or decided before a release goes public. Streams add it
 
 - [ ] (Stream B, R2) **Supabase plan for live location.** `saakshi-live` stays on the free plan while testing (owner's answer). Before R2 goes public, review the plan: free-plan projects can be paused when inactive, which would break every live link without warning.
 - [ ] (Stream B, R2, for Stream D) **Privacy texts for live location.** Update the privacy policy, the Apple privacy label and Play's Data safety answers before an R2 build is published (facts in Stream B, "For Stream D").
+- [ ] (Review, beta) **Owner's sign-offs:** the certificate text (then set `FORM_TEXT_REVIEWED`), the rights prompts, and every Hindi string.
+- [ ] (Review, beta) **Design pass:** directions mocked up and chosen by the owner, then applied; a real app icon and launch screen in place of Expo's placeholders.
+- [ ] (Review, beta) **Phone testing:** every feature on at least one iPhone and two different Android phones (one Samsung, one Xiaomi, Oppo or Vivo), with what was found fixed.
+- [ ] (Stream D, beta) **TestFlight Submit step** in the Release workflow works from CI.
+- [ ] (Stream D, beta) **Dependency audit:** `npm ci` reports 61 known vulnerabilities in build tools. Triage which, if any, reach the app; don't run `npm audit fix --force`.
+- [ ] (Stream D, beta) **TestFlight public link** (Apple's beta review) and **Play closed test** (12 or more testers for 14 days).
+- [ ] (Review, beta) **Rights and safety guides (G1, G2):** the owner decides whether they join the beta.
 
 ---
 
@@ -464,12 +468,12 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
   - In non-interactive mode, `eas submit` then uses "the key assigned to your app", and the submit profile needs `ascAppId`.
 
 **Owner's one-time steps:**
-1. **Expo token.** If not done yet (BUILD_PLAN section 5, step 1):
+1. **Expo token.** *Done 20 Oct.* If not done yet (BUILD_PLAN section 5, step 1):
    - revoke the token that was shared in chat;
    - at expo.dev → your account → Settings → Access tokens, create a new one;
    - on GitHub, open Saakshi → Settings → Secrets and variables → Actions → **New repository secret**, named `EXPO_TOKEN`.
 2. **Android: nothing.** The first run of the Release workflow makes the signing key.
-3. **iPhone: one command on your own computer (Mac, Windows or Linux), once.** It can't run in a cloud session, because it needs your Apple ID login and the two-factor code on your phone.
+3. **iPhone: one command on your own computer (Mac, Windows or Linux), once.** *Done 21 Oct on the owner's Mac (`~/Code/Saakshi`): distribution certificate and provisioning profiles for the app and the widget, and an App Store Connect API key (App Manager) for EAS Submit.* It can't run in a cloud session, because it needs your Apple ID login and the two-factor code on your phone.
    1. Install Node.js 22 (nodejs.org) and Git.
    2. In a terminal:
       ```bash
