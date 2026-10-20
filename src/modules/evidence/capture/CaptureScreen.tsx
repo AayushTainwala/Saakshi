@@ -116,6 +116,7 @@ export function CaptureScreen() {
 
   const close = useCallback(async () => {
     await stopRecording();
+    void session.finish();
     const id = session.id;
     if (id) router.replace({ pathname: '/record/[session]', params: { session: id } });
     else router.back();

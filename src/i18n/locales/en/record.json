@@ -54,7 +54,14 @@
     "errorTitle": "Something went wrong",
     "chainHead": "Fingerprint of this record",
     "chainHeadHelp": "The SHA-256 of the last signed record. It covers every file above.",
-    "audioSegment": "Audio {{clip}}, part {{index}}"
+    "audioSegment": "Audio {{clip}}, part {{index}}",
+    "delete": "Delete this record",
+    "deleteTitle": "Delete this record?",
+    "deleteBody_one": "This deletes {{count}} file, its signed record and any certificate from this phone. It can't be undone. Copies you have already exported or sent are not affected.",
+    "deleteBody_other": "This deletes {{count}} files, their signed records and any certificate from this phone. It can't be undone. Copies you have already exported or sent are not affected.",
+    "deleteCancel": "Keep it",
+    "deleteConfirm": "Delete",
+    "deleteBusy": "This record is still being saved. Try again when recording has stopped."
   },
   "witness": {
     "send": "Send witness message",

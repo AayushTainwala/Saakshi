@@ -1,3 +1,4 @@
+import { markActive, markInactive } from '../locker/active';
 import type { LockerStore } from '../locker/store';
 import { extensionOf, mediaFileName, mediaTypeFor } from '../locker/media';
 import type { ClosedFile, EvidenceItem, FileDigests, SessionState } from '../types';
@@ -84,9 +85,16 @@ export class CaptureSession {
     await this.queue;
   }
 
+  /** Call when recording is over: waits for the queue, then lets the session be deleted. */
+  async finish(): Promise<void> {
+    await this.drain();
+    if (this.state) markInactive(this.state.id);
+  }
+
   private session(): SessionState {
     if (!this.state) {
       this.state = this.deps.store.createSession(this.deps.newId(), this.deps.now().toISOString());
+      markActive(this.state.id);
     }
     return this.state;
   }
