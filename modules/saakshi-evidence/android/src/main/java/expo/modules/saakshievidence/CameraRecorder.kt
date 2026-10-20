@@ -126,7 +126,7 @@ object CameraRecorder {
 
       orientationListener = object : OrientationEventListener(context.applicationContext) {
         override fun onOrientationChanged(orientation: Int) {
-          if (orientation != ORIENTATION_UNKNOWN) deviceDegrees = ((orientation + 45) / 90 * 90) % 360
+          if (orientation != OrientationEventListener.ORIENTATION_UNKNOWN) deviceDegrees = ((orientation + 45) / 90 * 90) % 360
         }
       }.also { it.enable() }
 

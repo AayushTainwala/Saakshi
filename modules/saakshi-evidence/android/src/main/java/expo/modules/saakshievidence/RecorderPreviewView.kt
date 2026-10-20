@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Size
 import android.view.TextureView
+import android.view.ViewGroup
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.views.ExpoView
 
@@ -17,7 +18,7 @@ class RecorderPreviewView(context: Context, appContext: AppContext) : ExpoView(c
   private val main = Handler(Looper.getMainLooper())
 
   init {
-    addView(texture, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+    addView(texture, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     texture.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
       override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
         CameraRecorder.setPreview(surface) { size ->
