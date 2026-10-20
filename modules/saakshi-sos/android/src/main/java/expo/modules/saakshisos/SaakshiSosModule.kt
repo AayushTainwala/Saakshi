@@ -26,6 +26,16 @@ class SaakshiSosModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("SaakshiSos")
 
+    Events("onBugPieceClosed", "onBugRecorderError")
+
+    OnCreate {
+      BugRecorder.listener = { name, body -> sendEvent(name, body) }
+    }
+
+    OnDestroy {
+      BugRecorder.listener = null
+    }
+
     lateinit var phonePicker: AppContextActivityResultLauncher<PickPhoneInput, Uri?>
 
     RegisterActivityContracts {
@@ -58,6 +68,57 @@ class SaakshiSosModule : Module() {
       }
       SmsSender(context).send(phones, message).map { it.toMap() }
     }
+
+    // Quick trigger (spec S4): the ongoing notification that opens the code pad.
+    Function("quickNotificationShow") { title: String, text: String, action: String ->
+      QuickTrigger.showNotification(context, title, text, action)
+    }
+
+    Function("quickNotificationHide") {
+      QuickTrigger.hideNotification(context)
+    }
+
+    Function("quickNotificationEnabled") {
+      QuickTrigger.notificationEnabled(context)
+    }
+
+    // Bug mode (spec E8): sound in pieces from a microphone foreground service.
+    AsyncFunction("bugRecorderStart") { options: Map<String, Any?> ->
+      val intent = Intent(context, BugModeService::class.java).apply {
+        action = BugModeService.ACTION_START
+        putExtra(BugModeService.EXTRA_OUTPUT_DIR, pathOf(options["outputDir"] as String))
+        putExtra(BugModeService.EXTRA_PENDING_DIR, pathOf(options["pendingDir"] as String))
+        putExtra(BugModeService.EXTRA_PIECE_MILLIS, ((options["pieceSeconds"] as Number).toDouble() * 1000).toLong())
+        putExtra(BugModeService.EXTRA_CLIP, (options["clip"] as Number).toInt())
+        putExtra(BugModeService.EXTRA_TITLE, options["notificationTitle"] as? String)
+        putExtra(BugModeService.EXTRA_TEXT, options["notificationText"] as? String)
+      }
+      if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(intent) else context.startService(intent)
+      Unit
+    }
+
+    AsyncFunction("bugRecorderStop") {
+      context.startService(Intent(context, BugModeService::class.java).apply { action = BugModeService.ACTION_STOP })
+      Unit
+    }
+
+    Function("bugRecorderRunning") { BugModeService.running }
+
+    // iPhone only. Android's backup is off for the whole app (android:allowBackup="false").
+    AsyncFunction("setExcludedFromBackup") { _: String, _: Boolean -> 0 }
+
+    // iPhone only: the widget and the notification here open saakshi://codepad directly.
+    Function("consumeCodePadRequest") { false }
+
+    // iPhone only (bug mode's Live Activity); Android shows the recording notification instead.
+    AsyncFunction("liveActivityStart") { _: String, _: String -> false }
+    AsyncFunction("liveActivityUpdate") { _: String -> }
+    AsyncFunction("liveActivityEnd") { -> }
+  }
+
+  private fun pathOf(uri: String): String {
+    val parsed = Uri.parse(uri)
+    return if (parsed.scheme == "file") parsed.path ?: uri else uri
   }
 
   private fun readPickedPhone(uri: Uri): Map<String, String?>? {

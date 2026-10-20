@@ -18,6 +18,7 @@ export const alertController = new AlertController({
     location: i18n.t('sos:message.location'),
     noLocation: i18n.t('sos:message.noLocation'),
     sent: i18n.t('sos:message.sent'),
+    live: i18n.t('sos:message.live'),
   }),
 });
 

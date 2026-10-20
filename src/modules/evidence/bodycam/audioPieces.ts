@@ -3,13 +3,14 @@ import { type AudioRecorder, setAudioModeAsync } from 'expo-audio';
 import type { CaptureSession } from '../capture/pipeline';
 import { markerName, type PendingMarker } from '../locker/pending';
 import type { LockerStore } from '../locker/store';
-import type { EndReason, LocationSnapshot } from '../types';
+import type { CaptureMode, EndReason, LocationSnapshot } from '../types';
 
 type Piece = { recorder: AudioRecorder; uri: string; startedAt: Date; index: number; marker: string; gapBeforeMs: number | null };
 
 /**
- * iPhone body-cam sound: expo-audio records fixed pieces with background recording on, so sound
- * carries on when the user leaves the app or locks the phone (video can't). Each next piece starts
+ * iPhone body-cam sound, and bug mode's sound on iPhone (E8): expo-audio records fixed pieces
+ * with background recording on, so sound carries on when the user leaves the app or locks the
+ * phone (video can't). Each next piece starts
  * before the previous one stops, so there is no silence between them; the overlap shows as a
  * negative `gapBeforeMs`. That takes two recorders, used in turn. If a new piece can't start (iOS may refuse while a call holds the
  * microphone), the current one keeps running and the next attempt comes a piece later.
@@ -28,6 +29,7 @@ export class AudioPieces {
     private readonly store: LockerStore,
     private readonly location: () => LocationSnapshot,
     private readonly pieceSeconds: number,
+    private readonly mode: CaptureMode = 'body-cam',
   ) {
     this.clip = session.nextClip();
   }
@@ -64,7 +66,7 @@ export class AudioPieces {
       kind: 'audio',
       segment: { clip: this.clip, index: this.index },
       startedAt: startedAt.toISOString(),
-      mode: 'body-cam',
+      mode: this.mode,
       gapBeforeMs: this.lastEnded === null ? null : startedAt.getTime() - this.lastEnded,
       location: this.location(),
     };
@@ -104,7 +106,7 @@ export class AudioPieces {
       startedAt: piece.startedAt.toISOString(),
       closedAt: endedAt.toISOString(),
       endReason: reason,
-      mode: 'body-cam',
+      mode: this.mode,
       gapBeforeMs: piece.gapBeforeMs,
     });
     void this.session.add({
@@ -114,7 +116,7 @@ export class AudioPieces {
       startedAt: piece.startedAt,
       endedAt,
       location: this.location(),
-      mode: 'body-cam',
+      mode: this.mode,
       endReason: reason,
       gapBeforeMs: piece.gapBeforeMs,
       pendingMarker: piece.marker,

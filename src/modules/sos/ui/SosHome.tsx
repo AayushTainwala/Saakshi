@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking } from 'react-native';
 
@@ -7,9 +8,13 @@ import { AppText, Button, Card, Screen } from '@/components';
 import { alertController, useAlertState } from '../alert/instance';
 import { useTrustedContacts } from '../contacts/fileStore';
 import { AlertPanel } from './AlertPanel';
+import { LiveLocationCard } from './LiveLocationCard';
 
-/** The SOS tab: 112 first, then the alert to trusted contacts, then who they are. */
-export function SosHome() {
+/**
+ * The SOS tab: 112 first, then the alert to trusted contacts, live location and who the contacts
+ * are. `children` go at the end (the route adds confiscation mode, which builds on this module).
+ */
+export function SosHome({ children }: { children?: ReactNode }) {
   const { t } = useTranslation('sos');
   const contacts = useTrustedContacts();
   const state = useAlertState();
@@ -34,6 +39,8 @@ export function SosHome() {
         <AlertPanel controller={alertController} state={state} contacts={contacts} />
       )}
 
+      {contacts.length > 0 ? <LiveLocationCard hasContacts /> : null}
+
       {contacts.length > 0 ? (
         <Card>
           <AppText variant="heading">{t('contacts.title')}</AppText>
@@ -46,6 +53,8 @@ export function SosHome() {
           <Button variant="secondary" label={t('contacts.manage')} onPress={() => router.push('/sos/contacts')} />
         </Card>
       ) : null}
+
+      {children}
     </Screen>
   );
 }
