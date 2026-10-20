@@ -14,6 +14,7 @@ A free, open-source phone app that helps people in India protect themselves and 
 - **One complete app.** Everything useful that Tella does is built into this app, learning from Tella's code (MIT). Users never need a second app for the same job.
 - **Interoperable.** The app works through what people already use: SMS in v1, then WhatsApp, Signal and Telegram; the user's own cloud drive; plain web links that open in any browser.
 - **Nothing of the user's leaves the phone unless the user turns it on.** The two exceptions, both opt-in, are (a) uploads to the user's own cloud account and (b) live location while sharing is on (section 6).
+- **Backups are the user's choice** (decided 20 Oct 2026). The user decides whether their files and documents are backed up and where: kept on the phone only, or copied to a cloud service of their own, such as Google Drive or iCloud. Either way, nothing comes to us. So the app starts local-only and backs nothing up, the phone's automatic backups included, until the user chooses a destination.
 - **Law from statutes and judgments only**, each card with its pinpoint, reviewed by Aayush before release. The app never tells a user they have a right the law doesn't give them.
 - **Self-protection only.** Nothing that helps anyone attack, injure or obstruct.
 - **Modular.** Each module ships, waits or is swapped on its own.
