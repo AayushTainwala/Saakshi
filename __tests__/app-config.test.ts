@@ -51,6 +51,19 @@ describe('Android permissions', () => {
     }
   });
 
+  it('blocks the template permissions no feature uses, and keeps the ones body-cam needs', () => {
+    for (const env of [profileEnv('apk'), profileEnv('play'), {}]) {
+      const blocked = withBuildFlags(base, env).android?.blockedPermissions ?? [];
+      for (const p of ['READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE', 'SYSTEM_ALERT_WINDOW', 'VIBRATE']) {
+        expect(blocked).toContain(`android.permission.${p}`);
+      }
+      // Body-cam's foreground-service notice (Android 13+) and its camera and microphone.
+      for (const p of ['POST_NOTIFICATIONS', 'CAMERA', 'RECORD_AUDIO', 'FOREGROUND_SERVICE_CAMERA', 'FOREGROUND_SERVICE_MICROPHONE']) {
+        expect(blocked).not.toContain(`android.permission.${p}`);
+      }
+    }
+  });
+
   it('never asks for a blocked permission in app.json', () => {
     const asked = (base.android?.permissions ?? []).map((p) =>
       p.startsWith('android.permission.') ? p : `android.permission.${p}`,
