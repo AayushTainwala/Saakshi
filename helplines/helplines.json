@@ -80,20 +80,20 @@
         "hi": "मुफ़्त क़ानूनी सहायता (NALSA, 15100)"
       },
       "description": {
-        "en": "Toll-free helpline of the National Legal Services Authority, for legal advice and to be put in touch with free legal aid.",
-        "hi": "राष्ट्रीय विधिक सेवा प्राधिकरण (NALSA) की टोल-फ़्री हेल्पलाइन। क़ानूनी सलाह के लिए, और मुफ़्त क़ानूनी सहायता से जुड़ने के लिए।"
+        "en": "Toll-free helpline of the National Legal Services Authority (NALSA), for urgent legal help. You can also contact your nearest legal services authority.",
+        "hi": "राष्ट्रीय विधिक सेवा प्राधिकरण (NALSA) की टोल-फ़्री हेल्पलाइन, तुरंत क़ानूनी मदद के लिए। आप अपने सबसे पास के विधिक सेवा प्राधिकरण से भी संपर्क कर सकते हैं।"
       },
       "scope": "national",
       "sources": [
         {
           "url": "https://nalsa.gov.in/faqs/",
           "checked": "2026-10-20",
-          "how": "search-extract"
+          "how": "page-read"
         },
         {
           "url": "https://nalsa.gov.in/promoting-inclusive-legal-system/",
           "checked": "2026-10-20",
-          "how": "search-extract"
+          "how": "page-read"
         }
       ]
     }
