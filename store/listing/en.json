@@ -1,0 +1,44 @@
+{
+  "appStore": {
+    "name": "Saakshi",
+    "subtitle": "Record and protect your rights",
+    "promotionalText": "Record photos and video with a signed fingerprint, send a witness message, prepare your section 63 certificate, and alert your trusted contacts. In English and Hindi.",
+    "keywords": "evidence,camera,record,rights,safety,SOS,contacts,location,BSA,section 63,certificate,hash,legal",
+    "whatsNew": "First release.",
+    "description": [
+      "Saakshi (\"witness\") helps you protect yourself and your rights in India. Record what happens to you, keep a record that shows it has not been changed, let the people you trust know where you are, and know what to do, in English and Hindi.",
+      "",
+      "RECORD FOR YOUR OWN RECORDS",
+      "• Take photos and video inside the app.",
+      "• When a file closes, Saakshi computes its SHA-256 fingerprint and signs a record of it (time, place, phone, app version) with a key kept in your phone's security chip. The files in a session are chained together, so a file added or removed later shows.",
+      "• The original file is never changed.",
+      "• Body-cam mode: wear the phone on your chest and keep your hands free. The screen goes dark and locks while it records.",
+      "• Short reminders of your rights while you record, drawn on the screen only, never into the video.",
+      "",
+      "KEEP AND SHARE YOUR RECORDS",
+      "• Witness message: send the fingerprint, time and place by SMS to people you choose, so they also hold proof of what you recorded and when.",
+      "• Certificate: section 63(4) of the Bharatiya Sakshya Adhiniyam, 2023 asks for a certificate in the form in its Schedule with an electronic record. Saakshi fills in Part A and attaches the hash report. Part B must be signed by an expert.",
+      "• Export a bundle (original files, signed records, certificate) through the share sheet, for you and your lawyer. Anyone can check it with open tools.",
+      "",
+      "ALERT YOUR TRUSTED CONTACTS",
+      "• Add the people you trust. They are kept only on your phone.",
+      "• SOS opens a message to all of them with your location and the time; you tap Send.",
+      "• Saakshi is not an emergency service. 112 is always one tap away.",
+      "",
+      "KNOW WHAT TO DO",
+      "• Verified helpline numbers, including 112 and free legal aid.",
+      "• Guides: wearing your phone on your chest, digital safety before you go out, and staying in touch without the internet.",
+      "",
+      "PRIVATE BY DESIGN",
+      "• No account, no ads, no analytics, no tracking.",
+      "• Your recordings, contacts and location stay on your phone unless you send them.",
+      "• Free and open source (MIT): github.com/AayushTainwala/Saakshi",
+      "",
+      "Published by Aayush Tainwala, Advocate. Saakshi gives general information, not legal advice on your situation."
+    ]
+  },
+  "play": {
+    "title": "Saakshi: Protect Your Rights",
+    "shortDescription": "Record with a signed fingerprint, alert your trusted contacts. English & Hindi."
+  }
+}
