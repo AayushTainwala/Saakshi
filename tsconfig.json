@@ -8,10 +8,14 @@
       ],
       "@/assets/*": [
         "./assets/*"
+      ],
+      "@native/*": [
+        "./modules/*"
       ]
     },
     "types": [
-      "jest"
+      "jest",
+      "node"
     ]
   },
   "include": [

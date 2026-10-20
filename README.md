@@ -9,5 +9,6 @@ Published by Aayush Tainwala, Advocate.
 - Product decisions: [docs/SPEC.md](docs/SPEC.md)
 - How it is built: [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md)
 - Research behind it: [docs/research/](docs/research/)
+- Evidence bundle format, and how to check a bundle: [docs/spec/evidence-bundle.md](docs/spec/evidence-bundle.md) and [tools/verify-bundle.mjs](tools/verify-bundle.mjs)
 
 Licensed under the [MIT License](LICENSE). Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

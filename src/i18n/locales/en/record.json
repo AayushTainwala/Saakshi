@@ -1,4 +1,147 @@
 {
   "title": "Record",
-  "intro": "Photos and videos you take here are fingerprinted and signed on your phone, as a record for you and your lawyer."
+  "intro": "Photos and videos you take here are fingerprinted and signed on your phone, as a record for you and your lawyer.",
+  "openCamera": "Open evidence camera",
+  "capture": {
+    "photo": "Photo",
+    "video": "Video",
+    "takePhoto": "Take photo",
+    "startVideo": "Start recording",
+    "stopVideo": "Stop recording",
+    "close": "Close camera",
+    "sealing_one": "Sealing {{count}} file…",
+    "sealing_other": "Sealing {{count}} files…",
+    "saved_one": "{{count}} file saved",
+    "saved_other": "{{count}} files saved",
+    "cameraPermissionTitle": "Camera access",
+    "cameraPermissionBody": "To record evidence, Saakshi needs your camera. Photos and videos stay on your phone.",
+    "micPermissionTitle": "Microphone access",
+    "micPermissionBody": "Videos record sound too, so Saakshi needs your microphone.",
+    "allow": "Allow",
+    "openSettings": "Open Settings"
+  },
+  "locker": {
+    "heading": "Your records",
+    "empty": "Nothing recorded yet.",
+    "files_one": "{{count}} file",
+    "files_other": "{{count}} files",
+    "sessionTitle": "Record",
+    "missing": "This record is no longer on your phone.",
+    "photo": "Photo",
+    "segment": "Video {{clip}}, part {{index}}",
+    "filesHeading": "Files",
+    "itemSealed": "Fingerprinted and signed",
+    "itemFailed": "Could not be sealed: {{error}}",
+    "itemPending": "Sealing…",
+    "sha256": "SHA-256 fingerprint",
+    "statusSealed": "Fingerprinted and signed",
+    "statusSealedDetail": "{{sealed}} of {{total}} files",
+    "statusChecked": "Checked on this phone",
+    "checkedOk": "{{time}}: every file matches its record",
+    "checkedProblems_one": "{{time}}: {{count}} problem found",
+    "checkedProblems_other": "{{time}}: {{count}} problems found",
+    "statusWitness": "Witness message sent",
+    "statusCertificate": "Certificate (Part A) made",
+    "notYet": "Not yet",
+    "export": "Export bundle",
+    "exportDialog": "Share evidence bundle",
+    "check": "Check files",
+    "checkOkTitle": "All files match",
+    "checkOkBody": "Every file still matches its signed record, and the records are in an unbroken chain.",
+    "checkProblemTitle": "Problems found",
+    "checkProblemBody_one": "{{count}} problem was found. A file or record has changed or is missing since it was recorded.",
+    "checkProblemBody_other": "{{count}} problems were found. A file or record has changed or is missing since it was recorded.",
+    "errorTitle": "Something went wrong",
+    "chainHead": "Fingerprint of this record",
+    "chainHeadHelp": "The SHA-256 of the last signed record. It covers every file above.",
+    "audioSegment": "Audio {{clip}}, part {{index}}"
+  },
+  "witness": {
+    "send": "Send witness message",
+    "help": "Sends this record's fingerprint, time and place by SMS to people you choose, so that others hold it from today.",
+    "title": "Saakshi evidence record",
+    "time": "Time",
+    "place": "Place",
+    "noPlace": "not recorded",
+    "unavailable": "This phone can't send SMS.",
+    "cancelled": "Message not sent"
+  },
+  "certificate": {
+    "title": "Certificate, Part A",
+    "intro": "This fills in Part A of the certificate that section 63(4)(c) of the Bharatiya Sakshya Adhiniyam, 2023 asks for when electronic records are produced in court, with the hash report attached. The phone's make, model and the SHA-256 of each file are filled in for you.",
+    "partB": "The certificate also needs Part B, filled in and signed by an expert. This app cannot provide Part B.",
+    "name": "Your full name",
+    "relation": "You are the",
+    "son": "Son of",
+    "daughter": "Daughter of",
+    "spouse": "Spouse of",
+    "relativeName": "Name of your parent or spouse",
+    "connection": "Address type",
+    "residing": "Residing at",
+    "employed": "Employed at",
+    "address": "Address",
+    "imei": "IMEI of this phone",
+    "imeiHint": "Dial *#06# on this phone to see it. If it shows two, enter both, separated by a comma.",
+    "ownership": "This phone is, by you (tick all that apply):",
+    "owned": "Owned",
+    "maintained": "Maintained",
+    "managed": "Managed",
+    "operated": "Operated",
+    "color": "Colour of the phone (optional)",
+    "serialNumber": "Serial number (optional)",
+    "serialHint": "Usually in Settings, under About phone.",
+    "otherInfo": "Anything else about the phone (optional)",
+    "signByHand": "Print the certificate, then sign it and write the date, time and place by hand.",
+    "make": "Make certificate",
+    "required": "Fill in your name, your parent's or spouse's name, address and IMEI, and tick at least one box.",
+    "madeTitle": "Certificate made",
+    "madeBody": "It is saved with this record and goes into the bundle when you export it.",
+    "share": "Share certificate",
+    "done": "Done",
+    "open": "Make certificate (Part A)",
+    "openAgain": "Make the certificate again"
+  },
+  "rights": {
+    "show": "Show what to say",
+    "hide": "Hide",
+    "previous": "Previous",
+    "next": "Next",
+    "say": "Say",
+    "do": "Remember",
+    "position": "{{index}} of {{total}}",
+    "grounds": {
+      "text": "“Please tell me the grounds of my arrest, and give them to me in writing.”",
+      "why": "Police must tell you why you are arrested, and give it to you in writing in a language you understand, at the latest two hours before you are taken to a magistrate for remand.",
+      "source": "Constitution Art. 22(1); BNSS s.47(1); Mihir Rajesh Shah v. State of Maharashtra (SC, 2025), para 56"
+    },
+    "name": {
+      "text": "“What is your name?”",
+      "why": "An officer making an arrest must wear clear, visible identification of their name.",
+      "source": "BNSS s.36(a)"
+    },
+    "inform": {
+      "text": "“Please tell [name] that I have been arrested and where I am being held.”",
+      "why": "Police must tell a relative, friend or other person you name, and must tell you that you have this right.",
+      "source": "BNSS s.48"
+    },
+    "lawyer": {
+      "text": "“I want to consult my lawyer.”",
+      "why": "You have the right to consult a lawyer of your choice, and to meet them during questioning, though not for all of it.",
+      "source": "Constitution Art. 22(1); BNSS s.38"
+    },
+    "bail": {
+      "text": "“Is this a bailable offence?”",
+      "why": "If it is, police must tell you that you can be released on bail.",
+      "source": "BNSS s.47(2)"
+    },
+    "calm": {
+      "text": "Stay calm, keep your distance, and don't obstruct or resist.",
+      "why": "Obstructing a public servant, and resisting a lawful arrest, are offences.",
+      "source": "BNS ss.221 and 262"
+    },
+    "statement": {
+      "text": "Say the date, time and place out loud.",
+      "why": "It helps anyone who watches the recording later."
+    }
+  }
 }

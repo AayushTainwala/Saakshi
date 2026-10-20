@@ -1,0 +1,11 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "Saakshi",
+    "NSCameraUsageDescription": "Saakshi uses the camera to record photos and videos for your own records. They are fingerprinted and signed on your phone.",
+    "NSMicrophoneUsageDescription": "Saakshi records sound with your videos, for your own records.",
+    "NSLocationWhenInUseUsageDescription": "Saakshi adds where a photo or video was taken to its record, and to messages you choose to send."
+  },
+  "android": {
+    "app_name": "Saakshi"
+  }
+}
