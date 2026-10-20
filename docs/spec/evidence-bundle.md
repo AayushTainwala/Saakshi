@@ -200,7 +200,7 @@ README.txt
 }
 ```
 
-- `witness` lists the witness messages the user sent from the app (section 9). `result` is what the phone reported: `"sent"`, `"cancelled"` or `"unknown"` (Android never reports more than "unknown").
+- `witness` lists every witness message the app opened for the user (section 9), including ones the user cancelled. `recipients` is how many recipients the app filled in; 0 means the user chose them in the SMS app. `result` is what the phone reported: `"sent"`, `"cancelled"` or `"unknown"` (Android always reports "unknown").
 - `certificate` is null when no certificate has been made.
 - `hash-report.txt` is a plain-text table of every file's name, size, SHA-256, SHA-1 and MD5, every record's SHA-256, and the chain head, with times in IST. It is the hash report the Schedule asks to be enclosed.
 - `README.txt` repeats section 10 in short.

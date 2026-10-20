@@ -54,5 +54,15 @@
     "errorTitle": "Something went wrong",
     "chainHead": "Fingerprint of this record",
     "chainHeadHelp": "The SHA-256 of the last signed record. It covers every file above."
+  },
+  "witness": {
+    "send": "Send witness message",
+    "help": "Sends this record's fingerprint, time and place by SMS to people you choose, so that others hold it from today.",
+    "title": "Saakshi evidence record",
+    "time": "Time",
+    "place": "Place",
+    "noPlace": "not recorded",
+    "unavailable": "This phone can't send SMS.",
+    "cancelled": "Message not sent"
   }
 }

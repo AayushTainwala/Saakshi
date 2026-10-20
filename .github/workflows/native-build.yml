@@ -16,7 +16,8 @@ on:
 
 concurrency:
   group: native-build-${{ github.ref }}
-  cancel-in-progress: true
+  # Let a running build finish; GitHub keeps only the newest waiting run.
+  cancel-in-progress: false
 
 jobs:
   hashing-jvm:

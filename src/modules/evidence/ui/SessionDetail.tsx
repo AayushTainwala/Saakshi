@@ -8,6 +8,7 @@ import { spacing } from '@/theme';
 import { shareBundle } from '../export/bundle';
 import { runCheck } from '../locker/actions';
 import { useSession } from '../locker/useSessions';
+import { sendWitnessMessage, SmsUnavailableError } from '../witness/send';
 import type { EvidenceItem, SessionState } from '../types';
 import { formatBytes, formatIST } from './format';
 
@@ -66,6 +67,7 @@ export function SessionDetail({ id }: { id: string }) {
   const session = useSession(id);
   const [checking, setChecking] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [witnessing, setWitnessing] = useState(false);
 
   if (!session) {
     return (
@@ -77,7 +79,7 @@ export function SessionDetail({ id }: { id: string }) {
 
   const sealed = session.items.filter((item) => item.status === 'sealed').length;
   const head = chainHeadOf(session);
-  const lastWitness = session.witness[session.witness.length - 1];
+  const lastWitness = session.witness.filter((w) => w.result !== 'cancelled').at(-1);
 
   const check = async () => {
     setChecking(true);
@@ -91,6 +93,25 @@ export function SessionDetail({ id }: { id: string }) {
       Alert.alert(t('locker.errorTitle'), error instanceof Error ? error.message : String(error));
     } finally {
       setChecking(false);
+    }
+  };
+
+  const witness = async () => {
+    setWitnessing(true);
+    try {
+      await sendWitnessMessage(id, {
+        title: t('witness.title'),
+        time: t('witness.time'),
+        place: t('witness.place'),
+        noPlace: t('witness.noPlace'),
+      });
+    } catch (error) {
+      Alert.alert(
+        t('locker.errorTitle'),
+        error instanceof SmsUnavailableError ? t('witness.unavailable') : error instanceof Error ? error.message : String(error),
+      );
+    } finally {
+      setWitnessing(false);
     }
   };
 
@@ -138,7 +159,9 @@ export function SessionDetail({ id }: { id: string }) {
         />
       </Card>
 
-      <Button label={t('locker.export')} busy={exporting} disabled={sealed === 0} onPress={exportBundle} />
+      <Button label={t('witness.send')} busy={witnessing} disabled={sealed === 0} onPress={witness} />
+      <AppText color="textMuted">{t('witness.help')}</AppText>
+      <Button variant="secondary" label={t('locker.export')} busy={exporting} disabled={sealed === 0} onPress={exportBundle} />
       <Button variant="secondary" label={t('locker.check')} busy={checking} disabled={sealed === 0} onPress={check} />
 
       {head ? (
