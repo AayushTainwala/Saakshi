@@ -65,4 +65,13 @@ export type SaakshiEvidenceEvents = {
   onRecordingStarted: (event: RecordingStartedEvent) => void;
   onRecordingClosed: (event: RecordingClosedEvent) => void;
   onRecorderError: (event: { message: string }) => void;
+  /** A volume-down press, while volumeKeysStart() is in effect. */
+  onVolumeDown: () => void;
+};
+
+export type BodyCamOptions = RecorderOptions & {
+  pieceSeconds: number;
+  /** The text of the notification Android shows while the service runs. */
+  notificationTitle: string;
+  notificationText: string;
 };

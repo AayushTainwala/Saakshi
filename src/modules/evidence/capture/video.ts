@@ -1,11 +1,21 @@
 import SaakshiEvidence, { type RecordingClosedEvent } from '@native/saakshi-evidence';
 import type { CameraView } from 'expo-camera';
 import type { RefObject } from 'react';
+import { AppState } from 'react-native';
 
 import type { LockerStore } from '../locker/store';
 import { markerName, type PendingMarker } from '../locker/pending';
 import type { CaptureMode, EndReason, LocationSnapshot } from '../types';
 import type { CaptureSession } from './pipeline';
+
+/**
+ * Why expo-camera ended a recording we didn't stop: it reached the piece length, the app left
+ * the screen (iPhone stops video then), or the system took the camera.
+ */
+function endedBySystem(startedAt: Date, endedAt: Date, maxDuration?: number): EndReason {
+  if (maxDuration && endedAt.getTime() - startedAt.getTime() >= maxDuration * 1000 - 1500) return 'piece-complete';
+  return AppState.currentState === 'active' ? 'camera-lost' : 'app-left';
+}
 
 /** Starts and stops one video recording, handing each finished file to the session. */
 export type VideoController = {
@@ -29,7 +39,7 @@ type Common = {
  */
 export function iosVideoController(
   camera: RefObject<CameraView | null>,
-  common: Common & { clip: number; segment?: { index: number } | null; maxDuration?: number; mute?: boolean },
+  common: Common & { clip: number; segment?: { index: number } | null; maxDuration?: number; gapBeforeMs?: number | null },
 ): VideoController & { done: Promise<{ endReason: EndReason } | null> } {
   let endReason: EndReason = 'stopped';
   let stopping = false;
@@ -51,6 +61,7 @@ export function iosVideoController(
         segment,
         startedAt: startedAt.toISOString(),
         mode: common.mode,
+        gapBeforeMs: common.gapBeforeMs ?? null,
         location: common.location(),
       };
       const name = markerName(marker);
@@ -65,7 +76,7 @@ export function iosVideoController(
             return;
           }
           const endedAt = new Date();
-          const reason = common.maxDuration && endReason === 'stopped' && !stopping ? 'piece-complete' : endReason;
+          const reason = stopping ? endReason : endedBySystem(startedAt, endedAt, common.maxDuration);
           common.store.writePending(sessionId, name, {
             ...marker,
             file: result.uri,
@@ -82,6 +93,7 @@ export function iosVideoController(
             location: common.location(),
             mode: common.mode,
             endReason: reason,
+            gapBeforeMs: common.gapBeforeMs ?? null,
             pendingMarker: name,
           });
           resolveDone({ endReason: reason });

@@ -116,7 +116,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 | `capture.mode` | `"camera"` (the evidence camera), `"body-cam"` or `"bug"`. |
 | `capture.startedAt`, `endedAt` | When the camera started and stopped writing this file, by the phone's clock. Equal for a photo. |
 | `capture.endedAtSource` | `"recorder"`: the recorder reported the end. `"file-modified"`: the file's last-write time, for an interrupted file. |
-| `capture.endReason` | `"stopped"` (by the user), `"piece-complete"`, `"app-left"` (iPhone video stopped because the app left the screen), `"camera-lost"` (the system or another app took the camera), `"low-battery"` (the app stopped and saved the recording at 3% battery), `"interrupted"` or `"error"`. |
+| `capture.endReason` | `"stopped"` (by the user), `"piece-complete"`, `"app-left"` (iPhone video stopped because the app left the screen), `"camera-lost"` (the system or another app took the camera), `"low-battery"` (the app stopped and saved the recording at 3% battery), `"audio-interrupted"` (the system stopped sound recording, for example for a phone call on iPhone), `"interrupted"` or `"error"`. For a piece, a negative `gapBeforeMs` means it started before the previous piece stopped (iPhone sound pieces overlap so there is no silence). |
 | `capture.gapBeforeMs` | For a piece: milliseconds between the end of the previous piece of the same recording and the start of this one. Otherwise null. |
 | `capture.hashedAt` | When hashing finished. |
 | `capture.timeZone`, `utcOffsetMinutes` | The phone's time zone (IANA name, or null if unknown) and offset at `startedAt`, for showing local time. |

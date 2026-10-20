@@ -85,6 +85,34 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
   - Data still in memory when the phone goes off (typically under a second) is lost; a dead battery normally shuts the phone down cleanly, and step 4's auto-save at 3% avoids that case.
 - **Interrupted files** (both platforms): a marker in the session's `pending/` folder is written when recording starts and removed once the file is in the locker. When the app opens (Record tab), any marker left behind is sealed: hashed as it is, chained after the session's last file, with `interrupted: true` and `endReason: "interrupted"` in the record (spec 0.2, section 3). On iPhone the marker can't name the file in advance (expo-camera reports the path only when it stops), so recovery takes the first `.mov` in expo-camera's cache folder created after the recording started. iOS may empty that cache folder when storage is very low, which would lose the file.
 
+**Body-cam mode (B1–B4): how it works and every platform limit found (21 Oct).** Record tab → "Body-cam mode". The first time, the user must acknowledge how to unlock before Start is enabled. Pieces are 60 seconds (`BODYCAM_PIECE_SECONDS`), 720p by default with 1080p as an option, and are sealed through `createEvidenceSession()`. Nothing is uploaded in R1.
+
+- **Reading the volume buttons:**
+  - *Android, screen on:* key events reach the app's window while it is on screen. `VolumeKeys.kt` wraps the window's callback while the lock is showing, takes volume-down presses, and swallows both volume keys so the volume doesn't change.
+  - *Android, screen off:* apps get no key events. Volume keys go to the system, or to an active media session that takes remote volume handling ([`MediaSession.setPlaybackToRemote`](https://developer.android.com/reference/android/media/session/MediaSession): "This must be called to receive volume button events"). That would mean presenting a fake playing media session, so it isn't used. Unlocking needs the dark screen (which is on, at minimum brightness). If the user turns the screen off, recording carries on and they unlock the phone as usual.
+  - *iPhone, iOS 17.2+:* [`AVCaptureEventInteraction`](https://developer.apple.com/documentation/avkit/avcaptureeventinteraction): "The system sends capture events only to apps that actively use the camera. Backgrounded capture apps … don't receive events." Volume down is a "primary" event (WWDC 2025 session 253), and so are the **Action button and Camera Control**: pressing either twice also unlocks.
+  - *iPhone, iOS 16.4–17.1:* no public API reads the buttons. The fallback watches the system output volume and counts each decrease as a press, so it **does not work when the volume is already at zero**, and the presses do change the volume.
+- **Dark screen:** Android dims only Saakshi's window (no `WRITE_SETTINGS` permission; I removed expo-brightness, whose plugin would add it). iPhone sets the system brightness and restores the previous level on unlock; iOS also restores it when the phone locks. The screen stays on (keep-awake) so that it can be unlocked, which costs battery.
+- **Android foreground service** (`BodyCamService.kt`, types camera and microphone, partial wake lock):
+  - It can only be started while the app is on screen ([while-in-use rule](https://developer.android.com/develop/background-work/services/fgs/service-types)), which it always is when the user taps Start.
+  - Android 13+ shows its notification only if the user has allowed notifications. The app doesn't ask, to keep permissions minimal; the system still lists the running service.
+  - Some makers' battery managers (Xiaomi, Oppo, Vivo and others) may stop background services. Test.
+  - During a phone call Android may give the microphone to the call and silence other apps' recording; video continues. Not yet tested.
+  - Google Play requires a declaration for camera and microphone foreground services (Stream D).
+- **iPhone:**
+  - Apple allows video only while the app is on screen, as the spec says. Video pieces stop with `endReason: "app-left"` when the app leaves the screen, and a new clip starts on return; `gapBeforeMs` in the first piece's record gives the gap.
+  - The screen warns about this before Start, and again whenever it is unlocked. iOS gives no notice before the user leaves an app, so a warning at the moment of leaving isn't possible.
+  - Sound is recorded separately (expo-audio, background recording, `.m4a` pieces). Each piece starts before the last stops, so there is no silence, and records show a small negative `gapBeforeMs` for the overlap.
+  - A phone call interrupts sound recording. That piece ends `audio-interrupted`, and a new piece starts at the next minute if iOS allows it, which needs testing.
+  - Video and sound are separate files in the same session, matched by their times.
+  - There is no way to open the Low Power Mode setting directly, so the app explains where it is. On Android the button opens Battery Saver settings.
+- **Gaps between pieces:**
+  - Android: about the time to stop one `MediaRecorder` and start the next.
+  - iPhone video: the time between one `recordAsync` ending and the next starting.
+  - Both are recorded in `gapBeforeMs` and are untested on phones.
+- **For Stream C:** the chest-mount guide (G4) should teach the unlock (volume down, twice). The lock message deliberately doesn't name the buttons.
+- **For Stream D:** the generated Android manifest also carries template permissions no feature uses (`READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, `SYSTEM_ALERT_WINDOW`, `VIBRATE`); consider `android.blockedPermissions` in `app.json`. `POST_NOTIFICATIONS` and `FOREGROUND_SERVICE_MICROPHONE` come from expo-audio's background recording, which bug mode (E8) also needs.
+
 **NEEDS OWNER REVIEW:**
 - **Certificate Part A text** (`src/modules/evidence/certificate/html.ts`): check every line against the Gazette of India text of the Schedule. It follows law.md section 1B, which was read from the Gazette of Puducherry reproduction, and item 3 was joined from fragments. The PDF prints "DRAFT: the text of this form has not yet been checked against the Gazette of India" until `FORM_TEXT_REVIEWED` is set to `true`.
 - **Rights prompts** (`src/i18n/locales/{en,hi}/record.json` under `rights`, sources in `src/modules/evidence/rights/prompts.ts`): wording in English and Hindi. Sources: Art. 22(1); BNSS ss.36(a), 38, 47(1)–(2), 48; *Mihir Rajesh Shah* para 56; BNS ss.221, 262. All are rows marked VERIFIED (IK) in law.md, none checked against the Gazette yet.

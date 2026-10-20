@@ -29,6 +29,8 @@ export function RecordHome() {
     <Screen>
       <AppText>{t('intro')}</AppText>
       <Button label={t('openCamera')} onPress={() => router.push('/capture')} />
+      <Button variant="secondary" label={t('bodycam.open')} onPress={() => router.push('/bodycam')} />
+      <AppText color="textMuted">{t('bodycam.openHint')}</AppText>
 
       <AppText variant="heading">{t('locker.heading')}</AppText>
       {sessions.length === 0 ? <AppText color="textMuted">{t('locker.empty')}</AppText> : null}

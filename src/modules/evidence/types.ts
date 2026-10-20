@@ -8,7 +8,8 @@ export type CaptureMode = 'camera' | 'body-cam' | 'bug';
 /**
  * Why a file ended. `interrupted`: cut off (crash or forced power-off) and sealed when the app
  * next opened. `app-left`: on iPhone, video stops when the user leaves the app. `low-battery`:
- * the app stopped and saved the recording itself at 3% battery.
+ * the app stopped and saved the recording itself at 3% battery. `audio-interrupted`: the system
+ * stopped sound recording (for example, a phone call on iPhone).
  */
 export type EndReason =
   | 'stopped'
@@ -16,6 +17,7 @@ export type EndReason =
   | 'app-left'
   | 'camera-lost'
   | 'low-battery'
+  | 'audio-interrupted'
   | 'interrupted'
   | 'error';
 

@@ -1,6 +1,7 @@
 import { NativeModule, requireOptionalNativeModule } from 'expo';
 
 import type {
+  BodyCamOptions,
   FileHashes,
   KeyAttestation,
   NativeDeviceKey,
@@ -26,6 +27,16 @@ declare class SaakshiEvidenceModule extends NativeModule<SaakshiEvidenceEvents> 
   recorderClose(): Promise<void>;
   recorderStart(options: RecorderOptions): Promise<void>;
   recorderStop(): Promise<void>;
+
+  /** Android: starts body-cam recording in a foreground service (camera and microphone). */
+  bodyCamStart(options: BodyCamOptions): Promise<void>;
+  bodyCamStop(): Promise<void>;
+  bodyCamRunning(): boolean;
+  /** Starts delivering `onVolumeDown` events and stops the volume buttons changing the volume. */
+  volumeKeysStart(): Promise<void>;
+  volumeKeysStop(): Promise<void>;
+  /** Dims the screen to its minimum, or puts it back. */
+  setScreenDimmed(dimmed: boolean): Promise<void>;
 }
 
 /** Null where the native module isn't built in (unit tests, Expo Go). */

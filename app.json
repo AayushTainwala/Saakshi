@@ -55,7 +55,16 @@
           "locationWhenInUsePermission": "Saakshi adds where a photo or video was taken to its record, and to messages you choose to send."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Saakshi records sound with your videos, for your own records.",
+          "recordAudioAndroid": true,
+          "enableBackgroundRecording": true,
+          "enableBackgroundPlayback": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
