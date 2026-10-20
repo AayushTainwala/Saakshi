@@ -11,6 +11,8 @@ import type { PendingMarker } from './pending';
  *   evidence/sessions/<session id>/media/…        original files, never modified
  *   evidence/sessions/<session id>/records/…      signed records (<n>.json and <n>.json.sig)
  *   evidence/sessions/<session id>/certificate-part-a.pdf
+ *   evidence/sessions/<session id>/copies/…        playable MP4 copies of Android .ts videos, each
+ *                                                  with its own signed record (<name>.json, .sig)
  */
 export interface LockerStore {
   createSession(id: string, createdAt: string): SessionState;
@@ -27,6 +29,9 @@ export interface LockerStore {
   readRecordText(sessionId: string, name: string): string;
   recordUri(sessionId: string, name: string): string;
   sessionFileUri(sessionId: string, name: string): string;
+  /** Where a playable copy lives (copies/<name>), as a file:// URI. */
+  copyUri(sessionId: string, name: string): string;
+  writeCopyRecord(sessionId: string, mediaName: string, body: string, signatureDer: Uint8Array): void;
   /** The session folder, as a file:// URI. */
   sessionDirUri(sessionId: string): string;
   listPending(sessionId: string): { name: string; marker: PendingMarker }[];
@@ -166,6 +171,18 @@ export const fileLocker: LockerStore = {
 
   sessionFileUri(sessionId, name) {
     return new File(sessionDir(sessionId), name).uri;
+  },
+
+  copyUri(sessionId, name) {
+    return new File(ensure(new Directory(sessionDir(sessionId), 'copies')), name).uri;
+  },
+
+  writeCopyRecord(sessionId, mediaName, body, signatureDer) {
+    const dir = ensure(new Directory(sessionDir(sessionId), 'copies'));
+    writeText(new File(dir, `${mediaName}.json`), body);
+    const signature = new File(dir, `${mediaName}.json.sig`);
+    if (!signature.exists) signature.create();
+    signature.writeSync(signatureDer);
   },
 
   sessionDirUri(sessionId) {

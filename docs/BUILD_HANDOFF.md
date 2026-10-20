@@ -120,7 +120,7 @@ None of it has run on a phone yet.
 - **Dark screen:** Android dims only Saakshi's window (no `WRITE_SETTINGS` permission; I removed expo-brightness, whose plugin would add it). iPhone sets the system brightness and restores the previous level on unlock; iOS also restores it when the phone locks. The screen stays on (keep-awake) so that it can be unlocked, which costs battery.
 - **Android foreground service** (`BodyCamService.kt`, types camera and microphone, partial wake lock):
   - It can only be started while the app is on screen ([while-in-use rule](https://developer.android.com/develop/background-work/services/fgs/service-types)), which it always is when the user taps Start.
-  - Android 13+ shows its notification only if the user has allowed notifications. The app doesn't ask, to keep permissions minimal; the system still lists the running service.
+  - Android 13+ shows its notification only if the user has allowed notifications. Per the owner's decision of 22 Oct, the app asks for that permission the first time body-cam starts. The notice has a Stop button, which ends the session as the in-app Stop does. If the user refuses, recording carries on, and the screen says the notice is under Active apps at the bottom of the notification shade. Per Android's [notification permission guide](https://developer.android.com/guide/topics/ui/notifiers/notification-permission), foreground-service notices then appear in the Task Manager but not the drawer. Stopping Saakshi from Active apps ends the whole app ([Android 13 Task Manager](https://developer.android.com/about/versions/13/changes/fgs-manager)); the piece being recorded is then sealed as interrupted at the next start.
   - Some makers' battery managers (Xiaomi, Oppo, Vivo and others) may stop background services. Test.
   - During a phone call Android may give the microphone to the call and silence other apps' recording; video continues. Not yet tested.
   - Google Play requires a declaration for camera and microphone foreground services (Stream D).
@@ -136,13 +136,19 @@ None of it has run on a phone yet.
   - iPhone video: the time between one `recordAsync` ending and the next starting.
   - Both are recorded in `gapBeforeMs` and are untested on phones.
 - **For Stream C:** the chest-mount guide (G4) should teach the unlock (volume down, twice). The lock message deliberately doesn't name the buttons.
-- **For Stream D:** the generated Android manifest also carries template permissions no feature uses (`READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, `SYSTEM_ALERT_WINDOW`, `VIBRATE`); consider `android.blockedPermissions` in `app.json`. `POST_NOTIFICATIONS` and `FOREGROUND_SERVICE_MICROPHONE` come from expo-audio's background recording, which bug mode (E8) also needs.
+- **Permissions:** `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, `SYSTEM_ALERT_WINDOW` and `VIBRATE` come from Expo's template and no feature uses them. All four are now blocked in every Android build through `ALWAYS_BLOCKED` in `app.config.ts`; Stream D had already blocked the first three, and I added `VIBRATE`, which nothing in the app uses and no library declares. `POST_NOTIFICATIONS` stays, for body-cam's notice.
+
+**Android videos: the original and its MP4 copy (owner decision of 22 Oct).** The `.ts` from the camera stays the original: the chain, the export bundle and the certificate use only it.
+- Play and Share on a video in the session screen offer an MP4 copy instead. The copy is made once, without re-encoding (Android `MediaExtractor` into `MediaMuxer`, `Remuxer.kt`), and stored in `copies/`. It is labelled in the app as a copy, not the original, and has its own signed record naming the original's record and file SHA-256 and the method (spec section 11). Sharing asks whether to send the copy or the original.
+- MPEG-TS has no field for rotation, so a `.ts` recorded upright may play on its side. The recorder's rotation is now in each record (`capture.rotationDegrees`) and is written into the MP4 copy.
+- Not tested on a phone: the remux itself, whether MediaExtractor reads our MediaRecorder `.ts` files, and how the copy plays.
+- iPhone videos are `.mov` and need no copy; Play opens Quick Look and Share sends the original.
 
 **Low-battery auto-save (SPEC E1, decided 21 Oct).** While the evidence camera or body-cam mode is recording, the app warns at 10% and 5% (a line on the camera screen, and on body-cam's dark screen, which stays dark) and at 3% stops and saves the recording itself (`endReason: "low-battery"` in the record). Logic: `src/modules/evidence/battery/monitor.ts`, tested.
-- **Judgement call for the owner:** nothing happens while the phone is charging, since the battery isn't running down. Say if you want the 3% stop even when plugged in.
+- Nothing happens while the phone is charging, since the battery isn't running down (owner confirmed 22 Oct).
 - expo-battery's level listener fires on Android only around the system's "battery low" point, so the app also reads the level every 30 seconds while recording.
 - Older iPhones and iOS versions may report the level only in 5% steps. Then the 3% stop comes at the first reading of 0–3%, which could be too late. Check on a phone.
-- Bug mode (E8, Stream B) can use the same hook (`useLowBattery`) if the owner wants it there too; the decision named only the evidence camera and body-cam mode.
+- **Bug mode (E8) has no 3% save** (owner, 22 Oct): its pieces are already short. Stream B: don't use `useLowBattery` there.
 
 **NEEDS OWNER REVIEW:**
 - **Certificate Part A text** (`src/modules/evidence/certificate/html.ts`): check every line against the Gazette of India text of the Schedule. It follows law.md section 1B, which was read from the Gazette of Puducherry reproduction, and item 3 was joined from fragments. The PDF prints "DRAFT: the text of this form has not yet been checked against the Gazette of India" until `FORM_TEXT_REVIEWED` is set to `true`.

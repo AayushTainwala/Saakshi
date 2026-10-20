@@ -21,6 +21,7 @@ export type PendingMarker = {
   endReason?: EndReason | null;
   mode: CaptureMode;
   gapBeforeMs?: number | null;
+  rotationDegrees?: number | null;
   location?: LocationSnapshot;
 };
 

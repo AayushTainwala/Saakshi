@@ -78,6 +78,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
     "endedAtSource": "recorder",
     "endReason": "piece-complete",
     "gapBeforeMs": 180,
+    "rotationDegrees": 90,
     "hashedAt": "2026-10-20T09:03:03.910Z",
     "timeZone": "Asia/Kolkata",
     "utcOffsetMinutes": 330
@@ -117,6 +118,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 | `capture.startedAt`, `endedAt` | When the camera started and stopped writing this file, by the phone's clock. Equal for a photo. |
 | `capture.endedAtSource` | `"recorder"`: the recorder reported the end. `"file-modified"`: the file's last-write time, for an interrupted file. |
 | `capture.endReason` | `"stopped"` (by the user), `"piece-complete"`, `"app-left"` (iPhone video stopped because the app left the screen), `"camera-lost"` (the system or another app took the camera), `"low-battery"` (the app stopped and saved the recording at 3% battery), `"audio-interrupted"` (the system stopped sound recording, for example for a phone call on iPhone), `"interrupted"` or `"error"`. For a piece, a negative `gapBeforeMs` means it started before the previous piece stopped (iPhone sound pieces overlap so there is no silence). |
+| `capture.rotationDegrees` | Degrees clockwise to turn the picture to show it upright, as the recorder set it when the file started. Given only for MPEG-TS files, whose container has no field for it, so a player may show them on their side; null otherwise (QuickTime and MP4 carry their own rotation, and photos and audio have none). |
 | `capture.gapBeforeMs` | For a piece: milliseconds between the end of the previous piece of the same recording and the start of this one. Otherwise null. |
 | `capture.hashedAt` | When hashing finished. |
 | `capture.timeZone`, `utcOffsetMinutes` | The phone's time zone (IANA name, or null if unknown) and offset at `startedAt`, for showing local time. |
@@ -265,10 +267,32 @@ With standard tools (`unzip`, `sha256sum`, `openssl`):
 
 `tools/verify-bundle.mjs` in the Saakshi repository runs steps 2–5 with Node.js and no other dependencies. The tool reads versions 0.1 and 0.2, and does not yet check attestation chains (step 6).
 
-## 11. Versions
+## 11. Playable copies (Android)
+
+An Android video's original is an MPEG-TS file. Many players handle MP4 better, and MPEG-TS can't say which way up the picture goes. When the user plays or shares an Android video, the app can make an MP4 copy:
+
+- **Method:** a remux. Android's `MediaExtractor` reads each audio and video sample from the original, and `MediaMuxer` writes it unchanged into an MP4 container. Nothing is re-encoded. The original's `capture.rotationDegrees` is written into the MP4's rotation.
+- **Where:** in the session's `copies/` folder, as `<original name without extension>.copy.mp4`, with its record `<copy name>.json` and signature `<copy name>.json.sig`, made and signed as in section 5.
+- **What it is not:** the copy is not part of the session's chain, is never in the bundle (section 7) and is never named in the certificate (section 8). The app labels it as a copy wherever it appears.
+
+A copy record has exactly these members:
+
+| Member | Meaning |
+|---|---|
+| `type`, `version` | `"saakshi.evidence.copy"` and the format version. |
+| `id`, `session` | UUID of this copy record, and the session of the original. |
+| `original` | `recordId`, `recordSha256` (SHA-256 of the original's record file), `fileName` and `fileSha256` of the original. |
+| `method` | `name` (`"remux-mpegts-to-mp4"`), `reencoded` (`false`), a plain-language `description`, and the `rotationDegrees` written into the copy. |
+| `file` | The copy: `name`, `mediaType` (`"video/mp4"`), `size`, `sha256`, `sha1`, `md5`. |
+| `madeAt` | When the copy was made. |
+| `device`, `app`, `key` | As in section 4. |
+
+To check a copy against its original: verify the copy record's signature as in section 10, step 3; check that `original.fileSha256` and `original.recordSha256` match the original's record; check the copy's own SHA-256. Its pictures and sound can be compared with the original's frame for frame, for example with `ffprobe -show_packets` on both, since the samples are the same bytes.
+
+## 12. Versions
 
 - **0.1** (20 October 2026): records, signatures and chain; Android Key Attestation and Apple App Attest; bundle; certificate Part A; witness message.
-- **0.2** (this document): one file per evidence-camera video, in a cut-off-safe container; pieces for body-cam and bug mode; markers and interrupted files; new record members `interrupted`, `capture.mode`, `capture.endedAtSource`, `capture.endReason` and `capture.gapBeforeMs`.
+- **0.2** (this document): one file per evidence-camera video, in a cut-off-safe container; pieces for body-cam and bug mode; markers and interrupted files; new record members `interrupted`, `capture.mode`, `capture.endedAtSource`, `capture.endReason`, `capture.gapBeforeMs` and `capture.rotationDegrees`; playable copies of Android videos with their own signed records (section 11).
 - **0.3** (planned, R2): OpenTimestamps proofs for each chain head and record, in `timestamps/<recordSha256>.ots`, listed in the manifest's `timestamps`; upload state for copies in the user's cloud drive.
 - **1.1 of the app** (planned): C2PA Content Credentials and sensor readings.
 

@@ -65,6 +65,7 @@ export async function recoverPending(deps: PipelineDeps, files: RecoveryFiles): 
             endReason: closed ? (marker.endReason ?? 'stopped') : 'interrupted',
             interrupted: !closed,
             gapBeforeMs: marker.gapBeforeMs ?? null,
+            rotationDegrees: marker.rotationDegrees ?? null,
             pendingMarker: name,
           }),
         );

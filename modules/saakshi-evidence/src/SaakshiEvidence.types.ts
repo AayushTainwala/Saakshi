@@ -52,6 +52,8 @@ export type RecordingStartedEvent = {
   clip: number;
   index: number;
   cutoffSafe: boolean;
+  /** MPEG-TS only: degrees to turn the picture upright (the container can't say). Null otherwise. */
+  rotationDegrees: number | null;
 };
 
 export type RecordingClosedEvent = RecordingStartedEvent & {

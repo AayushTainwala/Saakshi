@@ -35,6 +35,8 @@ export type ClosedFile = {
   interrupted?: boolean;
   /** Milliseconds since the previous piece of the same recording ended, if there was one. */
   gapBeforeMs?: number | null;
+  /** Degrees to turn the picture upright, for containers with no field for it (MPEG-TS). */
+  rotationDegrees?: number | null;
   /** The crash-recovery marker for this file (locker/pending.ts), removed once the file is safe. */
   pendingMarker?: string;
 };
@@ -84,6 +86,11 @@ export type SessionState = {
   items: EvidenceItem[];
   witness: WitnessEntry[];
   certificate: { file: string; createdAt: string } | null;
+  /**
+   * Playable MP4 copies of Android .ts videos, by the original's sequence number. Each has its own
+   * signed record; the originals stay the evidence (owner decision of 22 Oct).
+   */
+  copies?: Record<string, { file: string; sha256: string; recordSha256: string; madeAt: string }>;
   /** The last on-phone check of files, records and chain. */
   lastCheck?: { at: string; ok: boolean; problems: { sequence: number; problem: string }[] };
 };

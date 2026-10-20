@@ -57,6 +57,17 @@ class SaakshiEvidenceModule : Module() {
 
     Function("bodyCamRunning") { BodyCamService.running }
 
+    // Android: an MP4 copy of an MPEG-TS recording, made without re-encoding (spec decision of 22 Oct).
+    AsyncFunction("remuxToMp4") Coroutine { input: String, output: String, rotationDegrees: Int? ->
+      withContext(Dispatchers.IO) {
+        val source = fileFromUri(input)
+        val target = File(Uri.parse(output).path ?: output)
+        target.parentFile?.mkdirs()
+        Remuxer.tsToMp4(source, target, rotationDegrees)
+        "file://${target.absolutePath}"
+      }
+    }
+
     // Volume-down presses while body-cam mode's lock screen shows (the screen is on, dimmed).
     AsyncFunction("volumeKeysStart") {
       appContext.currentActivity?.let { VolumeKeys.enable(it) }

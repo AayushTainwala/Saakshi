@@ -49,6 +49,7 @@ export function androidBodyCam(
       mode: 'body-cam',
       endReason: reason,
       gapBeforeMs: event.gapBeforeMs,
+      rotationDegrees: event.rotationDegrees,
       pendingMarker: `${event.uri.split('/').pop()}.json`,
     });
     if (event.endReason !== 'piece-complete') {

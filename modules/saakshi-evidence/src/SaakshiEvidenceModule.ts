@@ -32,6 +32,8 @@ declare class SaakshiEvidenceModule extends NativeModule<SaakshiEvidenceEvents> 
   bodyCamStart(options: BodyCamOptions): Promise<void>;
   bodyCamStop(): Promise<void>;
   bodyCamRunning(): boolean;
+  /** Android: MP4 copy of an MPEG-TS file without re-encoding; returns the copy's file:// URI. */
+  remuxToMp4(input: string, output: string, rotationDegrees: number | null): Promise<string>;
   /** Starts delivering `onVolumeDown` events and stops the volume buttons changing the volume. */
   volumeKeysStart(): Promise<void>;
   volumeKeysStop(): Promise<void>;

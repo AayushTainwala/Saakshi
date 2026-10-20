@@ -62,7 +62,9 @@
     "deleteCancel": "Keep it",
     "deleteConfirm": "Delete",
     "deleteBusy": "This record is still being saved. Try again when recording has stopped.",
-    "itemInterrupted": "Cut off before it was stopped (the app closed or the phone switched off). It plays up to the cut, and was sealed when the app next opened."
+    "itemInterrupted": "Cut off before it was stopped (the app closed or the phone switched off). It plays up to the cut, and was sealed when the app next opened.",
+    "video": "Video",
+    "audio": "Sound"
   },
   "witness": {
     "send": "Send witness message",
@@ -187,5 +189,16 @@
   "battery": {
     "warn": "Battery {{percent}}%. At 3% the recording will be stopped and saved.",
     "stopped": "Battery at 3%: the recording was stopped and saved, so it isn't cut off."
+  },
+  "video": {
+    "play": "Play",
+    "playCopy": "Play (MP4 copy)",
+    "share": "Share video",
+    "cancel": "Cancel",
+    "shareTitle": "Share this video",
+    "shareBody": "The original recording (.ts) is your evidence and stays unchanged on this phone. Many phones and computers play an MP4 copy more easily. The copy is made without re-encoding and has its own signed record naming the original. For court, export the bundle, which holds the original.",
+    "shareCopy": "Share the MP4 copy",
+    "shareOriginal": "Share the original (.ts)",
+    "copyMade": "MP4 copy for playing (not the original). SHA-256 {{sha256}}"
   }
 }
