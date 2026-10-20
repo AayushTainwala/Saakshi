@@ -1,0 +1,9 @@
+{
+  "platforms": ["android", "apple"],
+  "apple": {
+    "modules": ["SaakshiSosModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.saakshisos.SaakshiSosModule"]
+  }
+}
