@@ -1,5 +1,5 @@
 import { FORMAT_VERSION, RECORD_TYPE } from '../constants';
-import type { FileDigests, LocationSnapshot, SegmentRef } from '../types';
+import type { CaptureMode, EndReason, FileDigests, LocationSnapshot, SegmentRef } from '../types';
 
 export type DeviceInfo = {
   manufacturer: string | null;
@@ -21,6 +21,8 @@ export type EvidenceRecord = {
   sequence: number;
   segment: SegmentRef | null;
   previous: { id: string; recordSha256: string; fileSha256: string } | null;
+  /** True when the recording was cut off and this record was made when the app next opened. */
+  interrupted: boolean;
   file: {
     name: string;
     mediaType: string;
@@ -30,8 +32,13 @@ export type EvidenceRecord = {
     md5: string;
   };
   capture: {
+    mode: CaptureMode;
     startedAt: string;
     endedAt: string;
+    /** `recorder`: the camera reported the end. `file-modified`: the file's last write (interrupted). */
+    endedAtSource: 'recorder' | 'file-modified';
+    endReason: EndReason;
+    gapBeforeMs: number | null;
     hashedAt: string;
     timeZone: string | null;
     utcOffsetMinutes: number;
@@ -61,6 +68,10 @@ export type RecordInput = {
   startedAt: Date;
   endedAt: Date;
   hashedAt: Date;
+  mode?: CaptureMode;
+  endReason?: EndReason;
+  interrupted?: boolean;
+  gapBeforeMs?: number | null;
   timeZone: string | null;
   location: LocationSnapshot;
   device: DeviceInfo;
@@ -78,6 +89,7 @@ export function buildRecord(input: RecordInput): EvidenceRecord {
     sequence: input.sequence,
     segment: input.segment,
     previous: input.previous,
+    interrupted: !!input.interrupted,
     file: {
       name: input.fileName,
       mediaType: input.mediaType,
@@ -87,8 +99,12 @@ export function buildRecord(input: RecordInput): EvidenceRecord {
       md5: input.digests.md5,
     },
     capture: {
+      mode: input.mode ?? 'camera',
       startedAt: input.startedAt.toISOString(),
       endedAt: input.endedAt.toISOString(),
+      endedAtSource: input.interrupted ? 'file-modified' : 'recorder',
+      endReason: input.endReason ?? (input.interrupted ? 'interrupted' : 'stopped'),
+      gapBeforeMs: input.gapBeforeMs ?? null,
       hashedAt: input.hashedAt.toISOString(),
       timeZone: input.timeZone,
       utcOffsetMinutes: -input.startedAt.getTimezoneOffset(),

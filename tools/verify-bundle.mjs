@@ -10,7 +10,7 @@ import { createHash, createPublicKey, verify } from 'node:crypto';
 import { closeSync, createReadStream, existsSync, openSync, readdirSync, readFileSync, readSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const SUPPORTED_VERSIONS = ['0.1'];
+const SUPPORTED_VERSIONS = ['0.1', '0.2'];
 
 // ---- Reading a bundle from a folder or a stored (uncompressed) ZIP --------------------------
 

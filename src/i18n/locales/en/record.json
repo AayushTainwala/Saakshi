@@ -54,7 +54,15 @@
     "errorTitle": "Something went wrong",
     "chainHead": "Fingerprint of this record",
     "chainHeadHelp": "The SHA-256 of the last signed record. It covers every file above.",
-    "audioSegment": "Audio {{clip}}, part {{index}}"
+    "audioSegment": "Audio {{clip}}, part {{index}}",
+    "delete": "Delete this record",
+    "deleteTitle": "Delete this record?",
+    "deleteBody_one": "This deletes {{count}} file, its signed record and any certificate from this phone. It can't be undone. Copies you have already exported or sent are not affected.",
+    "deleteBody_other": "This deletes {{count}} files, their signed records and any certificate from this phone. It can't be undone. Copies you have already exported or sent are not affected.",
+    "deleteCancel": "Keep it",
+    "deleteConfirm": "Delete",
+    "deleteBusy": "This record is still being saved. Try again when recording has stopped.",
+    "itemInterrupted": "Cut off before it was stopped (the app closed or the phone switched off). It plays up to the cut, and was sealed when the app next opened."
   },
   "witness": {
     "send": "Send witness message",
@@ -143,5 +151,39 @@
       "text": "Say the date, time and place out loud.",
       "why": "It helps anyone who watches the recording later."
     }
+  },
+  "bodycam": {
+    "title": "Body-cam mode",
+    "open": "Body-cam mode",
+    "openHint": "Wear the phone and keep your hands free. It records video continuously, in one-minute pieces, each fingerprinted and signed as it is saved.",
+    "intro": "Wear the phone on your chest, round your neck or clipped to your clothes. It records video continuously and saves it in one-minute pieces, each fingerprinted and signed as it is saved. The screen goes dark and touch is locked while it records.",
+    "unlockTitle": "How to unlock the screen",
+    "unlockBody": "While body-cam mode records, the screen is dark and doesn't respond to touch. To unlock it, press the volume-down button twice, quickly. Practise this before you need it.",
+    "unlockAck": "I know how to unlock it",
+    "ackFirst": "First read how to unlock the screen, above.",
+    "iosWarningTitle": "Stay in Saakshi",
+    "iosWarning": "On iPhone, video records only while Saakshi is on screen. If you leave the app, or a call comes in, video stops and sound keeps recording. Video starts again when you come back.",
+    "androidNote": "Recording carries on if you turn the screen off, take a call or use other apps.",
+    "batteryTitle": "Save battery",
+    "batteryAndroid": "Turn on Battery Saver before you start: body-cam mode keeps the camera running.",
+    "batteryIos": "Turn on Low Power Mode before you start, in Control Centre or Settings > Battery: body-cam mode keeps the camera running.",
+    "batteryButton": "Open Battery Saver",
+    "quality": "Video quality",
+    "q720": "720p: saves battery and space",
+    "q1080": "1080p: sharper, larger files",
+    "start": "Start body-cam",
+    "locked": "Screen locked. Use your unlock buttons.",
+    "recordingFor": "Recording {{time}}",
+    "saving": "Saving…",
+    "pieces_one": "{{count}} piece saved",
+    "pieces_other": "{{count}} pieces saved",
+    "lock": "Lock screen",
+    "stop": "Stop and save",
+    "notificationTitle": "Saakshi is recording",
+    "notificationText": "Body-cam mode. Open Saakshi to stop."
+  },
+  "battery": {
+    "warn": "Battery {{percent}}%. At 3% the recording will be stopped and saved.",
+    "stopped": "Battery at 3%: the recording was stopped and saved, so it isn't cut off."
   }
 }

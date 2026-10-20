@@ -2,6 +2,25 @@ export type MediaKind = 'photo' | 'video' | 'audio';
 
 export type SegmentRef = { clip: number; index: number };
 
+/** What was recording: the evidence camera, body-cam mode or bug mode (spec E1, B1–B4, E8). */
+export type CaptureMode = 'camera' | 'body-cam' | 'bug';
+
+/**
+ * Why a file ended. `interrupted`: cut off (crash or forced power-off) and sealed when the app
+ * next opened. `app-left`: on iPhone, video stops when the user leaves the app. `low-battery`:
+ * the app stopped and saved the recording itself at 3% battery. `audio-interrupted`: the system
+ * stopped sound recording (for example, a phone call on iPhone).
+ */
+export type EndReason =
+  | 'stopped'
+  | 'piece-complete'
+  | 'app-left'
+  | 'camera-lost'
+  | 'low-battery'
+  | 'audio-interrupted'
+  | 'interrupted'
+  | 'error';
+
 /** A file the camera has just closed, before it is hashed or moved. */
 export type ClosedFile = {
   uri: string;
@@ -10,6 +29,14 @@ export type ClosedFile = {
   startedAt: Date;
   endedAt: Date;
   location: LocationSnapshot;
+  mode?: CaptureMode;
+  endReason?: EndReason;
+  /** True when the file was cut off and is being sealed at the next app start. */
+  interrupted?: boolean;
+  /** Milliseconds since the previous piece of the same recording ended, if there was one. */
+  gapBeforeMs?: number | null;
+  /** The crash-recovery marker for this file (locker/pending.ts), removed once the file is safe. */
+  pendingMarker?: string;
 };
 
 export type FileDigests = {
@@ -37,6 +64,8 @@ export type EvidenceItem = {
   /** The signed record's file name in records/ and its id. */
   record?: { file: string; recordId: string };
   recordSha256?: string;
+  interrupted?: boolean;
+  endReason?: EndReason;
   error?: string;
 };
 

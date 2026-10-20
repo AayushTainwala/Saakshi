@@ -8,6 +8,8 @@ import { spacing } from '@/theme';
 
 import { shareBundle } from '../export/bundle';
 import { runCheck } from '../locker/actions';
+import { deleteSession, SessionBusyError } from '../locker/delete';
+import { fileLocker } from '../locker/store';
 import { useSession } from '../locker/useSessions';
 import { sendWitnessMessage, SmsUnavailableError } from '../witness/send';
 import type { EvidenceItem, SessionState } from '../types';
@@ -57,6 +59,7 @@ function ItemCard({ item }: { item: EvidenceItem }) {
       <AppText color={item.status === 'failed' ? 'danger' : item.status === 'sealed' ? 'success' : 'textMuted'}>
         {status}
       </AppText>
+      {item.interrupted ? <AppText color="warning">{t('locker.itemInterrupted')}</AppText> : null}
       {item.digests ? (
         <AppText variant="mono" selectable accessibilityLabel={t('locker.sha256')}>
           SHA-256 {item.digests.sha256}
@@ -117,6 +120,27 @@ export function SessionDetail({ id }: { id: string }) {
     } finally {
       setWitnessing(false);
     }
+  };
+
+  const confirmDelete = () => {
+    Alert.alert(t('locker.deleteTitle'), t('locker.deleteBody', { count: session.items.length }), [
+      { text: t('locker.deleteCancel'), style: 'cancel' },
+      {
+        text: t('locker.deleteConfirm'),
+        style: 'destructive',
+        onPress: () => {
+          try {
+            deleteSession(fileLocker, id);
+            router.back();
+          } catch (error) {
+            Alert.alert(
+              t('locker.errorTitle'),
+              error instanceof SessionBusyError ? t('locker.deleteBusy') : error instanceof Error ? error.message : String(error),
+            );
+          }
+        },
+      },
+    ]);
   };
 
   const exportBundle = async () => {
@@ -188,6 +212,8 @@ export function SessionDetail({ id }: { id: string }) {
       {session.items.map((item) => (
         <ItemCard key={item.sequence} item={item} />
       ))}
+
+      <Button variant="danger" label={t('locker.delete')} onPress={confirmDelete} />
     </Screen>
   );
 }

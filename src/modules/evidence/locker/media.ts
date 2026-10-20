@@ -7,6 +7,7 @@ const MEDIA_TYPES: Record<string, string> = {
   png: 'image/png',
   mp4: 'video/mp4',
   mov: 'video/quicktime',
+  ts: 'video/mp2t',
   m4a: 'audio/mp4',
   aac: 'audio/aac',
   wav: 'audio/wav',
