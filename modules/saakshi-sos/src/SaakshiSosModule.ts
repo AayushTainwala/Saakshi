@@ -29,6 +29,12 @@ declare class SaakshiSosModule extends NativeModule<SaakshiSosEvents> {
   bugRecorderStop(): Promise<void>;
   bugRecorderRunning(): boolean;
 
+  /**
+   * iPhone: marks a folder and everything in it as excluded from iCloud device backup (or not).
+   * Resolves to how many items were marked. Android: does nothing (backup is off app-wide).
+   */
+  setExcludedFromBackup(uri: string, excluded: boolean): Promise<number>;
+
   /** iPhone: bug mode's Live Activity. Resolves false where Live Activities are off. */
   liveActivityStart(title: string, detail: string): Promise<boolean>;
   liveActivityUpdate(detail: string): Promise<void>;

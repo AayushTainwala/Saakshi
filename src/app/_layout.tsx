@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useMemo } from 'react';
 
 import { initI18n } from '@/i18n';
+import { useBackupExclusion } from '@/modules/backup';
 import { registerLiveLocationTask } from '@/modules/location';
 import { useQuickTriggers } from '@/modules/trigger';
 import { PreferencesProvider } from '@/preferences/PreferencesProvider';
@@ -26,6 +27,8 @@ function ThemedStack() {
   const { scheme, colors } = useTheme();
   // The code pad opens from the iPhone controls and Action Button, and Android's notification.
   useQuickTriggers();
+  // Nothing goes into iCloud device backup until the user chooses (spec section 2).
+  useBackupExclusion();
   const navigationTheme = useMemo(() => {
     const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
     return {

@@ -104,6 +104,9 @@ class SaakshiSosModule : Module() {
 
     Function("bugRecorderRunning") { BugModeService.running }
 
+    // iPhone only. Android's backup is off for the whole app (android:allowBackup="false").
+    AsyncFunction("setExcludedFromBackup") { _: String, _: Boolean -> 0 }
+
     // iPhone only: the widget and the notification here open saakshi://codepad directly.
     Function("consumeCodePadRequest") { false }
 

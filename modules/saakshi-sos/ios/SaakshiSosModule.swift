@@ -51,6 +51,14 @@ public class SaakshiSosModule: Module {
     Function("quickNotificationHide") { () in }
     Function("quickNotificationEnabled") { () -> Bool in false }
 
+    // Keeps the app's files out of iCloud device backup until the user chooses otherwise.
+    AsyncFunction("setExcludedFromBackup") { (uri: URL, excluded: Bool) throws -> Int in
+      guard uri.isFileURL else {
+        throw Exception(name: "ERR_FILE_URI", description: "Not a local file URI: \(uri)")
+      }
+      return try BackupExclusion.apply(to: uri, excluded: excluded)
+    }
+
     // Android only: bug mode's recorder. iPhone records through expo-audio (Stream A's AudioPieces).
     Function("bugRecorderRunning") { () -> Bool in false }
 
