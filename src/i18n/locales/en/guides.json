@@ -1,4 +1,10 @@
 {
   "title": "Guides",
-  "intro": "How to prepare, stay safe and protect your rights."
+  "intro": "How to prepare, stay safe and protect your rights.",
+  "notFound": "This guide wasn't found.",
+  "untested": "Not yet tested by the Saakshi team. Try it at home before you rely on it.",
+  "step": "{{number}}.",
+  "licence": "Licence: {{licence}}",
+  "licenceLink": "Licence (CC BY 4.0)",
+  "openLinkHint": "Opens the page in your browser"
 }
