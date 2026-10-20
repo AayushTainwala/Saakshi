@@ -104,7 +104,7 @@
     "intro": "Bug mode records sound, for your own records, until you stop it or the battery runs out. It carries on with the screen locked. The sound is saved in pieces of 2 minutes, and each piece is fingerprinted and signed as it is saved.",
     "iosNote": "While it records, iPhone shows a dot at the top of the screen and a Live Activity on the Lock Screen.",
     "androidNote": "While it records, Android shows a notification.",
-    "witnessOn": "After each piece, its fingerprint is texted to your trusted contacts, at most 20 texts in 30 minutes.",
+    "witnessOn": "After a piece is saved, its fingerprint is texted to your trusted contacts, at most once every 10 minutes. Each fingerprint also vouches for every piece before it.",
     "witnessOff": "On this phone the fingerprints are not texted by themselves. You can send a witness message from the Record tab.",
     "localNote": "The pieces stay on this phone, in the Record tab.",
     "start": "Start bug mode",

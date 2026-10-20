@@ -39,6 +39,7 @@ function fakeSession() {
 
 function setup(options: { contacts?: number } = {}) {
   const fake = fakeSession();
+  let clock = Date.parse('2026-10-20T09:00:00Z');
   const stopEngine = jest.fn(async () => undefined);
   const uploads: number[] = [];
   const deps: BugDeps = {
@@ -48,20 +49,23 @@ function setup(options: { contacts?: number } = {}) {
     witnessText: (item, pieces) => `piece ${pieces}: ${item.recordSha256}`,
     liveActivity: { start: jest.fn(async () => undefined), update: jest.fn(async () => undefined), end: jest.fn(async () => undefined) },
     uploader: () => async ({ item }) => void uploads.push(item.sequence),
-    now: () => new Date('2026-10-20T09:00:00Z'),
+    now: () => new Date(clock),
   };
-  return { bug: new BugModeController(deps), deps, fake, stopEngine, uploads };
+  const advance = (minutes: number) => void (clock += minutes * 60_000);
+  return { bug: new BugModeController(deps), deps, fake, stopEngine, uploads, advance };
 }
 
 describe('BugModeController', () => {
   it('witnesses, uploads and counts each piece as it is sealed', async () => {
-    const { bug, deps, fake, uploads } = setup();
+    const { bug, deps, fake, uploads, advance } = setup();
     await bug.start();
     expect(bug.getState()).toMatchObject({ running: true, sessionId: 'session-1', sealed: 0 });
     expect(deps.liveActivity.start).toHaveBeenCalled();
 
     fake.seal(0, 'hashed');
     fake.seal(0);
+    await bug.settled();
+    advance(10);
     fake.seal(1);
     await bug.settled();
 
@@ -81,14 +85,33 @@ describe('BugModeController', () => {
     expect(deps.witness).not.toHaveBeenCalled();
   });
 
-  it('skips witness texts once the budget is spent', async () => {
-    const { bug, deps, fake } = setup({ contacts: 10 });
+  it('texts a witness at most once every 10 minutes', async () => {
+    const { bug, deps, fake, advance } = setup();
     await bug.start();
-    for (let i = 0; i < 4; i++) fake.seal(i);
+    // Five 2-minute pieces: only the first is texted; the next chain head will cover them all.
+    for (let i = 0; i < 5; i++) {
+      fake.seal(i);
+      await bug.settled();
+      advance(2);
+    }
+    expect(deps.witness).toHaveBeenCalledTimes(1);
+    fake.seal(5);
     await bug.settled();
-    // 10 contacts: two pieces fit in 20 texts per 30 minutes.
     expect(deps.witness).toHaveBeenCalledTimes(2);
-    expect(bug.getState().sealed).toBe(4);
+    expect(deps.witness).toHaveBeenLastCalledWith('piece 6: hash-5');
+    expect(bug.getState().sealed).toBe(6);
+  });
+
+  it('also keeps to 20 texts in 30 minutes', async () => {
+    const { bug, deps, fake, advance } = setup({ contacts: 10 });
+    await bug.start();
+    for (let i = 0; i < 3; i++) {
+      fake.seal(i);
+      await bug.settled();
+      advance(10);
+    }
+    // 10 contacts: two messages fit in 20 texts per 30 minutes.
+    expect(deps.witness).toHaveBeenCalledTimes(2);
   });
 
   it('does not witness where the phone cannot text with no tap', async () => {
@@ -124,13 +147,21 @@ describe('BugModeController', () => {
 });
 
 describe('WitnessThrottle', () => {
+  const minute = 60_000;
+
+  it('allows one message every 10 minutes', () => {
+    const throttle = new WitnessThrottle();
+    expect(throttle.allow(2, 0)).toBe(true);
+    expect(throttle.allow(2, 9 * minute)).toBe(false);
+    expect(throttle.allow(2, 10 * minute)).toBe(true);
+  });
+
   it('allows 20 texts in any 30 minutes', () => {
     const throttle = new WitnessThrottle();
-    const minute = 60_000;
     expect(throttle.allow(10, 0)).toBe(true);
-    expect(throttle.allow(10, 5 * minute)).toBe(true);
-    expect(throttle.allow(1, 10 * minute)).toBe(false);
+    expect(throttle.allow(10, 10 * minute)).toBe(true);
+    expect(throttle.allow(1, 20 * minute)).toBe(false);
     expect(throttle.allow(10, 30 * minute)).toBe(true);
-    expect(throttle.allow(0, 31 * minute)).toBe(false);
+    expect(throttle.allow(0, 41 * minute)).toBe(false);
   });
 });
