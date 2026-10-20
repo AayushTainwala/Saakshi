@@ -38,6 +38,13 @@ export type AlertDeps = {
 
 type Plan = { recipients: TrustedContact[]; message: string; located: boolean };
 
+export type StartOptions = {
+  /** Skip the countdown: the code pad (S4) is already a deliberate act. */
+  immediate?: boolean;
+  /** A live-location link (S3) to include. */
+  liveLink?: string;
+};
+
 /**
  * Runs one SOS alert (spec S1, S2): finds the position, writes the text, and sends it to every
  * trusted contact. Where the build and the user allow it (the Android APK with SEND_SMS granted),
@@ -70,19 +77,19 @@ export class AlertController {
   }
 
   /** Starts an alert. Ignored while one is already under way. */
-  async start(): Promise<void> {
+  async start(options: StartOptions = {}): Promise<void> {
     if (this.busy) return;
     const run = ++this.run;
     const recipients = [...this.deps.contacts()];
     if (recipients.length === 0) return this.set({ phase: 'failed', error: 'no-contacts' });
 
     // Locating starts at once, during the countdown, so no time is lost.
-    this.plan = this.makePlan(recipients);
+    this.plan = this.makePlan(recipients, options.liveLink);
     const direct = await this.deps.channels.direct.allowed().catch(() => false);
     if (run !== this.run) return;
 
     if (direct) {
-      const seconds = this.deps.countdownSeconds ?? 3;
+      const seconds = options.immediate ? 0 : (this.deps.countdownSeconds ?? 3);
       if (seconds > 0) {
         this.set({ phase: 'countdown', secondsLeft: seconds });
         this.timer = setInterval(() => {
@@ -130,11 +137,11 @@ export class AlertController {
     this.set({ phase: 'idle' });
   }
 
-  private async makePlan(recipients: TrustedContact[]): Promise<Plan> {
+  private async makePlan(recipients: TrustedContact[], liveLink?: string): Promise<Plan> {
     const where = await this.deps.locate();
     return {
       recipients,
-      message: alertMessage(where, this.deps.now(), this.deps.labels()),
+      message: alertMessage(where, this.deps.now(), this.deps.labels(), liveLink),
       located: where.status === 'fixed',
     };
   }

@@ -5,6 +5,7 @@ const labels = {
   location: 'My location',
   noLocation: 'My location: not available',
   sent: 'Sent',
+  live: 'Live location',
 };
 
 // 20 Oct 2026, 14:32 IST.
@@ -45,5 +46,17 @@ describe('alertMessage', () => {
     expect(alertMessage({ status: 'denied', fix: null }, sentAt, labels)).toBe(
       ['Saakshi alert: I may need help.', 'My location: not available', 'Sent: 20/10/2026 14:32 IST'].join('\n'),
     );
+  });
+});
+
+describe('alertMessage with live location', () => {
+  it('adds the live link before the time sent', () => {
+    const text = alertMessage({ status: 'denied', fix: null }, sentAt, labels, 'https://example.org/live/#tok');
+    expect(text.split('\n')).toEqual([
+      'Saakshi alert: I may need help.',
+      'My location: not available',
+      'Live location: https://example.org/live/#tok',
+      'Sent: 20/10/2026 14:32 IST',
+    ]);
   });
 });

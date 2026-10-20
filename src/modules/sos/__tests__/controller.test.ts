@@ -34,7 +34,7 @@ function setup(options: { direct?: boolean; contacts?: TrustedContact[]; where?:
     locate: jest.fn(async () => options.where ?? fixed),
     now: () => new Date('2026-10-20T09:02:00Z'),
     channels,
-    labels: () => ({ title: 'Alert', location: 'Location', noLocation: 'No location', sent: 'Sent' }),
+    labels: () => ({ title: 'Alert', location: 'Location', noLocation: 'No location', sent: 'Sent', live: 'Live location' }),
   };
   return { controller: new AlertController(deps), channels, deps };
 }
@@ -164,6 +164,6 @@ function setupDeps(channels: SmsChannels): AlertDeps {
     locate: async () => fixed,
     now: () => new Date('2026-10-20T09:02:00Z'),
     channels,
-    labels: () => ({ title: 'Alert', location: 'Location', noLocation: 'No location', sent: 'Sent' }),
+    labels: () => ({ title: 'Alert', location: 'Location', noLocation: 'No location', sent: 'Sent', live: 'Live location' }),
   };
 }
