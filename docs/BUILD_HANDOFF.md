@@ -91,7 +91,7 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
 - `tools/verify-bundle.mjs` does not check attestation chains (spec section 10, step 6). That is the next piece of tooling to write.
 
 **NEEDS OWNER REVIEW:**
-- **Certificate Part A text** (`src/modules/evidence/certificate/html.ts`): check every line against the Gazette of India text of the Schedule. It follows law.md section 1B, which was read from the Gazette of Puducherry reproduction, and item 3 was joined from fragments. The PDF prints "DRAFT: the text of this form has not yet been checked against the Gazette of India" until `FORM_TEXT_REVIEWED` is set to `true`.
+- **Certificate Part A text** (`src/modules/evidence/certificate/html.ts`): checked against the Gazette of India on 21.10.2026 (law.md section 1B). The wording matched, item 3 included; the layout now follows the Gazette too (unnumbered paragraphs, "Make & Model", "Son/daughter/spouse", em dashes). The owner's sign-off is what remains: until `FORM_TEXT_REVIEWED` is `true`, the PDF prints "DRAFT: the text of this form has not yet had its final legal review".
 - **Rights prompts** (`src/i18n/locales/{en,hi}/record.json` under `rights`, sources in `src/modules/evidence/rights/prompts.ts`): wording in English and Hindi. Sources: Art. 22(1); BNSS ss.36(a), 38, 47(1)–(2), 48; *Mihir Rajesh Shah* para 56; BNS ss.221, 262. All are rows marked VERIFIED (IK) in law.md, none checked against the Gazette yet.
 - **Certificate screen help text** (`certificate.*` in `record.json`), in both languages.
 
@@ -211,11 +211,11 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
   - a review of High Court rulings on BSA s.63 on Indian Kanoon (`docs/research/hc-s63-review.md`; not exhaustive): none decides who may sign Part B, and they are split on late certificates;
   - NALSA's 15100 confirmed from NALSA's own pages.
 
-  Still owed, because those sites can't be reached from here: the Schedule against the Gazette, the commencement and DPDP notifications, and the D.K. Basu and Arnesh paragraph numbers.
+  The checks that couldn't be reached from here (the Schedule against the Gazette, the commencement and DPDP notifications, the D.K. Basu and Arnesh paragraphs) were done by the review session on 21.10.2026 from the owner's browser; see law.md, "Results of the checks, 21 October 2026". The two judgments' official copies are unnumbered, so their SCC paragraph numbers still need SCC.
 - 126 tests pass (33 new); typecheck and lint pass.
 
 **Not verified:**
-- **Official pages:** only NALSA's could be opened (15100 is `page-read`). 112, 108 and 102 still rest on search-engine extracts of official pages (`"how": "search-extract"`). The G5 phone steps and the EFF adaptation rest on search summaries and general knowledge, not on reading Apple's, Google's or EFF's pages: `ssd.eff.org`, `support.apple.com` and `support.google.com` are not reachable from here.
+- **Official pages:** only NALSA's could be opened (15100 is `page-read`). 112, 108 and 102 still rest on search-engine extracts of official pages (`"how": "search-extract"`); on 21.10.2026 `112.gov.in` failed to load even from the owner's browser in India, and only an old (2019) Lok Sabha answer and a state NHM page were found (law.md, third pass, row 5). The G5 phone steps and the EFF adaptation rest on search summaries and general knowledge, not on reading Apple's, Google's or EFF's pages: `ssd.eff.org`, `support.apple.com` and `support.google.com` are not reachable from here.
 - Nothing has run on a phone. The `tel:` links, the fetch and the guide screens need checking on both platforms.
 - The Printables model's licence (CC BY-ND) and the Thingiverse clamp's (CC BY-NC) come from mirror sites, as in the research doc.
 

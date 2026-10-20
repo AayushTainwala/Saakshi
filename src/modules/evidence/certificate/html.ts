@@ -6,10 +6,11 @@ import { formatIST } from '../ui/format';
 /**
  * Part A of the certificate in the Schedule to the Bharatiya Sakshya Adhiniyam, 2023 (s.63(4)(c)).
  *
- * The wording follows the field list in docs/research/law.md, section 1B, which was read from the
- * Gazette of Puducherry reproduction (Extraordinary Part II No. 40, 9 May 2025), not the Gazette of
- * India. NEEDS OWNER REVIEW: check every line against the central Gazette text, then set
- * FORM_TEXT_REVIEWED to true so the draft notice is no longer printed.
+ * The wording and layout follow the Gazette of India text of the Schedule (Extraordinary, Part II,
+ * Section 1, No. 55, 25 December 2023, pp.46-47), transcribed in docs/research/law.md, section 1B.
+ * Part A's paragraphs are unnumbered there, so they are unnumbered here. The only additions are
+ * the tick boxes and the table that fills the hash blank. NEEDS OWNER REVIEW: once the owner signs
+ * off the text, set FORM_TEXT_REVIEWED to true so the draft notice is no longer printed.
  */
 export const FORM_TEXT_REVIEWED = false;
 
@@ -61,9 +62,14 @@ const box = (ticked: boolean) => (ticked ? '&#9746;' : '&#9744;');
 const blank = (value: string, width = 14) =>
   value.trim() ? `<u>&nbsp;${escapeHtml(value.trim())}&nbsp;</u>` : `<span class="blank">${'&nbsp;'.repeat(width)}</span>`;
 
-/** "son/daughter/spouse of": the chosen word stays, the others are struck through. */
-function choose<T extends string>(options: readonly T[], chosen: T): string {
-  return options.map((o) => (o === chosen ? `<b>${o}</b>` : `<s>${o}</s>`)).join('/');
+/** "Son/daughter/spouse of": the chosen word stays, the others are struck through. */
+function choose<T extends string>(options: readonly T[], chosen: T, labels?: Partial<Record<T, string>>): string {
+  return options
+    .map((o) => {
+      const label = labels?.[o] ?? o;
+      return o === chosen ? `<b>${label}</b>` : `<s>${label}</s>`;
+    })
+    .join('/');
 }
 
 export function makeAndModel(record: EvidenceRecord): string {
@@ -98,7 +104,7 @@ export function certificateHtml(input: CertificateInput): string {
 
   const draft = FORM_TEXT_REVIEWED
     ? ''
-    : '<p class="draft">DRAFT: the text of this form has not yet been checked against the Gazette of India.</p>';
+    : '<p class="draft">DRAFT: the text of this form has not yet had its final legal review.</p>';
 
   const reportRows = records
     .map(({ record, mediaFile, recordFile, recordSha256 }) => {
@@ -119,8 +125,7 @@ export function certificateHtml(input: CertificateInput): string {
   h1 { font-size: 15pt; text-align: center; margin: 0; }
   h2 { font-size: 12.5pt; text-align: center; margin: 4pt 0 10pt; }
   .sub { text-align: center; margin: 0 0 6pt; }
-  ol { padding-left: 18pt; }
-  li { margin-bottom: 8pt; }
+  .parta p { margin: 0 0 8pt; }
   .blank { border-bottom: 1px dotted #000; }
   .mono { font-family: "Courier New", Courier, monospace; font-size: 8.5pt; word-break: break-all; }
   table { border-collapse: collapse; width: 100%; margin: 4pt 0; }
@@ -136,24 +141,28 @@ ${draft}
 <h1>CERTIFICATE</h1>
 <p class="sub">[See section 63(4)(c)]</p>
 <h2>PART A<br/>(To be filled by the Party)</h2>
-<ol>
-  <li>I, ${blank(d.name, 30)} (Name), ${choose(['son', 'daughter', 'spouse'] as const, d.relation)} of ${blank(d.relativeName, 30)}
-    ${choose(['residing', 'employed'] as const, d.connection)} at ${blank(d.address, 40)} do hereby solemnly affirm and sincerely state and submit as follows:&ndash;</li>
-  <li>I have produced electronic record/output of the digital record taken from the following device/digital record source (tick mark):&ndash;<br/>
-    ${SOURCES.map((s) => `${box(s === 'Mobile')} ${s}`).join('&nbsp;&nbsp; ')}&nbsp;&nbsp; ${box(false)} Other: ${blank('', 14)}<br/>
-    Make and Model: ${blank(makeAndModel(first))}&nbsp;&nbsp; Color: ${blank(d.color)}<br/>
+<div class="parta">
+  <p>I, ${blank(d.name, 30)} (Name), ${choose(['son', 'daughter', 'spouse'] as const, d.relation, { son: 'Son' })} of ${blank(d.relativeName, 30)}
+    ${choose(['residing', 'employed'] as const, d.connection)} at ${blank(d.address, 40)} do hereby solemnly affirm and sincerely state and submit as follows:&mdash;</p>
+  <p>I have produced electronic record/output of the digital record taken from the following device/digital record source (tick mark):&mdash;<br/>
+    ${SOURCES.map((s) => `${box(s === 'Mobile')} ${s}`).join('&nbsp;&nbsp; ')}&nbsp;&nbsp; ${box(false)} Other<br/>
+    Other: ${blank('', 14)}<br/>
+    Make &amp; Model: ${blank(makeAndModel(first))}&nbsp;&nbsp; Color: ${blank(d.color)}<br/>
     Serial Number: ${blank(d.serialNumber)}<br/>
-    IMEI/UIN/UID/MAC/Cloud ID ${blank(d.imei, 24)} (as applicable)<br/>
-    and any other relevant information, if any, about the device/digital record ${blank(d.otherInfo, 30)} (specify).</li>
-  <li>The digital device or the digital record source was under the lawful control for regularly creating, storing or processing information for the purposes of carrying out regular activities and during this period, the computer or the communication device was working properly and the relevant information was regularly fed into the computer during the ordinary course of business. If the computer/digital device at any point of time was not working properly or out of operation, then it has not affected the electronic/digital record or its accuracy.</li>
-  <li>The digital device or the source of the digital record is:&ndash;<br/>
-    ${OWNERSHIP.map((o) => `${box(d.ownership.includes(o))} ${OWNERSHIP_LABEL[o]}`).join(' / ')} by me (select as applicable).</li>
-  <li>I state that the HASH value/s of the electronic/digital record/s is:
+    IMEI/UIN/UID/MAC/Cloud ID${blank(d.imei, 24)} (as applicable)<br/>
+    and any other relevant information, if any, about the device/digital record${blank(d.otherInfo, 30)}(specify).</p>
+  <p>The digital device or the digital record source was under the lawful control for regularly creating, storing or processing information for the purposes of carrying out regular activities and during this period, the computer or the communication device was working properly and the relevant information was regularly fed into the computer during the ordinary course of business. If the computer/digital device at any point of time was not working properly or out of operation, then it has not affected the electronic/digital record or its accuracy. The digital device or the source of the digital record is:&mdash;<br/>
+    ${OWNERSHIP.map((o) => `${box(d.ownership.includes(o))} ${OWNERSHIP_LABEL[o]}`).join('&nbsp;&nbsp; ')}<br/>
+    by me (select as applicable).</p>
+  <p>I state that the HASH value/s of the electronic/digital record/s is
     <table><tr><th>Electronic record</th><th>Hash value</th></tr>${hashes}</table>
-    obtained through the following algorithm:&ndash;<br/>
-    ${box(false)} SHA1: &nbsp; ${box(true)} SHA256: &nbsp; ${box(false)} MD5: &nbsp; ${box(false)} Other ${blank('', 10)} (Legally acceptable standard)<br/>
-    (Hash report to be enclosed with the certificate)</li>
-</ol>
+    obtained through the following algorithm:&mdash;<br/>
+    ${box(false)} SHA1:<br/>
+    ${box(true)} SHA256:<br/>
+    ${box(false)} MD5:<br/>
+    ${box(false)} Other${blank('', 10)} (Legally acceptable standard)<br/>
+    (Hash report to be enclosed with the certificate)</p>
+</div>
 <table class="sign">
   <tr><td>(Name and signature)</td><td>${blank('', 40)}</td></tr>
   <tr><td>Date (DD/MM/YYYY):</td><td>${blank('', 20)}</td></tr>
