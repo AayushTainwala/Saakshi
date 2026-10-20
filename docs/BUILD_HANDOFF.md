@@ -34,13 +34,20 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [x] (Stream B) **Phone backups.** Android backs up an app's files to the user's Google account unless the app turns this off (`android.allowBackup`), and iCloud backs up the documents directory. That would copy trusted contacts (and evidence) off the phone. Turn Android backup off for the whole app, keep it, or exclude only some files? This touches Stream A's evidence too. *Answered 20 Oct:* the user chooses whether anything is backed up and where: local only, or a cloud service of their own (Google Drive, iCloud or another). Nothing ever comes to us. So the app starts local-only, with the phone's automatic backups off for its files, and copies only where the user chooses. SPEC section 2. Work for Streams A and B: see Stream D, "For other streams".
 - [x] (Stream B, for Stream D) **Extra Android permissions.** `npx expo config --type introspect` shows the Expo defaults `SYSTEM_ALERT_WINDOW`, `READ_EXTERNAL_STORAGE` and `WRITE_EXTERNAL_STORAGE` in the manifest. No feature needs them; consider blocking them in `app.json` (`android.blockedPermissions`) so the Play listing and App Review notes stay short. *Done by Stream D:* `app.config.ts` blocks all three in every Android build.
 - [x] (Stream B) **Supabase region for live location (S3).** *Answered 20 Oct:* Mumbai (`ap-south-1`). Project `saakshi-live` created there.
-- [ ] (Stream B) **Supabase plan for live location.** `saakshi-live` is in the "AT's Desk" organisation. Supabase pauses inactive projects on its free plan, which would break live links without warning. Keep it on the free plan (and check the pause rules), or move it to a paid plan?
-- [ ] (Stream B, for Stream D) **Apple Team ID.** The widget extension needs `ios.appleTeamId` in `app.json` (Apple Developer → Membership). Without it, signed iOS builds may fail.
+- [x] (Stream B) **Supabase plan for live location.** `saakshi-live` is in the "AT's Desk" organisation. Supabase pauses inactive projects on its free plan, which would break live links without warning. *Answered (owner's review of R2):* free while testing; the plan must be reviewed before R2 goes public. On the release checklist below.
+- [x] (Stream B, for Stream D) **Apple Team ID.** The widget extension needs `ios.appleTeamId` in `app.json`. *Answered (owner's review of R2):* `5NYAUT5C56` (not secret); set in `app.json`.
 - [ ] (Stream C) **Helpline list updates.** The Help tab fetches `helplines/helplines.json` from raw.githubusercontent.com each time it opens (a plain GET; nothing of the user's is sent, but GitHub sees the phone's IP address). Keep it automatic, or only on a "Check for updates" tap? And should the list be signed, so that a compromised `main` branch can't change numbers on every phone? Today it is only schema-checked.
 - [ ] (Stream C) **Lawyers and medics list.** The schema (`src/modules/helplines/schema.ts`, `helplines/README.md`) shows name, phone, city, state and languages, and records the registration number, consent date and an expiry (`listedUntil`) in the public file. Is publishing the registration number right, or should it be checked and kept off GitHub? Who collects the written consent, and where is it kept?
 - [ ] (Stream C) **"What police may ask of a phone"** (SPEC G5) is left out of the guide: `docs/research/law.md` has nothing on demands to unlock a phone or give a passcode. It needs its own research from statutes and judgments first. Shall I do that next?
 - [ ] (Stream C) **SPEC section 6, BNS s.37.** Read verbatim on 20 Oct (`docs/research/law.md`, section 2F). The SPEC says "Explanations 1 and 2 keep the right where the person is not known to be a public servant, or does not state or produce their authority when asked". In the text, the stating or producing of authority is only in Explanation 2. That Explanation covers someone acting *by the direction of* a public servant. Explanation 1, for the public servant themself, turns only on whether the person knows or has reason to believe they are one. Shall I correct the SPEC line? It affects the v1.1 unlawful-detention card.
 - [ ] (Stream C) **Carrying ID.** Should the "what to take" list tell people to carry a photo ID? It is left out because it has legal weight.
+
+## Release checklist
+
+Things that must be done or decided before a release goes public. Streams add items as `- [ ] (Stream X, release) item`.
+
+- [ ] (Stream B, R2) **Supabase plan for live location.** `saakshi-live` stays on the free plan while testing (owner's answer). Before R2 goes public, review the plan: free-plan projects can be paused when inactive, which would break every live link without warning.
+- [ ] (Stream B, R2, for Stream D) **Privacy texts for live location.** Update the privacy policy, the Apple privacy label and Play's Data safety answers before an R2 build is published (facts in Stream B, "For Stream D").
 
 ---
 
@@ -206,7 +213,7 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
 
 **Status:**
 - **R1 (S1, S2):** merged (https://github.com/AayushTainwala/Saakshi/pull/6). Not yet run on a phone.
-- **R2 (S3, S4, E8, confiscation mode):** built and tested in code on `claude/stream-b-r2-efgu96`, pull request open. It includes Stream A's https://github.com/AayushTainwala/Saakshi/pull/4 (merged in, because bug mode reuses its sound-piece pipeline), so **merge #4 first**; the R2 diff then shrinks to Stream B's own changes. Not yet run on a phone.
+- **R2 (S3, S4, E8, confiscation mode):** built and tested in code on `claude/stream-b-r2-efgu96`: https://github.com/AayushTainwala/Saakshi/pull/8. Stream A's #4 is now in `main` and merged into the branch. The owner's review of #8 is addressed (witness texts every 10 minutes at most, Apple Team ID, iCloud backup exclusion, Supabase plan on the release checklist). Not yet run on a phone.
 
 **Done, R1** (details in #6): trusted contacts kept only on the phone (picker with no contacts permission, or typed in); SOS text with map link, accuracy and times, by the Messages composer, or in the Android APK by itself after a 3-second countdown (`SAAKSHI_SMS_AUTOSEND=1` at prebuild declares SEND_SMS; every other build removes it); 112 always at the top; `getTrustedContacts()` for Stream A.
 
@@ -229,7 +236,10 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
   - Pieces are 2 minutes long, recorded until stopped or the battery runs out, with the screen locked. Each is sealed through Stream A's pipeline with `capture.mode: "bug"` (spec 0.2).
   - **Android:** the app's own recorder in a microphone foreground service (`BugModeService`). It writes cut-off-safe AAC (`.aac`, ADTS), so a piece cut off by a dead battery plays up to the cut. It uses Stream A's crash-recovery markers, so a piece the app didn't seal (killed, phone off) is sealed when the app next opens.
   - **iPhone:** Stream A's `AudioPieces` (expo-audio background recording, two overlapping recorders, no silence between pieces), now taking a capture mode. There is also a Live Activity (Lock Screen and Dynamic Island) with a timer and the number of pieces saved.
-  - **Witness texts:** after each sealed piece, its chain head is texted to trusted contacts where the phone can send with no tap (the APK with SEND_SMS allowed). At most 20 texts are sent in 30 minutes, leaving room for an SOS under Android's 30-text limit. A skipped piece is still covered by the next chain head.
+  - **Witness texts:** after a sealed piece, its chain head is texted to trusted contacts where the phone can send with no tap (the APK with SEND_SMS allowed).
+    - At most one witness message every 10 minutes (SPEC E8, owner's review), so bug mode can't use up the SMS the user may need for an SOS. With 2-minute pieces that is every fifth piece; a skipped piece is still covered by the next chain head.
+    - Also at most 20 texts in any 30 minutes, under Android's 30-text limit. With more than 6 contacts this cap is the tighter one.
+    - Many Indian prepaid plans cap SMS at about 100 a day. With 10 contacts, bug mode can still send up to 40 texts an hour, so a long recording could reach a daily cap. A daily budget would need the owner's decision.
   - **E7 hook:** `setPieceUploader()` from `@/modules/bugmode`. Each sealed piece is handed to it as soon as it is saved; until Stream A sets it, pieces stay on the phone.
 - **Confiscation mode** (SOS tab): one button, then Start in the confirmation (2 taps). It starts bug mode and live location (8 hours), then sends the SOS alert at once with the live link in it.
   - Each part starts even if another fails.
@@ -253,15 +263,19 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
   - Supabase's request logs probably record the phone's IP address for their own retention period. I have not checked that period.
   - Nothing else goes to us.
 - **iOS:**
-  - `ios.appleTeamId` must be set in `app.json`.
+  - `ios.appleTeamId` is set (`5NYAUT5C56`).
   - EAS needs signing for a second target: the widget extension `in.aayushtainwala.saakshi.widgets`.
   - Prebuild adds `UIBackgroundModes` `fetch` (from a library plugin); no feature uses it.
 - **Play:** declare the foreground-service types `microphone` (bug mode, and body-cam) and `location` (live location) in the Play Console.
 
-**Backups (owner's decision of 20 Oct):** `android.allowBackup` is now `false` in `app.json`, for the whole app (Stream A's files too), so Android Auto Backup copies nothing. **Not done yet:** excluding the app's files from iCloud backup. That needs a small native call shared by Streams A and B (`isExcludedFromBackup` on the documents directory, or on each file). It is the next Stream B item unless Stream A takes it with the evidence locker.
+**Backups (owner's decision of 20 Oct):**
+- **Android:** `android.allowBackup` is `false` in `app.json`, for the whole app (Stream A's files too), so Auto Backup copies nothing.
+- **iPhone:** new module `@/modules/backup`. `useBackupExclusion()` in the root layout marks the app's Documents folder and everything in it as excluded from iCloud device backup (`isExcludedFromBackup`, native in `modules/saakshi-sos/ios/BackupExclusion.swift`). It runs at launch and each time the app goes to the background. Everything the app keeps (evidence, contacts, settings, live-share state) is under Documents; caches and temporary files are never backed up.
+- When the user can choose iCloud as a destination (a later feature), call `setExcludedFromBackup(uri, false)` from `modules/saakshi-sos`.
+- **Not verified on a phone:** whether marking the folder alone also covers files created in it later (bug-mode pieces written while locked). Until the next background or launch marks them, they rely on the folder's mark.
 
 **Verified:**
-- All tests pass on the merged tree (R2 added 48: live-share client and API calls, code rules and the pad, trigger settings, confiscation orchestration, the bug-mode controller and witness budget, texts to contacts, the alert's live link and immediate start). Typecheck and lint pass.
+- All tests pass on the merged tree (R2 added 52: live-share client and API calls, code rules and the pad, trigger settings, confiscation orchestration, the bug-mode controller and witness rationing, iCloud backup exclusion, texts to contacts, the alert's live link and immediate start). Typecheck and lint pass.
 - The Supabase functions, checked as `anon` (above).
 - `npx expo prebuild --platform ios` generates the `SaakshiWidgets` target, with the intent in both targets. `npx expo config --type introspect` shows Live Activities, the `audio` and `location` background modes, and the Android location and microphone foreground-service permissions.
 
@@ -295,7 +309,7 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
   - iPhone pieces are `.m4a`, which spec 0.2 already says is not cut-off safe.
   - Android records 64 kbit/s mono, about 29 MB an hour.
 - **Live location, server:** the server has no accounts, so anyone with the public key can create shares. Abuse is bounded by the 24-hour limit, 300 positions a share and 20,000 active shares, but there is no per-device rate limit.
-- **Live location, Supabase plan:** Supabase pauses inactive free-plan projects. I don't know the current terms for this organisation's plan; see owner questions.
+- **Live location, Supabase plan:** Supabase pauses inactive free-plan projects. The project stays on the free plan while testing; reviewing it is on the release checklist.
 - **Live location, how often:** positions every 30 s or 20 m, whichever comes later per the platform's rules.
 - **Supabase MCP:** applying a migration through the MCP timed out whenever a function body held an `INSERT … SELECT` or a `DELETE … NOT IN (SELECT …)`. The same logic was applied as two small helper functions, `live.add_positions` and `live.keep_latest`; the repository migration matches what is applied.
 
