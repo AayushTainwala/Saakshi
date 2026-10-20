@@ -13,6 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppText, Button, Card, OptionGroup, Screen } from '@/components';
 import { palettes, spacing } from '@/theme';
 
+import type { BatteryAction } from '../battery/monitor';
+import { useLowBattery } from '../battery/useLowBattery';
 import { createEvidenceSession } from '../capture/deps';
 import { useLatestLocation } from '../capture/useLocation';
 import { fileLocker } from '../locker/store';
@@ -138,6 +140,17 @@ export function BodyCamScreen() {
     [session, unlock],
   );
 
+  // Spec E1: warn at 10% and 5%; at 3%, stop and save so a dying battery never cuts a piece off.
+  const [batteryNote, setBatteryNote] = useState<string | null>(null);
+  const onBattery = useCallback(
+    (action: BatteryAction) => {
+      if (action.type === 'warn') setBatteryNote(t('battery.warn', { percent: action.percent }));
+      else void stop('low-battery');
+    },
+    [stop, t],
+  );
+  useLowBattery(phase === 'running', onBattery);
+
   // While recording, the back button never leaves the screen: unlock with the volume buttons,
   // then use Stop.
   useEffect(() => {
@@ -260,6 +273,11 @@ export function BodyCamScreen() {
               {t('bodycam.locked')}
             </AppText>
           ) : null}
+          {batteryNote ? (
+            <AppText variant="label" style={[styles.lockText, { color: dark.warning }]}>
+              {batteryNote}
+            </AppText>
+          ) : null}
         </Pressable>
       ) : (
         <SafeAreaView style={styles.controls}>
@@ -267,6 +285,7 @@ export function BodyCamScreen() {
             {phase === 'stopping' ? t('bodycam.saving') : t('bodycam.recordingFor', { time: formatElapsed(now - startedAt) })}
           </AppText>
           <AppText style={{ color: dark.textMuted }}>{t('bodycam.pieces', { count: pieces })}</AppText>
+          {batteryNote ? <AppText style={{ color: dark.warning }}>{batteryNote}</AppText> : null}
           {Platform.OS === 'ios' ? <AppText style={{ color: dark.warning }}>{t('bodycam.iosWarning')}</AppText> : null}
           <Button label={t('bodycam.lock')} disabled={phase !== 'running'} onPress={lock} />
           <Button variant="danger" label={t('bodycam.stop')} busy={phase === 'stopping'} disabled={phase !== 'running'} onPress={() => void stop()} />

@@ -34,7 +34,7 @@ A free, open-source phone app that helps people in India protect themselves and 
 - the record is signed with a key held in the phone's security chip, with key attestation showing it came from the genuine app on an untampered phone;
 - a video runs from start to stop as **one file**, straight from the camera, with one fingerprint and one signed record. That one file is what is identified, fingerprinted, played, shared and certified. Each record also carries the previous record's hash, so a session's files are chained and nothing can be added or removed unnoticed;
 - the recording format is chosen so that a video cut off suddenly (the phone forced off, the app crashing) stays playable up to the moment it stopped. Such a file is fingerprinted and signed when the app next opens, and its record says the recording was interrupted. The build cost of this format on each phone is checked and reported before it is built;
-- **Proposed:** while recording, the app warns at 10% and 5% battery, and at 3% stops and saves the recording itself, so a dying battery never cuts a file off.
+- while recording (evidence camera and body-cam mode), the app warns at 10% and 5% battery, and at 3% stops and saves the recording itself, so a dying battery never cuts a file off (decided 21 Oct).
 
 Physical damage to the phone during a recording is not solved for in v1.
 

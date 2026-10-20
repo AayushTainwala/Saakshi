@@ -41,9 +41,16 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
 
 ## Stream A: Foundation and evidence
 
-**Status:** R1 evidence pipeline (E1, E2, E4, E5, E6) built and tested in code; not yet run on a phone. Owner decisions of 20 Oct (owner questions above) add: ordinary delete, one-file video, and body-cam mode (B1–B4) in R1.
+**Status:** R1 evidence pipeline (E1, E2, E4, E5, E6) merged (https://github.com/AayushTainwala/Saakshi/pull/2). The owner's decisions of 20 and 21 Oct are built on `stream-a/followup`, in one pull request with one commit per step:
+1. ordinary delete in the locker;
+2. one file per evidence-camera video, cut-off safe, with interrupted files sealed at the next start (evidence bundle format 0.2);
+3. body-cam mode (B1–B4);
+4. low-battery warnings and the 3% auto-save.
+
+None of it has run on a phone yet.
 - Shell: merged to `main` (https://github.com/AayushTainwala/Saakshi/pull/1). **Streams B, C and D can start.**
-- Evidence: https://github.com/AayushTainwala/Saakshi/pull/2 (`stream-a/evidence`), ready for review. The Native build workflow compiles the Android debug and iOS simulator apps successfully.
+- Evidence: merged (https://github.com/AayushTainwala/Saakshi/pull/2).
+- Follow-up: `stream-a/followup`; see the pull request for its checks.
 
 **Done, shell:**
 - Template demo screens and assets removed; Expo Router native tabs Record, SOS, Guides, Help, Settings; i18next with English and Hindi and a language switch; light and dark themes with a switch; module stubs for `evidence`, `sos`, `location`, `bugmode`, `cloud`, `guides`, `helplines`; jest-expo with tests for i18n completeness, language choice, preferences and colour contrast; Expo packages updated to SDK 58's expected patch versions.
@@ -113,10 +120,26 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
 - **For Stream C:** the chest-mount guide (G4) should teach the unlock (volume down, twice). The lock message deliberately doesn't name the buttons.
 - **For Stream D:** the generated Android manifest also carries template permissions no feature uses (`READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, `SYSTEM_ALERT_WINDOW`, `VIBRATE`); consider `android.blockedPermissions` in `app.json`. `POST_NOTIFICATIONS` and `FOREGROUND_SERVICE_MICROPHONE` come from expo-audio's background recording, which bug mode (E8) also needs.
 
+**Low-battery auto-save (SPEC E1, decided 21 Oct).** While the evidence camera or body-cam mode is recording, the app warns at 10% and 5% (a line on the camera screen, and on body-cam's dark screen, which stays dark) and at 3% stops and saves the recording itself (`endReason: "low-battery"` in the record). Logic: `src/modules/evidence/battery/monitor.ts`, tested.
+- **Judgement call for the owner:** nothing happens while the phone is charging, since the battery isn't running down. Say if you want the 3% stop even when plugged in.
+- expo-battery's level listener fires on Android only around the system's "battery low" point, so the app also reads the level every 30 seconds while recording.
+- Older iPhones and iOS versions may report the level only in 5% steps. Then the 3% stop comes at the first reading of 0–3%, which could be too late. Check on a phone.
+- Bug mode (E8, Stream B) can use the same hook (`useLowBattery`) if the owner wants it there too; the decision named only the evidence camera and body-cam mode.
+
 **NEEDS OWNER REVIEW:**
 - **Certificate Part A text** (`src/modules/evidence/certificate/html.ts`): check every line against the Gazette of India text of the Schedule. It follows law.md section 1B, which was read from the Gazette of Puducherry reproduction, and item 3 was joined from fragments. The PDF prints "DRAFT: the text of this form has not yet been checked against the Gazette of India" until `FORM_TEXT_REVIEWED` is set to `true`.
 - **Rights prompts** (`src/i18n/locales/{en,hi}/record.json` under `rights`, sources in `src/modules/evidence/rights/prompts.ts`): wording in English and Hindi. Sources: Art. 22(1); BNSS ss.36(a), 38, 47(1)–(2), 48; *Mihir Rajesh Shah* para 56; BNS ss.221, 262. All are rows marked VERIFIED (IK) in law.md, none checked against the Gazette yet.
 - **Certificate screen help text** (`certificate.*` in `record.json`), in both languages.
+
+**Follow-up: not verified.** Everything in the follow-up needs testing on real phones. Most important:
+- an Android recording cut off by force-stopping the app or holding the power button, then reopened: is the `.ts` playable, and is it sealed as interrupted?
+- the same on iPhone, with a recording longer than 10 seconds;
+- body-cam with the screen off on Android, through a phone call;
+- body-cam on iPhone leaving and returning to the app;
+- volume-down unlock on each platform, including iOS 16 and 17.0–17.1;
+- the 10%, 5% and 3% battery points.
+
+Kotlin and Swift compile only on GitHub's runners (Native build workflow).
 
 **Next:**
 - Owner and phone testing of R1 as above; fix what it finds.

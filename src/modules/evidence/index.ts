@@ -9,6 +9,8 @@
  */
 import type { CaptureSession } from './capture/pipeline';
 
+export type { BatteryAction } from './battery/monitor';
+export { useLowBattery } from './battery/useLowBattery';
 export { BodyCamScreen } from './bodycam/BodyCamScreen';
 export { CaptureScreen } from './capture/CaptureScreen';
 export { createEvidenceSession } from './capture/deps';

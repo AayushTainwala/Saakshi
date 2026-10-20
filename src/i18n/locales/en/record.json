@@ -181,5 +181,9 @@
     "stop": "Stop and save",
     "notificationTitle": "Saakshi is recording",
     "notificationText": "Body-cam mode. Open Saakshi to stop."
+  },
+  "battery": {
+    "warn": "Battery {{percent}}%. At 3% the recording will be stopped and saved.",
+    "stopped": "Battery at 3%: the recording was stopped and saved, so it isn't cut off."
   }
 }

@@ -9,9 +9,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppText, Button } from '@/components';
 import { palettes, radius, spacing, touchTarget } from '@/theme';
 
+import type { BatteryAction } from '../battery/monitor';
+import { useLowBattery } from '../battery/useLowBattery';
 import { fileLocker } from '../locker/store';
 import { RightsOverlay } from '../rights/RightsOverlay';
-import type { MediaKind } from '../types';
+import type { EndReason, MediaKind } from '../types';
 import { createPipelineDeps } from './deps';
 import { CaptureSession } from './pipeline';
 import { useLatestLocation } from './useLocation';
@@ -111,15 +113,29 @@ export function CaptureScreen() {
     }
   }, [location, session]);
 
-  const stopRecording = useCallback(async () => {
+  const stopRecording = useCallback(async (reason: EndReason = 'stopped') => {
     if (!recordingRef.current) return;
     recordingRef.current = false;
     const current = controller.current;
     controller.current = null;
-    await current?.stop();
+    await current?.stop(reason);
     if (current && 'dispose' in current) (current as { dispose: () => void }).dispose();
     setRecording(false);
   }, []);
+
+  // Spec E1: warn at 10% and 5%; at 3%, stop and save so a dying battery never cuts the file off.
+  const [batteryNote, setBatteryNote] = useState<string | null>(null);
+  const onBattery = useCallback(
+    (action: BatteryAction) => {
+      if (action.type === 'warn') {
+        setBatteryNote(t('battery.warn', { percent: action.percent }));
+      } else {
+        void stopRecording('low-battery').then(() => setBatteryNote(t('battery.stopped')));
+      }
+    },
+    [stopRecording, t],
+  );
+  useLowBattery(recording, onBattery);
 
   const close = useCallback(async () => {
     await stopRecording();
@@ -210,6 +226,11 @@ export function CaptureScreen() {
                 ● {formatElapsed(elapsed)}
               </AppText>
             ) : null}
+            {batteryNote ? (
+              <AppText variant="small" style={{ color: colors.warning }}>
+                {batteryNote}
+              </AppText>
+            ) : null}
             <AppText variant="small" style={{ color: colors.text }}>
               {pending > 0
                 ? t('capture.sealing', { count: pending })
@@ -245,7 +266,7 @@ export function CaptureScreen() {
                   : t('capture.startVideo')
             }
             disabled={!ready || busy}
-            onPress={mode === 'photo' ? takePhoto : recording ? stopRecording : startRecording}
+            onPress={mode === 'photo' ? takePhoto : recording ? () => void stopRecording() : startRecording}
             style={[styles.shutter, { opacity: !ready || busy ? 0.5 : 1 }]}>
             <View
               style={
