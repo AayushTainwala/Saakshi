@@ -99,5 +99,48 @@
     "done": "Done",
     "open": "Make certificate (Part A)",
     "openAgain": "Make the certificate again"
+  },
+  "rights": {
+    "show": "Show what to say",
+    "hide": "Hide",
+    "previous": "Previous",
+    "next": "Next",
+    "say": "Say",
+    "do": "Remember",
+    "position": "{{index}} of {{total}}",
+    "grounds": {
+      "text": "“Please tell me the grounds of my arrest, and give them to me in writing.”",
+      "why": "Police must tell you why you are arrested, and give it to you in writing in a language you understand, at the latest two hours before you are taken to a magistrate for remand.",
+      "source": "Constitution Art. 22(1); BNSS s.47(1); Mihir Rajesh Shah v. State of Maharashtra (SC, 2025), para 56"
+    },
+    "name": {
+      "text": "“What is your name?”",
+      "why": "An officer making an arrest must wear clear, visible identification of their name.",
+      "source": "BNSS s.36(a)"
+    },
+    "inform": {
+      "text": "“Please tell [name] that I have been arrested and where I am being held.”",
+      "why": "Police must tell a relative, friend or other person you name, and must tell you that you have this right.",
+      "source": "BNSS s.48"
+    },
+    "lawyer": {
+      "text": "“I want to consult my lawyer.”",
+      "why": "You have the right to consult a lawyer of your choice, and to meet them during questioning, though not for all of it.",
+      "source": "Constitution Art. 22(1); BNSS s.38"
+    },
+    "bail": {
+      "text": "“Is this a bailable offence?”",
+      "why": "If it is, police must tell you that you can be released on bail.",
+      "source": "BNSS s.47(2)"
+    },
+    "calm": {
+      "text": "Stay calm, keep your distance, and don't obstruct or resist.",
+      "why": "Obstructing a public servant, and resisting a lawful arrest, are offences.",
+      "source": "BNS ss.221 and 262"
+    },
+    "statement": {
+      "text": "Say the date, time and place out loud.",
+      "why": "It helps anyone who watches the recording later."
+    }
   }
 }

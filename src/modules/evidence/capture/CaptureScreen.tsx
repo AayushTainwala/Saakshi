@@ -9,6 +9,7 @@ import { AppText, Button } from '@/components';
 import { palettes, radius, spacing, touchTarget } from '@/theme';
 
 import { SEGMENT_SECONDS } from '../constants';
+import { RightsOverlay } from '../rights/RightsOverlay';
 import type { MediaKind } from '../types';
 import { createPipelineDeps } from './deps';
 import { CaptureSession } from './pipeline';
@@ -201,6 +202,7 @@ export function CaptureScreen() {
         </View>
 
         <View style={styles.bottomBar}>
+          <RightsOverlay />
           <View style={styles.modes} accessibilityRole="radiogroup">
             {(['photo', 'video'] as const).map((value) => (
               <Pressable
