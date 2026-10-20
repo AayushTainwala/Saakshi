@@ -334,7 +334,7 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
    1. On the same computer, run `npx eas-cli@latest credentials --platform android`.
    2. Choose profile **apk** → **Keystore: Manage everything needed to build your project** → **Download existing keystore**.
    3. Keep the `.jks` file and the passwords it prints in your password manager. **Never commit them.**
-5. **App Store Connect app ID.**
+5. **App Store Connect app ID.** *Done 20 Oct: `ascAppId` 6824945012 is in `eas.json`.*
    1. In App Store Connect, open Saakshi → App Information → General Information, and copy the **Apple ID** (a number).
    2. In `eas.json`, change `"ios": {}` under `"submit"` to `"ios": { "ascAppId": "THE NUMBER" }`, and commit (the GitHub web editor is fine). It is not a secret.
    3. From then on, every iPhone build goes to TestFlight.
