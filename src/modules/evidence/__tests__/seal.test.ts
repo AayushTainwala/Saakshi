@@ -103,6 +103,7 @@ describe('sealing', () => {
         endedAtSource: 'recorder',
         endReason: 'stopped',
         gapBeforeMs: null,
+        rotationDegrees: null,
         hashedAt: '2026-10-20T09:03:04.000Z',
         timeZone: 'Asia/Kolkata',
       },

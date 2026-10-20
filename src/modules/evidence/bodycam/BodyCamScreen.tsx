@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackHandler, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { BackHandler, Linking, PermissionsAndroid, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, Button, Card, OptionGroup, Screen } from '@/components';
@@ -60,6 +60,7 @@ export function BodyCamScreen() {
   const [locked, setLocked] = useState(false);
   const [message, setMessage] = useState(false);
   const [startedAt, setStartedAt] = useState(0);
+  const [notificationsOff, setNotificationsOff] = useState(false);
   const [now, setNow] = useState(0);
   const camera = useRef<CameraView>(null);
   const engine = useRef<BodyCamEngine | null>(null);
@@ -106,7 +107,12 @@ export function BodyCamScreen() {
   const begin = useCallback(async () => {
     const common = { session, store: fileLocker, location, quality: settings.quality };
     const next = OWN_RECORDER
-      ? androidBodyCam({ ...common, notificationTitle: t('bodycam.notificationTitle'), notificationText: t('bodycam.notificationText') })
+      ? androidBodyCam({
+          ...common,
+          notificationTitle: t('bodycam.notificationTitle'),
+          notificationText: t('bodycam.notificationText'),
+          notificationStop: t('bodycam.notificationStop'),
+        })
       : iosBodyCam(camera, [recorderA, recorderB], common);
     engine.current = next;
     await activateKeepAwakeAsync(KEEP_AWAKE_TAG);
@@ -118,11 +124,29 @@ export function BodyCamScreen() {
     lock();
   }, [location, lock, recorderA, recorderB, session, settings.quality, t]);
 
-  const start = useCallback(() => {
+  /**
+   * Android 13+: the recording notice (with its Stop button) needs the notification permission.
+   * Ask the first time body-cam starts; if refused, record anyway and say where the notice is.
+   */
+  const checkNotifications = useCallback(async () => {
+    if (Platform.OS !== 'android' || Number(Platform.Version) < 33) return;
+    const permission = PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS;
+    if (await PermissionsAndroid.check(permission)) return setNotificationsOff(false);
+    if (!settings.notificationsAsked) {
+      setSettings({ ...settings, notificationsAsked: true });
+      const result = await PermissionsAndroid.request(permission);
+      if (result === PermissionsAndroid.RESULTS.GRANTED) return setNotificationsOff(false);
+    }
+    setNotificationsOff(true);
+  }, [settings]);
+
+  const start = useCallback(async () => {
+    await checkNotifications().catch(() => undefined);
     // iPhone records through expo-camera, which must be on screen and ready first.
     if (OWN_RECORDER) void begin();
     else setPhase('starting');
-  }, [begin]);
+  }, [begin, checkNotifications]);
+
 
   const stop = useCallback(
     async (reason: EndReason = 'stopped') => {
@@ -139,6 +163,13 @@ export function BodyCamScreen() {
     },
     [session, unlock],
   );
+
+  // Android: stopped from the recording notice's Stop button.
+  useEffect(() => {
+    if (!OWN_RECORDER || !SaakshiEvidence || phase !== 'running') return;
+    const subscription = SaakshiEvidence.addListener('onBodyCamStopped', () => void stop());
+    return () => subscription.remove();
+  }, [phase, stop]);
 
   // Spec E1: warn at 10% and 5%; at 3%, stop and save so a dying battery never cuts a piece off.
   const [batteryNote, setBatteryNote] = useState<string | null>(null);
@@ -239,7 +270,7 @@ export function BodyCamScreen() {
           onChange={(value) => setSettings({ ...settings, quality: value === '1080' ? 1080 : 720 })}
         />
 
-        <Button variant="danger" label={t('bodycam.start')} disabled={!settings.taught} onPress={start} />
+        <Button variant="danger" label={t('bodycam.start')} disabled={!settings.taught} onPress={() => void start()} />
         {!settings.taught ? <AppText color="textMuted">{t('bodycam.ackFirst')}</AppText> : null}
       </Screen>
     );
@@ -286,6 +317,7 @@ export function BodyCamScreen() {
           </AppText>
           <AppText style={{ color: dark.textMuted }}>{t('bodycam.pieces', { count: pieces })}</AppText>
           {batteryNote ? <AppText style={{ color: dark.warning }}>{batteryNote}</AppText> : null}
+          {notificationsOff ? <AppText style={{ color: dark.textMuted }}>{t('bodycam.notificationsOff')}</AppText> : null}
           {Platform.OS === 'ios' ? <AppText style={{ color: dark.warning }}>{t('bodycam.iosWarning')}</AppText> : null}
           <Button label={t('bodycam.lock')} disabled={phase !== 'running'} onPress={lock} />
           <Button variant="danger" label={t('bodycam.stop')} busy={phase === 'stopping'} disabled={phase !== 'running'} onPress={() => void stop()} />

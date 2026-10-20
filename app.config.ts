@@ -17,6 +17,8 @@ export const ALWAYS_BLOCKED = [
   'android.permission.SYSTEM_ALERT_WINDOW',
   'android.permission.READ_EXTERNAL_STORAGE',
   'android.permission.WRITE_EXTERNAL_STORAGE',
+  // Added by Expo's template manifest; nothing in the app vibrates.
+  'android.permission.VIBRATE',
 ];
 
 export const SEND_SMS = 'android.permission.SEND_SMS';

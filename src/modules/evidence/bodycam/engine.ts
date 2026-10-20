@@ -29,11 +29,14 @@ type Common = {
  * events and are sealed here. If the JavaScript side is not running when a piece closes, its
  * marker stays and the piece is sealed when the app next opens.
  */
-export function androidBodyCam(common: Common & { notificationTitle: string; notificationText: string }): BodyCamEngine {
+export function androidBodyCam(
+  common: Common & { notificationTitle: string; notificationText: string; notificationStop: string },
+): BodyCamEngine {
   const native = SaakshiEvidence;
   if (!native) throw new Error('The SaakshiEvidence native module is not available in this build.');
   let stopReason: EndReason | null = null;
   let onFinal: (() => void) | null = null;
+  let finished = false;
   const subscription = native.addListener('onRecordingClosed', (event: RecordingClosedEvent) => {
     const reason: EndReason = event.endReason === 'stopped' && stopReason ? stopReason : event.endReason;
     void common.session.add({
@@ -46,9 +49,13 @@ export function androidBodyCam(common: Common & { notificationTitle: string; not
       mode: 'body-cam',
       endReason: reason,
       gapBeforeMs: event.gapBeforeMs,
+      rotationDegrees: event.rotationDegrees,
       pendingMarker: `${event.uri.split('/').pop()}.json`,
     });
-    if (event.endReason !== 'piece-complete') onFinal?.();
+    if (event.endReason !== 'piece-complete') {
+      finished = true;
+      onFinal?.();
+    }
   });
 
   return {
@@ -64,10 +71,16 @@ export function androidBodyCam(common: Common & { notificationTitle: string; not
         mode: 'body-cam',
         notificationTitle: common.notificationTitle,
         notificationText: common.notificationText,
+        notificationStop: common.notificationStop,
       });
     },
     async stop(reason = 'stopped') {
       stopReason = reason;
+      // Already over, for example stopped from the notification.
+      if (finished) {
+        subscription.remove();
+        return;
+      }
       const closed = new Promise<void>((resolve) => {
         onFinal = resolve;
         setTimeout(resolve, 5000);

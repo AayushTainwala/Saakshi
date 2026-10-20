@@ -38,7 +38,7 @@ describe('certificate Part A', () => {
   });
 
   it('keeps the chosen words of the form and strikes the others', () => {
-    expect(html()).toContain('<s>son</s>/<b>daughter</b>/<s>spouse</s> of');
+    expect(html()).toContain('<s>Son</s>/<b>daughter</b>/<s>spouse</s> of');
     expect(html()).toContain('<b>residing</b>/<s>employed</s> at');
   });
 
@@ -47,7 +47,7 @@ describe('certificate Part A', () => {
     expect(out).toContain('&#9746; Mobile');
     expect(out).toContain('&#9746; SHA256:');
     expect(out).toContain('&#9744; SHA1:');
-    expect(out).toContain('&#9746; Owned / &#9744; Maintained / &#9744; Managed / &#9746; Operated by me');
+    expect(out).toContain('&#9746; Owned&nbsp;&nbsp; &#9744; Maintained&nbsp;&nbsp; &#9744; Managed&nbsp;&nbsp; &#9746; Operated<br/>\n    by me (select as applicable)');
     expect(out.match(/&#9746;/g)).toHaveLength(4);
   });
 
@@ -64,7 +64,16 @@ describe('certificate Part A', () => {
 
   it('says Part B is needed and, until the form text is reviewed, that it is a draft', () => {
     expect(html()).toContain('This is Part A only. Part B must be filled in and signed by an expert');
-    expect(html()).toContain('DRAFT: the text of this form has not yet been checked against the Gazette of India.');
+    expect(html()).toContain('DRAFT: the text of this form has not yet had its final legal review.');
+  });
+
+  it('follows the Gazette of India layout: no paragraph numbers, its spelling and dashes', () => {
+    const out = html();
+    expect(out).not.toContain('<ol>');
+    expect(out).toContain('Make &amp; Model:');
+    expect(out).toContain('submit as follows:&mdash;');
+    expect(out).toContain('or its accuracy. The digital device or the source of the digital record is:&mdash;');
+    expect(out).toContain('(Hash report to be enclosed with the certificate)');
   });
 
   it('needs name, relative, address, IMEI and one ownership box', () => {

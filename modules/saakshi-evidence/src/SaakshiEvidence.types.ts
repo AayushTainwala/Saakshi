@@ -52,6 +52,8 @@ export type RecordingStartedEvent = {
   clip: number;
   index: number;
   cutoffSafe: boolean;
+  /** MPEG-TS only: degrees to turn the picture upright (the container can't say). Null otherwise. */
+  rotationDegrees: number | null;
 };
 
 export type RecordingClosedEvent = RecordingStartedEvent & {
@@ -67,6 +69,8 @@ export type SaakshiEvidenceEvents = {
   onRecorderError: (event: { message: string }) => void;
   /** A volume-down press, while volumeKeysStart() is in effect. */
   onVolumeDown: () => void;
+  /** Android: body-cam was stopped from its notification's Stop button. */
+  onBodyCamStopped: () => void;
 };
 
 export type BodyCamOptions = RecorderOptions & {
@@ -74,4 +78,6 @@ export type BodyCamOptions = RecorderOptions & {
   /** The text of the notification Android shows while the service runs. */
   notificationTitle: string;
   notificationText: string;
+  /** Label of the notification's Stop button. */
+  notificationStop: string;
 };

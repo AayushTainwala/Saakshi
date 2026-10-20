@@ -9,6 +9,7 @@ export function memoryLocker(files: Map<string, Uint8Array> = new Map()) {
   let deviceKey: string | null = null;
   const sessionFiles = new Map<string, Uint8Array>();
   const pending = new Map<string, Map<string, PendingMarker>>();
+  const copyRecords = new Map<string, { body: string; signature: Uint8Array }>();
 
   const store: LockerStore = {
     createSession(id, createdAt) {
@@ -45,6 +46,10 @@ export function memoryLocker(files: Map<string, Uint8Array> = new Map()) {
     },
     recordUri: (sessionId, name) => `mem://${sessionId}/records/${name}`,
     sessionFileUri: (sessionId, name) => `mem://${sessionId}/${name}`,
+    copyUri: (sessionId, name) => `mem://${sessionId}/copies/${name}`,
+    writeCopyRecord(sessionId, mediaName, body, signature) {
+      copyRecords.set(`${sessionId}/${mediaName}`, { body, signature });
+    },
     sessionDirUri: (sessionId) => `mem://${sessionId}`,
     listPending: (sessionId) =>
       [...(pending.get(sessionId) ?? new Map()).entries()].map(([name, marker]) => ({ name, marker: structuredClone(marker) })),
@@ -59,5 +64,5 @@ export function memoryLocker(files: Map<string, Uint8Array> = new Map()) {
     },
   };
 
-  return { store, files, sessions, records, sessionFiles, pending };
+  return { store, files, sessions, records, sessionFiles, pending, copyRecords };
 }

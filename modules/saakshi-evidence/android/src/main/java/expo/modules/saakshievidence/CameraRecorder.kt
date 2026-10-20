@@ -78,6 +78,8 @@ object CameraRecorder {
   private var cutoffSafe = true
   private var lastEndedAt: Long? = null
   private var currentGap: Long? = null
+  /** Degrees to turn the picture upright, for MPEG-TS, which has no field for it. Null for MP4. */
+  private var currentRotation: Int? = null
 
   val isRecording: Boolean get() = recorder != null
   val isOpen: Boolean get() = device != null
@@ -325,10 +327,13 @@ object CameraRecorder {
     r.setAudioEncodingBitRate(128_000)
     r.setAudioSamplingRate(44_100)
     r.setAudioChannels(1)
-    r.setOrientationHint((sensorOrientation + deviceDegrees) % 360)
+    r.setOrientationHint(rotationHint())
     r.setInputSurface(surface)
     return r
   }
+
+  /** Camera2's formula for the back camera: sensor orientation plus the phone's rotation. */
+  private fun rotationHint(): Int = (sensorOrientation + deviceDegrees) % 360
 
   private fun startFile() {
     val cfg = config ?: return
@@ -349,6 +354,7 @@ object CameraRecorder {
       r.prepare()
     }
     cutoffSafe = useTs
+    currentRotation = if (useTs) rotationHint() else null
     val startedAt = System.currentTimeMillis()
     r.start()
     recorder = r
@@ -363,6 +369,7 @@ object CameraRecorder {
       "clip" to cfg.clip,
       "index" to pieceIndex,
       "cutoffSafe" to cutoffSafe,
+      "rotationDegrees" to currentRotation,
     ))
   }
 
@@ -399,6 +406,7 @@ object CameraRecorder {
         "endReason" to reason,
         "gapBeforeMs" to currentGap,
         "cutoffSafe" to cutoffSafe,
+        "rotationDegrees" to currentRotation,
       ))
     }
   }
@@ -415,6 +423,7 @@ object CameraRecorder {
       put("mode", cfg.mode)
       put("gapBeforeMs", gapBeforeMs ?: JSONObject.NULL)
       put("cutoffSafe", cutoffSafe)
+      put("rotationDegrees", currentRotation ?: JSONObject.NULL)
     }
     if (closedAt != null) {
       json.put("closedAt", iso(closedAt))

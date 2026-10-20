@@ -24,6 +24,7 @@ Research date: 16 October 2026. Only primary texts (statutes and judgments) are 
   - the Supreme Court's description of the certificate in *Pune Bar Association* (2026).
 
   The PRS-hosted copy of Act 47 of 2023 confirmed the text of s.63(4), but its Schedule pages were not readable through my fetch tool. Status for the Schedule is therefore "VERIFIED from a government gazette reproduction; central Gazette not checked".
+- **21 October 2026: the Gazette of India and the Supreme Court's own copies were read.** eGazette (`egazette.gov.in`) and the Supreme Court's judgment server (`api.sci.gov.in`) answer from a browser in India. The review session opened them in the owner's browser and extracted the PDF text there. That settled the BSA Schedule (1B), the commencement notifications (checks table), the DPDP notifications (3A) and the paragraph question for *D.K. Basu* and *Arnesh Kumar* (2C).
 - Format: Proposition | Provision/para | Short quote | Link | Status.
 
 ---
@@ -34,6 +35,7 @@ Research date: 16 October 2026. Only primary texts (statutes and judgments) are 
 
 Primary links:
 - BSA (Indian Kanoon reproduction): https://indiankanoon.org/doc/70224818/
+- **Gazette of India copy:** https://egazette.gov.in/WriteReadData/2023/250882.pdf (Gazette of India, Extraordinary, Part II, Section 1, No. 55, 25 December 2023; Act No. 47 of 2023). Section 63 is at pp.22–23 and the Schedule at pp.46–47. Read 21.10.2026.
 - PRS copy of the Act as enacted (Gazette, 25 Dec 2023): https://prsindia.org/files/bills_acts/acts_parliament/2023/The%20Bharatiya%20Sakshya%20Bill,%202023.pdf. The file name says "Bill", but the PDF is the enacted Act No. 47 of 2023. Checked: title block, and s.63(4) at gazette p.23.
 
 | Proposition | Provision | Short quote | Link | Status |
@@ -60,30 +62,28 @@ Primary links:
 
 ### 1B. BSA Schedule: certificate under s.63(4)(c), field list
 
-Source: Gazette of Puducherry, Extraordinary Part II No. 40, 9 May 2025 (G.O. Ms. No. 27, Home Dept., 6 May 2025), "Comprehensive Guidelines for the admissibility of digital and electronic records under the BSA, 2023", Schedule at pp. 720–723.
-Link: https://styandptg.py.gov.in/2025/MAY/EXTRAORDINARYPART-II/1/40-PART-II%20dated%2009-05-2025.pdf
+Source: **Gazette of India, Extraordinary, Part II, Section 1, No. 55, 25 December 2023**, Act No. 47 of 2023, "THE SCHEDULE [See section 63(4)(c)]", pp.46–47.
+Link: https://egazette.gov.in/WriteReadData/2023/250882.pdf
 
-**Status:** VERIFIED from this state government gazette reproduction, which is headed "CERTIFICATE [See section 63(4)(c)]". **Not verified against the central Gazette of India text.** The fetch tool returned line-by-line quotes. A human should check punctuation and line breaks against the Act PDF before reproducing the form in-app.
+**Status: VERIFIED against the Gazette of India, 21.10.2026.** The text below is transcribed from the Gazette PDF's text layer. The Gazette prints blanks as underscores, the source list and the ownership options as words without boxes, and each algorithm on its own line. Part A's paragraphs are **not numbered** in the Gazette. The earlier reading from the Gazette of Puducherry reproduction (Extraordinary Part II No. 40, 9 May 2025) matches it word for word, including the declaration that had been joined from fragments.
 
 **PART A (To be filled by the Party)**
-1. "I, ............ (Name), son/daughter/spouse of ............ residing/employed at ............ do hereby solemnly affirm and sincerely state and submit as follows:–"
-2. "I have produced electronic record/output of the digital record taken from the following device/digital record source (tick mark):–"
-   - Computer/Storage Media / DVR / Mobile / Flash Drive / CD/DVD / Server / Cloud / Other / "Other: ............"
-   - "Make and Model:" / "Color:" / "Serial Number:" / "IMEI/UIN/UID/MAC/Cloud ID ............ (as applicable)"
-   - "and any other relevant information, if any, about the device/digital record ............ (specify)."
-3. The fetch tool returned the declaration in fragments, which I have joined:
-   > "The digital device or the digital record source was under the lawful control for regularly creating, storing or processing information for the purposes of carrying out regular activities and during this period, the computer or the communication device was working properly and the relevant information was regularly fed into the computer during the ordinary course of business. If the computer/digital device at any point of time was not working properly or out of operation, then it has not affected the electronic/digital record or its accuracy."
-4. "The digital device or the source of the digital record is:– Owned / Maintained / Managed / Operated by me (select as applicable)."
-5. **"I state that the HASH value/s of the electronic/digital record/s is ............, obtained through the following algorithm:– SHA1: / SHA256: / MD5: / Other ............ (Legally acceptable standard)"**
-6. **"(Hash report to be enclosed with the certificate)"**
-7. "(Name and signature)" / "Date (DD/MM/YYYY):" / "Time (IST): ...... hours (In 24 hours format)" / "Place:"
+- "I, ____ (Name), Son/daughter/spouse of ____ residing/employed at ____ do hereby solemnly affirm and sincerely state and submit as follows:—"
+- "I have produced electronic record/output of the digital record taken from the following device/digital record source (tick mark):—"
+  - "Computer / Storage Media DVR Mobile Flash Drive CD/DVD Server Cloud Other"
+  - "Other: ____" / "Make & Model: ____ Color: ____" / "Serial Number: ____" / "IMEI/UIN/UID/MAC/Cloud ID____ (as applicable)"
+  - "and any other relevant information, if any, about the device/digital record____(specify)."
+- In the same paragraph:
+  > "The digital device or the digital record source was under the lawful control for regularly creating, storing or processing information for the purposes of carrying out regular activities and during this period, the computer or the communication device was working properly and the relevant information was regularly fed into the computer during the ordinary course of business. If the computer/digital device at any point of time was not working properly or out of operation, then it has not affected the electronic/digital record or its accuracy. The digital device or the source of the digital record is:— Owned Maintained Managed Operated by me (select as applicable)."
+- **"I state that the HASH value/s of the electronic/digital record/s is ____, obtained through the following algorithm:— SHA1: SHA256: MD5: Other____ (Legally acceptable standard)"**
+- **"(Hash report to be enclosed with the certificate)"**
+- "(Name and signature)" / "Date (DD/MM/YYYY): ____" / "Time (IST): ____hours (In 24 hours format)" / "Place: ____"
 
 **PART B (To be filled by the Expert)**
-1. Same identity block: "I, ...... (Name), son/daughter/spouse of ...... residing/employed at ...... do hereby solemnly affirm and sincerely state and submit as follows:–"
-2. "The produced electronic record/output of the digital record are obtained from the following device/digital record source (tick mark):–" followed by the same source list and the same Make/Model, Color, Serial Number, IMEI/UIN/UID/MAC/Cloud ID and "other relevant information" fields.
-3. **"I state that the HASH value/s of the electronic/digital record/s is ......, obtained through the following algorithm:– SHA1: / SHA256: / MD5: / Other ...... (Legally acceptable standard)"**
-4. **"(Hash report to be enclosed with the certificate)"**
-5. "(Name, designation and signature)" / "Date (DD/MM/YYYY):" / "Time (IST): ... hours (In 24 hours format)" / "Place:"
+- The same identity block, then: "The produced electronic record/output of the digital record are obtained from the following device/digital record source (tick mark):—", with the same source list and the same Make & Model, Color, Serial Number, IMEI/UIN/UID/MAC/Cloud ID and "other relevant information" fields.
+- **"I state that the HASH value/s of the electronic/digital record/s is ____, obtained through the following algorithm:— SHA1: SHA256: MD5: Other____ (Legally acceptable standard)"**
+- **"(Hash report to be enclosed with the certificate)"**
+- "(Name, designation and signature)" / "Date (DD/MM/YYYY): ____" / "Time (IST): ____hours (In 24 hours format)" / "Place: ____"
 
 **Answer to the hash question.** Yes, both Part A and Part B require the hash value(s) of the record. The form names **SHA1, SHA256 and MD5** and also allows "Other (Legally acceptable standard)". A hash report must be enclosed. Part B is the expert's own declaration of the source device and the hash. It contains no s.63(2)-style "lawful control" declaration. The form does not mandate a specific algorithm.
 
@@ -174,10 +174,10 @@ Link: https://indiankanoon.org/doc/91117739/ (IK reproduction carries an "origin
 
 | Proposition | Para | Short quote | Link | Status |
 |---|---|---|---|---|
-| D.K. Basu arrest requirements (1)–(11): name tags, arrest memo, informing a friend, telling the arrestee of rights, medical examination, lawyer during interrogation, control room within 12 hours; non-compliance means departmental action and contempt | *D.K. Basu v. State of W.B.* (1997) 1 SCC 416. Commonly cited as para 35; the IK text is **unnumbered**, so the para number is UNVERIFIED | "(1) The police personnel carrying out the arrest ... should bear accurate, visible and clear identification and name tags with their designations ... (10) The arrestee may be permitted to meet his lawyer during interrogation, though not throughout the interrogation" | https://indiankanoon.org/doc/501198/ | Text VERIFIED (IK); para no. UNVERIFIED |
+| D.K. Basu arrest requirements (1)–(11): name tags, arrest memo, informing a friend, telling the arrestee of rights, medical examination, lawyer during interrogation, control room within 12 hours; non-compliance means departmental action and contempt | *D.K. Basu v. State of W.B.*, W.P. (Crl.) 539 of 1986, decided 18.12.1996; (1997) 1 SCC 416. **The Supreme Court's own copy has no paragraph numbers**; the requirements are at pp.14–15 of 23 of that copy. "Para 35" is the SCC report's numbering and has not been checked against SCC | "(1) The police personnel carrying out the arrest ... should bear accurate, visible and clear identification and name tags with their designations ... (10) The arrestee may be permitted to meet his lawyer during interrogation, though not throughout the interrogation" (the SC copy misprints "name togs") | SC copy: https://api.sci.gov.in/jonew/judis/14580.pdf ; https://indiankanoon.org/doc/501198/ | Text VERIFIED (SC copy, 21.10.2026). Cite by the SC copy's page, or check the SCC para in SCC |
 | Power to arrest differs from justification; no routine arrest | *Joginder Kumar v. State of U.P.* (1994) 4 SCC 260, para 20 | "No arrest can be made because it is lawful for the police officer to do so. The existence of the power to arrest is one thing. The justification for the exercise of it is quite another." | https://indiankanoon.org/doc/768175/ | VERIFIED (IK) |
 | Right to have a friend or relative informed; the Magistrate must check | *Joginder Kumar*, paras 21–22 | "An arrested person being held in custody is entitled, if he so requests to have one friend, relative or other person ... told" | same | VERIFIED (IK) |
-| No automatic arrest; s.41 checklist; directions apply to all offences punishable up to 7 years | *Arnesh Kumar v. State of Bihar* (2014) 8 SCC 273. Directions commonly cited as para 11; the IK text is **unnumbered** | "the directions aforesaid shall not only apply to the cases under Section 498-A ... but also such cases where offence is punishable with imprisonment for a term which may be less than seven years or which may extend to seven years" | https://indiankanoon.org/doc/2982624/ | Text VERIFIED (IK); para no. UNVERIFIED |
+| No automatic arrest; s.41 checklist; directions apply to all offences punishable up to 7 years | *Arnesh Kumar v. State of Bihar*, Crl. A. 1277 of 2014, decided 02.07.2014; (2014) 8 SCC 273. **The Supreme Court's own copy has no paragraph numbers**; directions (1)–(8) are at pp.17–20 of 21 and the seven-year extension at p.20. "Para 11" (11.1–11.8) is the SCC report's numbering and has not been checked against SCC | "the directions aforesaid shall not only apply to the cases under Section 498-A of the I.P.C. or Section 4 of the Dowry Prohibition Act, the case in hand, but also such cases where offence is punishable with imprisonment for a term which may be less than seven years or which may extend to seven years; whether with or without fine" | SC copy: https://api.sci.gov.in/jonew/judis/41736.pdf ; https://indiankanoon.org/doc/2982624/ | Text VERIFIED (SC copy, 21.10.2026). Cite by the SC copy's page, or check the SCC para in SCC |
 | PMLA: written grounds to be furnished "as a matter of course and without exception" | *Pankaj Bansal v. Union of India* (03.10.2023). Para 35 in the IK/SC text. The SCC version is cited as (2024) 7 SCC 576, and *Vihaan Kumar* refers to its "paragraphs 42 and 43" for the "ideal course", so **numbering differs between versions** | "a copy of such written grounds of arrest is furnished to the arrested person as a matter of course and without exception" | https://indiankanoon.org/doc/189692408/ | VERIFIED (IK) |
 | Written grounds extended to UAPA "or for that matter any other offence(s)" | *Prabir Purkayastha v. State (NCT of Delhi)* (15.05.2024), paras 17–20 | "any person arrested for allegation of commission of offences under the provisions of UAPA or for that matter any other offence(s) has a fundamental and a statutory right to be informed about the grounds of arrest in writing" (para 20) | https://indiankanoon.org/doc/17476648/ | VERIFIED (IK) |
 | Art. 22(1) is mandatory; communicate in a language understood; burden on police; breach vitiates arrest and remand (but not the investigation); court must release; bail despite statutory bars | *Vihaan Kumar v. State of Haryana* (07.02.2025), para 21(a)–(f) | "(d) ... non-compliance with the requirements of Article 22(1) vitiates the arrest of the accused" | https://indiankanoon.org/doc/74708490/ | VERIFIED (IK) |
@@ -252,7 +252,7 @@ Link: https://indiankanoon.org/doc/3510545/
 | Proposition | Provision | Short quote | Status |
 |---|---|---|---|
 | Commencement by notification; different dates are allowed for different provisions | s.1(2) | "different dates may be appointed for different provisions" | VERIFIED (IK) |
-| **Whether in force, and the Rules dates** | DPDP Rules 2025 / commencement notifications | Secondary sources (Mondaq, SCC Online blog) say the Rules were notified 13 Nov 2025, in phases: Rules 1, 2, 17–21 immediately; Rule 4 (consent managers) after 1 year; Rules 3, 5–16, 22–23 after 18 months (about May 2027). IK still marks the Act "Not commenced". | **UNVERIFIED.** The gazette and MeitY PDFs could not be reached. I could not confirm the G.S.R./S.O. numbers or which Act sections are in force today. This must be checked before launch. |
+| **Whether in force, and the Rules dates** | G.S.R. 843(E) (commencement of the Act) and G.S.R. 846(E) (DPDP Rules, 2025), both dated 13.11.2025, Gazette of India, Extraordinary, Part II, s.3(i), Nos. 757 and 760, 13 November 2025 | **In force from 13.11.2025:** Act s.1(2), s.2, ss.18–26, 35, 38–43, s.44(1), (3); Rules 1, 2, 17–21. **From 13.11.2026:** Act s.6(9), s.27(1)(d); Rule 4. **From 13.05.2027:** Act ss.3–5, s.6(1)–(8), (10), ss.7–17, s.27 (except (1)(d)), ss.28–34, 36, 37, s.44(2); Rules 3, 5–16, 22, 23. So on 21.10.2026 the notice, consent and Data Fiduciary duties (ss.5, 6, 8) are **not yet in force**; they start on 13.05.2027 | VERIFIED (Gazette, 21.10.2026): https://egazette.gov.in/WriteReadData/2025/267647.pdf (G.S.R. 843(E), para (a)–(c)); https://egazette.gov.in/WriteReadData/2025/267650.pdf (G.S.R. 846(E), rule 1(2)–(4)). A later notification changing these dates was not searched for exhaustively. |
 | Act applies to digital personal data processed in India | s.3(a) | "apply to the processing of digital personal data within the territory of India" | VERIFIED (IK) |
 | Personal/domestic exemption: an individual's own personal use is outside the Act | s.3(c)(i) | "personal data processed by an individual for any personal or domestic purpose" | VERIFIED (IK) |
 | Data Fiduciary = whoever determines the purpose and means of processing | s.2(i) | "any person who alone or in conjunction with other persons determines the purpose and means of processing" | VERIFIED (IK) |
@@ -287,10 +287,10 @@ Link: https://indiankanoon.org/doc/3510545/
 
 ## Open items to verify before relying on this
 
-1. **BSA Schedule:** check against the central Gazette text (Act 47 of 2023, Gazette of India Extraordinary, 25.12.2023) on India Code or eGazette. Mine came from the Puducherry Gazette reproduction.
-2. **Commencement:** confirm the BSA/BNSS/BNS commencement notification (S.O. numbers and dates; 1 July 2024).
-3. **DPDP:** confirm the DPDP Rules 2025 and the Act's commencement notifications (dates, and the sections in force today).
-4. **Paragraph numbers:** D.K. Basu (para 35?) and Arnesh Kumar (para 11?). The IK text I read is unnumbered.
+1. **Done 21 Oct 2026** (section 1B). **BSA Schedule:** check against the central Gazette text (Act 47 of 2023, Gazette of India Extraordinary, 25.12.2023) on India Code or eGazette. Mine came from the Puducherry Gazette reproduction.
+2. **Done 21 Oct 2026** (checks table, third pass). **Commencement:** confirm the BSA/BNSS/BNS commencement notification (S.O. numbers and dates; 1 July 2024).
+3. **Done 21 Oct 2026** (section 3A). **DPDP:** confirm the DPDP Rules 2025 and the Act's commencement notifications (dates, and the sections in force today).
+4. **Done 21 Oct 2026, as far as official copies go** (section 2C): the Supreme Court's own copies are unnumbered; the SCC paragraph numbers need SCC. **Paragraph numbers:** D.K. Basu (para 35?) and Arnesh Kumar (para 11?). The IK text I read is unnumbered.
 5. **Madras HC case:** *R. v. B.*, 2024 SCC OnLine Mad 6084. **Done 20 Oct 2026:** read in full on Indian Kanoon; see section 1C.
 6. **Post-July-2024 HC case law on BSA s.63:** run an exhaustive SCC Online search. Mine was a limited Indian Kanoon search.
 7. **Telecom shutdowns:** check the current suspension rules under the Telecommunications Act, 2023.
@@ -319,6 +319,16 @@ The table now records the second pass. Rows marked **Done** were read from the p
 | — | BNS s.37 verbatim (section 2F) | **Done against Indian Kanoon** (the Gazette is still owed). The verbatim text is now in section 2F, **with a correction**: the authority condition is only in Explanation 2. | — | Act 45 of 2023 on India Code |
 
 **What would let the rest be done.** The Gazette, India Code and sci.gov.in still can't be reached from this environment (see the second pass above). Allowing `www.indiacode.nic.in` may open India Code's Act pages. eGazette, `upload.indiacode.nic.in` and sci.gov.in appear to refuse connections from outside India. **The owner opening the documents in the last column is the reliable route.** Items 1, 2, 3 and 4 need them.
+
+### Results of the checks, 21 October 2026 (third pass, owner's browser)
+
+| # | Check | Result | Source |
+|---|---|---|---|
+| 1 | BSA Schedule against the Gazette of India | **Done. VERIFIED.** Section 1B now quotes the Gazette. The Puducherry reproduction matched it word for word. The Gazette's layout differs from the app's certificate in small ways: no paragraph numbers in Part A, "Make & Model", "Son/daughter/spouse", em dashes, and the ownership sentence closing the lawful-control paragraph. | https://egazette.gov.in/WriteReadData/2023/250882.pdf , pp.46–47 |
+| 2 | BSA, BNSS and BNS commencement | **Done. VERIFIED.** All dated 23.02.2024, Gazette of India, Extraordinary, Part II, s.3(ii), 24.02.2024, Ministry of Home Affairs, each appointing **1 July 2024**: **S.O. 848(E)** BNSS (No. 809), "except the provisions of the entry relating to section 106(2) of the Bharatiya Nyaya Sanhita, 2023, in the First Schedule"; **S.O. 849(E)** BSA (No. 810); **S.O. 850(E)** BNS (No. 811), "except the provision of sub-section (2) of section 106". *Arshdeep Singh* (P&H HC, 30.08.2024, para 2) gives S.O. 850(E) for the BNSS; the Gazette shows S.O. 850(E) is the BNS notification and S.O. 848(E) the BNSS one. | BNSS https://egazette.gov.in/WriteReadData/2024/252354.pdf ; BSA https://egazette.gov.in/WriteReadData/2024/252352.pdf ; BNS https://egazette.gov.in/WriteReadData/2024/252353.pdf |
+| 3 | DPDP Rules and the Act's commencement | **Done. VERIFIED.** See section 3A. The first-pass leads were right on numbers and phases; the notifications are dated 13.11.2025 (the eGazette IDs carry 14.11.2025, the upload date). | https://egazette.gov.in/WriteReadData/2025/267647.pdf ; https://egazette.gov.in/WriteReadData/2025/267650.pdf |
+| 4 | D.K. Basu para 35; Arnesh Kumar para 11 | **Done as far as official copies go.** Both Supreme Court copies are unnumbered, so the familiar paragraph numbers belong to the SCC report. The app can cite the official copy with its page, which anyone can open free, or the SCC paragraph once checked in SCC. | https://api.sci.gov.in/jonew/judis/14580.pdf ; https://api.sci.gov.in/jonew/judis/41736.pdf |
+| 5 | Official pages for 112, 108, 102 | **Not done.** `112.gov.in` failed to load even from the owner's browser in India; the MHA site redirects its ERSS pages to its home page. Found instead: Lok Sabha Unstarred Question No. 2500, MHA, answered 03.12.2019, describing ERSS as a "Pan-India, single, internationally recognized number i.e. 112 based emergency response mechanism" operational then in 27 States/UTs (read through the fetch tool; out of date on coverage); and NHM Himachal Pradesh's transport page, which says 108 "is available round the clock and free of cost to all persons" and that 102 is the "JSSK Drop back (102) ambulance service" (a state page, not a national one). | https://eparlib.sansad.in/bitstream/123456789/958400/1/AU2500.pdf ; https://nhm.hp.gov.in/health-transport |
 
 ## Helpline sources (G3), 20 October 2026
 

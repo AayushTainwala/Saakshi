@@ -57,6 +57,7 @@ export function createSealer(deps: SealerDeps) {
       endReason: input.file.endReason,
       interrupted: input.file.interrupted,
       gapBeforeMs: input.file.gapBeforeMs,
+      rotationDegrees: input.file.rotationDegrees,
       timeZone: deps.timeZone(),
       location: input.file.location,
       device: deps.device(),

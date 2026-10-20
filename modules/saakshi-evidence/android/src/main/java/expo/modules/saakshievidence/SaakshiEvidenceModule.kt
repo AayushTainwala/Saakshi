@@ -18,7 +18,7 @@ class SaakshiEvidenceModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("SaakshiEvidence")
 
-    Events("onRecorderReady", "onRecordingStarted", "onRecordingClosed", "onRecorderError", "onVolumeDown")
+    Events("onRecorderReady", "onRecordingStarted", "onRecordingClosed", "onRecorderError", "onVolumeDown", "onBodyCamStopped")
 
     OnCreate {
       CameraRecorder.listener = { name, body -> sendEvent(name, body) }
@@ -43,18 +43,30 @@ class SaakshiEvidenceModule : Module() {
         putExtra(BodyCamService.EXTRA_CLIP, config.clip)
         putExtra(BodyCamService.EXTRA_TITLE, options["notificationTitle"] as? String)
         putExtra(BodyCamService.EXTRA_TEXT, options["notificationText"] as? String)
+        putExtra(BodyCamService.EXTRA_STOP_LABEL, options["notificationStop"] as? String)
       }
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
     }
 
     AsyncFunction("bodyCamStop") {
-      appContext.reactContext?.let { context ->
+      appContext.reactContext?.takeIf { BodyCamService.running }?.let { context ->
         context.startService(Intent(context, BodyCamService::class.java).apply { action = BodyCamService.ACTION_STOP })
       }
       Unit
     }
 
     Function("bodyCamRunning") { BodyCamService.running }
+
+    // Android: an MP4 copy of an MPEG-TS recording, made without re-encoding (spec decision of 22 Oct).
+    AsyncFunction("remuxToMp4") Coroutine { input: String, output: String, rotationDegrees: Int? ->
+      withContext(Dispatchers.IO) {
+        val source = fileFromUri(input)
+        val target = File(Uri.parse(output).path ?: output)
+        target.parentFile?.mkdirs()
+        Remuxer.tsToMp4(source, target, rotationDegrees)
+        "file://${target.absolutePath}"
+      }
+    }
 
     // Volume-down presses while body-cam mode's lock screen shows (the screen is on, dimmed).
     AsyncFunction("volumeKeysStart") {

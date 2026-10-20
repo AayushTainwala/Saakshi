@@ -39,6 +39,8 @@ export type EvidenceRecord = {
     endedAtSource: 'recorder' | 'file-modified';
     endReason: EndReason;
     gapBeforeMs: number | null;
+    /** Degrees to turn the picture upright, for MPEG-TS, which has no field for it. Otherwise null. */
+    rotationDegrees: number | null;
     hashedAt: string;
     timeZone: string | null;
     utcOffsetMinutes: number;
@@ -72,6 +74,7 @@ export type RecordInput = {
   endReason?: EndReason;
   interrupted?: boolean;
   gapBeforeMs?: number | null;
+  rotationDegrees?: number | null;
   timeZone: string | null;
   location: LocationSnapshot;
   device: DeviceInfo;
@@ -105,6 +108,7 @@ export function buildRecord(input: RecordInput): EvidenceRecord {
       endedAtSource: input.interrupted ? 'file-modified' : 'recorder',
       endReason: input.endReason ?? (input.interrupted ? 'interrupted' : 'stopped'),
       gapBeforeMs: input.gapBeforeMs ?? null,
+      rotationDegrees: input.rotationDegrees ?? null,
       hashedAt: input.hashedAt.toISOString(),
       timeZone: input.timeZone,
       utcOffsetMinutes: -input.startedAt.getTimezoneOffset(),

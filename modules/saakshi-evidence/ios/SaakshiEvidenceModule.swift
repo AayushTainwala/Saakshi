@@ -30,6 +30,11 @@ public class SaakshiEvidenceModule: Module {
     // no foreground service, because Apple allows video only while the app is on screen.
     Function("bodyCamRunning") { false }
 
+    // iPhone recordings are already QuickTime files that play everywhere; no copy is made.
+    AsyncFunction("remuxToMp4") { (_: String, _: String, _: Int?) -> String in
+      throw Exception(name: "ERR_UNSUPPORTED", description: "Remuxing is only needed for Android recordings")
+    }
+
     // Reads the file once and returns its size, SHA-256, SHA-1, MD5 and CRC-32.
     // Runs in a detached task so a large file doesn't hold up the module's queue.
     AsyncFunction("hashFile") { (uri: URL) async throws -> [String: Any] in
