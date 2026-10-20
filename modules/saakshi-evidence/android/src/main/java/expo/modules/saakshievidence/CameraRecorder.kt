@@ -61,7 +61,9 @@ object CameraRecorder {
   private var appContext: Context? = null
   private var device: CameraDevice? = null
   private var session: CameraCaptureSession? = null
+  private var previewTexture: android.graphics.SurfaceTexture? = null
   private var previewSurface: Surface? = null
+  private var onPreviewSize: ((Size) -> Unit)? = null
   private var persistentSurface: Surface? = null
   private var videoSize: Size = Size(1280, 720)
   private var sensorOrientation = 90
@@ -84,9 +86,17 @@ object CameraRecorder {
     listener?.invoke(name, body)
   }
 
+  /** The camera thread, started on first use (the preview can arrive before the camera opens). */
+  @Synchronized
+  private fun cameraHandler(): Handler {
+    handler?.let { return it }
+    val t = HandlerThread("SaakshiCamera").also { it.start() }
+    thread = t
+    return Handler(t.looper).also { handler = it }
+  }
+
   private fun post(block: () -> Unit) {
-    val h = handler ?: return
-    h.post {
+    cameraHandler().post {
       try {
         block()
       } catch (e: Exception) {
@@ -100,10 +110,6 @@ object CameraRecorder {
   /** Opens the back camera. `quality` decides the recording size; the preview, if any, matches it. */
   @SuppressLint("MissingPermission") // The app asks for CAMERA and RECORD_AUDIO before opening.
   fun open(context: Context, quality: Int) {
-    if (thread == null) {
-      thread = HandlerThread("SaakshiCamera").also { it.start() }
-      handler = Handler(thread!!.looper)
-    }
     appContext = context.applicationContext
     post {
       if (device != null) return@post
@@ -116,6 +122,7 @@ object CameraRecorder {
       sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
       val map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
       videoSize = chooseSize(map?.getOutputSizes(MediaRecorder::class.java) ?: emptyArray(), quality)
+      makePreviewSurface()
 
       orientationListener = object : OrientationEventListener(context.applicationContext) {
         override fun onOrientationChanged(orientation: Int) {
@@ -158,6 +165,10 @@ object CameraRecorder {
       device = null
       orientationListener?.disable()
       orientationListener = null
+      previewSurface?.release()
+      previewSurface = null
+      previewTexture = null
+      onPreviewSize = null
       persistentSurface?.release()
       persistentSurface = null
     }
@@ -165,18 +176,25 @@ object CameraRecorder {
 
   /**
    * Shows the preview in [texture], or none when null (body-cam mode, or the view went away).
-   * [onSize] is called on the camera thread with the recording size once it is known.
+   * [onSize] is called on the camera thread with the recording size, now and whenever it changes.
    */
   fun setPreview(texture: android.graphics.SurfaceTexture?, onSize: ((Size) -> Unit)? = null) {
     post {
-      previewSurface?.release()
-      previewSurface = texture?.let {
-        it.setDefaultBufferSize(videoSize.width, videoSize.height)
-        Surface(it)
-      }
-      if (texture != null) onSize?.invoke(videoSize)
+      previewTexture = texture
+      onPreviewSize = if (texture != null) onSize else null
+      makePreviewSurface()
       if (device != null) rebuildSession()
     }
+  }
+
+  /** (Re)creates the preview surface at the recording size. */
+  private fun makePreviewSurface() {
+    previewSurface?.release()
+    previewSurface = previewTexture?.let {
+      it.setDefaultBufferSize(videoSize.width, videoSize.height)
+      Surface(it)
+    }
+    if (previewSurface != null) onPreviewSize?.invoke(videoSize)
   }
 
   private fun chooseSize(sizes: Array<Size>, quality: Int): Size {
