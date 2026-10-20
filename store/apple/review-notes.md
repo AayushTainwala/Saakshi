@@ -6,7 +6,7 @@ Paste the main block. Then add each optional block only if the build being revie
 
 Other fields in App Review Information:
 - **Sign-in required:** off. There is no account.
-- **Contact:** the owner's name, email and phone in international format (+91…).
+- **Contact:** Aayush Tainwala, `tainwala.aayush@gmail.com`, and a phone number in international format (+91…).
 
 ## Main block
 

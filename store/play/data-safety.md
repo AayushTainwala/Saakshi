@@ -46,13 +46,23 @@ From the generated manifest (`npx expo prebuild`, 20 Oct 2026, with the `play` p
 | App access | **All functionality is available without special access.** No login. |
 | Ads | **No, my app does not contain ads.** |
 | Content rating | Fill in the questionnaire truthfully. The app has no violence, sexual content, gambling or user-to-user chat. It does share the user's location, but only by SMS the user sends to their own contacts. Expect a low rating. |
-| Target audience | **18 and over** is my recommendation, because the app is legal content and record-keeping for adults. This is the owner's decision (handoff owner questions). |
+| Target audience | **18 and over** (owner's decision, 21 Oct). |
 | News app | No. |
 | COVID-19 contact tracing or status | No. |
 | Government app | **No.** Saakshi is not made by or for a government. |
 | Financial features | None. |
 | Health | None. |
 | Data safety | As above. |
+
+## App signing
+
+The owner's decision of 21 Oct: Play signs with **our EAS keystore**, not a key Google makes. The Play copy and the GitHub APK then share one signature, so a user can move between them without uninstalling, and without losing the recordings kept in the app.
+- At the first upload, when the Console asks about the app signing key, choose to use your own key, and follow Google's export steps with the keystore downloaded from EAS (docs/BUILD_HANDOFF.md, Stream D, step 4).
+- Google's export steps couldn't be read from this session, so follow the Console's own instructions.
+
+## Developer contact
+
+Public developer email: `tainwala.aayush@gmail.com`.
 
 ## Store listing
 

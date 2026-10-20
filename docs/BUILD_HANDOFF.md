@@ -21,16 +21,17 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [x] (Stream A) **Segment length.** *Answered 20 Oct:* the evidence camera saves one file from start to stop, with no segments and no joining; the format must survive a sudden cut-off (check its cost on both platforms first and report in this handoff). Segments are for bug mode and body-cam mode only. SPEC E1, E8, body-cam mode.
 - [x] (Stream A) **Certificate language.** *Answered 20 Oct:* English only for now, with the Hindi help text kept. SPEC E4.
 - [x] (Stream A) **App Attest environment.** *Answered 20 Oct:* `production` confirmed.
-- [ ] (Stream D) **Play signing key.** When you first upload to Google Play, the Console asks who holds the app signing key. Two choices:
+- [x] (Stream D) **Play signing key.** When you first upload to Google Play, the Console asks who holds the app signing key. Two choices:
   - **(a) Google makes its own key (the default).** The Play copy and the GitHub APK then have different signatures. Android won't install one over the other, so someone switching must uninstall first, which **deletes the recordings kept in the app**.
   - **(b) Upload our EAS keystore as the app signing key.** Both copies share one signature and the user can switch freely.
 
-  I recommend (b). Decide before the first Play upload: it can't easily be changed afterwards. (b) needs the keystore backup (Stream D, step 4) and Google's key-export steps in the Console, which I couldn't read from here.
-- [ ] (Stream D) **Public contact email** for the privacy policy, TestFlight feedback, App Review contact and the Play developer page. Until then, the privacy policy points to GitHub issues.
-- [ ] (Stream D) **Play target audience.** I suggest 18 and over. Your call.
-- [ ] (Stream D) **Mirrors.**
+  I recommend (b). Decide before the first Play upload: it can't easily be changed afterwards. (b) needs the keystore backup (Stream D, step 4) and Google's key-export steps in the Console, which I couldn't read from here. *Answered 21 Oct: (b).* At the first Play upload, choose to upload your own app signing key, using the EAS keystore from step 4, rather than letting Google make one. The keystore backup is therefore required before the first Play upload.
+- [x] (Stream D) **Public contact email** for the privacy policy, TestFlight feedback, App Review contact and the Play developer page. *Answered 21 Oct:* `tainwala.aayush@gmail.com`. It is now in the privacy policy (both languages) and the store text.
+- [x] (Stream D) **Play target audience.** I suggest 18 and over. Your call. *Answered 21 Oct:* 18 and over.
+- [ ] (Stream D) **Mirrors.** *21 Oct: on hold until the owner confirms.* The Codeberg job stays off: it runs only once `CODEBERG_REPO` is set.
   - Is Codeberg fine as the first mirror (docs/release/mirrors.md)?
   - The Internet Archive's official uploader is AGPL. May CI use it (it never enters the app), or should a later session use plain `curl` instead?
+- [x] (Owner, 21 Oct) **The repository is public**, by the owner's decision. GitHub Pages may serve the privacy policy and the live-location viewer page (S3).
 - [ ] (Stream B) **Supabase region for live location (S3).** Which region should the project be created in? Mumbai (`ap-south-1`) keeps the data in India and is closest to users. Nothing will be created until you answer.
 - [x] (Stream B) **Phone backups.** Android backs up an app's files to the user's Google account unless the app turns this off (`android.allowBackup`), and iCloud backs up the documents directory. That would copy trusted contacts (and evidence) off the phone. Turn Android backup off for the whole app, keep it, or exclude only some files? This touches Stream A's evidence too. *Answered 20 Oct:* the user chooses whether anything is backed up and where: local only, or a cloud service of their own (Google Drive, iCloud or another). Nothing ever comes to us. So the app starts local-only, with the phone's automatic backups off for its files, and copies only where the user chooses. SPEC section 2. Work for Streams A and B: see Stream D, "For other streams".
 - [x] (Stream B, for Stream D) **Extra Android permissions.** `npx expo config --type introspect` shows the Expo defaults `SYSTEM_ALERT_WINDOW`, `READ_EXTERNAL_STORAGE` and `WRITE_EXTERNAL_STORAGE` in the manifest. No feature needs them; consider blocking them in `app.json` (`android.blockedPermissions`) so the Play listing and App Review notes stay short. *Done by Stream D:* `app.config.ts` blocks all three in every Android build.
@@ -330,7 +331,7 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
          - If you already made a key in App Store Connect, choose to give it instead (the `.p8` file path, key ID and issuer ID). EAS uploads it. Then delete the `.p8` from the clone folder, or move it to your password manager. **Never commit it.**
       4. **Exit.**
    4. Re-run step 3 whenever an iPhone capability or app extension is added (for example Stream B's Lock Screen controls or widgets in R2), and if a build says the provisioning profile has expired.
-4. **Back up the Android key** (strongly advised, after the first Release run). Losing it means no update can ever install over existing copies, and the published fingerprint changes.
+4. **Back up the Android key** (after the first Release run; **required before the first Play upload**, because Play will sign with this key, as decided on 21 Oct). Losing it means no update can ever install over existing copies, and the published fingerprint changes.
    1. On the same computer, run `npx eas-cli@latest credentials --platform android`.
    2. Choose profile **apk** → **Keystore: Manage everything needed to build your project** → **Download existing keystore**.
    3. Keep the `.jks` file and the passwords it prints in your password manager. **Never commit them.**
