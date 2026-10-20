@@ -17,10 +17,10 @@ The pickup file for build sessions. Each stream keeps its own section current: s
 
 Streams add questions here as `- [ ] (Stream X) question`.
 
-- [ ] (Stream A) **Deleting recordings.** The locker has no delete button, because the spec holds back quick delete (E9) for your decision. Without one, recordings fill the phone. Should ordinary delete (one session at a time, with a confirmation) ship in R1?
-- [ ] (Stream A) **Segment length.** Video is saved in 60-second segments: a seized or crashed phone loses at most the last minute. Shorter segments lose less but make more files; there is a gap of under a second between segments. Keep 60 seconds?
-- [ ] (Stream A) **Certificate language.** Part A is printed in English, as the Schedule's text is English. Do you also want a Hindi version, or Hindi help text only (as now)?
-- [ ] (Stream A) **App Attest environment.** `app.json` sets the App Attest entitlement to `production`. Apple needs the App Attest capability on the App ID (your setup step 2). Confirm before the first iPhone build.
+- [x] (Stream A) **Deleting recordings.** *Answered 20 Oct:* ordinary delete ships in R1, one session at a time with a confirmation. Quick delete (E9) stays held back. SPEC E5.
+- [x] (Stream A) **Segment length.** *Answered 20 Oct:* the evidence camera saves one file from start to stop, with no segments and no joining; the format must survive a sudden cut-off (check its cost on both platforms first and report in this handoff). Segments are for bug mode and body-cam mode only. SPEC E1, E8, body-cam mode.
+- [x] (Stream A) **Certificate language.** *Answered 20 Oct:* English only for now, with the Hindi help text kept. SPEC E4.
+- [x] (Stream A) **App Attest environment.** *Answered 20 Oct:* `production` confirmed.
 
 ---
 
@@ -41,7 +41,7 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
 
 ## Stream A: Foundation and evidence
 
-**Status:** R1 evidence pipeline (E1, E2, E4, E5, E6) built and tested in code; not yet run on a phone.
+**Status:** R1 evidence pipeline (E1, E2, E4, E5, E6) built and tested in code; not yet run on a phone. Owner decisions of 20 Oct (owner questions above) add: ordinary delete, one-file video, and body-cam mode (B1–B4) in R1.
 - Shell: merged to `main` (https://github.com/AayushTainwala/Saakshi/pull/1). **Streams B, C and D can start.**
 - Evidence: https://github.com/AayushTainwala/Saakshi/pull/2 (`stream-a/evidence`), ready for review. The Native build workflow compiles the Android debug and iOS simulator apps successfully.
 

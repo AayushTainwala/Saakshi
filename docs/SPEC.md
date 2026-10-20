@@ -32,7 +32,11 @@ A free, open-source phone app that helps people in India protect themselves and 
 - each file's SHA-256 hash is computed when it closes;
 - a record beside it holds the hash, time, GPS position and accuracy, device make and model, and app version;
 - the record is signed with a key held in the phone's security chip, with key attestation showing it came from the genuine app on an untampered phone;
-- long recordings are saved as segments, each segment's record including the previous segment's hash, so nothing can be spliced in.
+- a video runs from start to stop as **one file**, straight from the camera, with one fingerprint and one signed record. That one file is what is identified, fingerprinted, played, shared and certified. Each record also carries the previous record's hash, so a session's files are chained and nothing can be added or removed unnoticed;
+- the recording format is chosen so that a video cut off suddenly (the phone forced off, the app crashing) stays playable up to the moment it stopped. Such a file is fingerprinted and signed when the app next opens, and its record says the recording was interrupted. The build cost of this format on each phone is checked and reported before it is built;
+- **Proposed:** while recording, the app warns at 10% and 5% battery, and at 3% stops and saves the recording itself, so a dying battery never cuts a file off.
+
+Physical damage to the phone during a recording is not solved for in v1.
 
 In v1.1, C2PA Content Credentials and motion, compass and network readings are added. The aim is to make a claim that a recording is AI-generated implausible and to put the burden on whoever makes it; nothing makes a recording unquestionable.
 
@@ -40,9 +44,9 @@ In v1.1, C2PA Content Credentials and motion, compass and network readings are a
 
 **E3. Public timestamp.** When the phone next has internet, each hash is stamped through OpenTimestamps, implemented against its public calendar servers. The official clients are LGPL-3.0, so we write our own rather than bundle theirs.
 
-**E4. BSA s.63 certificate.** For each recording, Part A of the certificate in the Schedule is pre-filled: device type Mobile, make and model, hash value and algorithm (SHA256), with the hash report attached. The user adds name, address and IMEI (the screen shows how: *#06#) and signs. The PDF states that s.63(4)(c) also requires Part B signed by an expert. The form text is checked against the central Gazette before release.
+**E4. BSA s.63 certificate.** For each recording, Part A of the certificate in the Schedule is pre-filled: device type Mobile, make and model, hash value and algorithm (SHA256), with the hash report attached. The user adds name, address and IMEI (the screen shows how: *#06#) and signs. The PDF states that s.63(4)(c) also requires Part B signed by an expert. The form text is checked against the central Gazette before release. The certificate is printed in English; its help text on screen is in English and Hindi.
 
-**E5. Evidence locker and export.** Every recording with its status (hash checked, witness sent, timestamped, uploaded, certificate made). Export a bundle (original file, signed record, timestamp proof, certificate, hash report) through the share sheet.
+**E5. Evidence locker and export.** Every recording with its status (hash checked, witness sent, timestamped, uploaded, certificate made). Export a bundle (original file, signed record, timestamp proof, certificate, hash report) through the share sheet. **Ordinary delete:** the user deletes one recording session at a time, after a confirmation, which removes its media, records and certificate. Quick delete (E9) stays held back.
 
 **E6. Rights prompts while recording.** Short on-screen prompts of what to say, such as asking for the grounds of arrest in writing. Drawn on screen only, never burned into the video.
 
@@ -52,10 +56,18 @@ In v1.1, C2PA Content Credentials and motion, compass and network readings are a
 - The app tells the user that cloud copies can be obtained from the provider through legal process, so the feature is not for private content.
 
 **E8. Bug mode.** The phone becomes a voice recorder:
-- audio is saved in segments of 1–3 minutes;
-- each segment is hashed, its hash sent to contacts, uploaded to the user's cloud when there is signal, and its link shared with contacts;
+- audio is saved in fixed short pieces of 1–3 minutes;
+- each piece is hashed, signed and chained as it is saved, its hash sent to contacts, and the piece uploaded to the user's cloud the moment it is saved, with its link shared with contacts. Pieces saved without signal upload as soon as it returns. This continues until the battery runs out;
+- pieces are not joined together;
 - recording continues with the screen locked;
 - on iPhone, Apple shows an orange dot and a Live Activity while recording, which is acceptable.
+
+**Body-cam mode (B1–B4), R1.** The phone is worn on the chest, round the neck or clipped to clothing, and records video continuously, so the user's hands stay free in a crowd. On both iPhone and Android:
+- **Start:** one button. The screen goes dark at minimum brightness and touch is locked; recording carries on. The app prompts the user to turn on Battery Saver or Low Power Mode.
+- **Unlock:** pressing volume-down twice unlocks the screen. Touching the locked screen shows only "Screen locked. Use your unlock buttons." without naming them; the buttons are taught when body-cam mode is first turned on, and in the chest-mount guide (G4).
+- **Saving:** like bug mode, in fixed short pieces, each fingerprinted, signed and chained as it is saved, and not joined together. In R1 the pieces stay on the phone; from R2, each uploads the moment it is saved (E7).
+- **Quality:** 720p by default; the user can raise it.
+- **Calls, messages and notifications keep working.** On Android, recording continues with the screen off through a foreground service while the user takes calls and uses other apps. On iPhone, Apple allows video only while the app is on screen: before the user leaves the app, it warns that video will stop; if they leave anyway, or a call comes in, sound keeps recording, and video restarts when they return. Every gap is logged in the record.
 
 **E9 (v1.1). Vault, disguised icon, quick lock**, learning from Tella. Quick delete of evidence is held back pending Aayush's decision.
 
@@ -105,7 +117,7 @@ The card must also state the limit in BNS s.37 ([research/law.md](research/law.m
 
 ## 7. Later
 
-- **v1.1:** body-cam pocket mode, screen-off recording on Android, sealed segments for video, survival of calls (B1–B4); E9; G1; G2; C2PA and sensor readings; WhatsApp, Signal and Telegram; more cloud providers.
+- **v1.1:** E9; G1; G2; C2PA and sensor readings; WhatsApp, Signal and Telegram; more cloud providers.
 - **v2:** a request-help network for lawyers and medics, with verified volunteers, a one-hour commitment, confirmation by the person helped, and strikes for no-shows.
 - **Separate companion app (parked):** offline mesh messaging.
 

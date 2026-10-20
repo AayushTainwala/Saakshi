@@ -6,7 +6,7 @@ How v1 ([SPEC.md](SPEC.md)) gets built and shipped: releases, architecture, buil
 
 | Release | Modules (codes from the spec) | Target |
 |---|---|---|
-| **R1** | Shell, navigation, English and Hindi throughout (F1, G6); evidence camera with signed, chained fingerprint (E1); witness SMS (E2); BSA s.63 certificate (E4); locker and export (E5); rights prompts while recording (E6); contacts and SOS by SMS, sending itself in the Android APK (S1, S2); helplines (G3); chest-mount guide (G4); digital safety (G5); offline-communication guide (O1); signed APK with checksums on GitHub Releases and mirrors, and iPhone build to TestFlight and App Store review (F2) | Android APK about 1.5–2 days after the build streams start |
+| **R1** | Shell, navigation, English and Hindi throughout (F1, G6); evidence camera with signed, chained fingerprint (E1); witness SMS (E2); BSA s.63 certificate (E4); locker and export (E5); rights prompts while recording (E6); body-cam mode (B1–B4); contacts and SOS by SMS, sending itself in the Android APK (S1, S2); helplines (G3); chest-mount guide (G4); digital safety (G5); offline-communication guide (O1); signed APK with checksums on GitHub Releases and mirrors, and iPhone build to TestFlight and App Store review (F2) | Android APK about 1.5–2 days after the build streams start |
 | **R2** | Public timestamp (E3); copies to Google Drive (E7); bug mode (E8); live location by link (S3); trigger and code pad (S4); confiscation mode | About 2–4 days after R1 |
 
 Total is about 70 agent-hours across four parallel streams, plus the owner's review and testing on phones.
@@ -46,7 +46,7 @@ Each stream is a separate Claude Code cloud session on this repository, on its o
 
 | Stream | Scope | Model and effort |
 |---|---|---|
-| **A. Foundation and evidence** | Shell, navigation, theming, i18n scaffold, module layout; evidence-bundle format; E1, E2, E4, E5, E6; then E3 and E7 for R2 | Opus, high |
+| **A. Foundation and evidence** | Shell, navigation, theming, i18n scaffold, module layout; evidence-bundle format; E1, E2, E4, E5, E6; body-cam mode (B1–B4); then E3 and E7 for R2 | Opus, high |
 | **B. Safety and alerts** | S1, S2; then S3 (server and viewer page), S4, bug mode (E8) and confiscation mode | Opus, high |
 | **C. Content and Hindi** | G3 with every number verified; G4, G5, O1; Hindi for every interface string and all content; checks owed in `docs/research/law.md` | Opus, high for anything legal; Sonnet for the rest |
 | **D. Release** | GitHub Actions and EAS pipeline (signing, checksums, Releases, mirrors, TestFlight); store listings, privacy policy, App Review notes, data-safety and privacy labels | Sonnet, high |
