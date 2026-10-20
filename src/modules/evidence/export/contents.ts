@@ -54,6 +54,16 @@ export function buildManifest(
   };
 }
 
+const END_REASONS: Record<string, string> = {
+  stopped: 'stopped by the user',
+  'piece-complete': 'piece complete; recording continued in the next file',
+  'app-left': 'video stopped because the app left the screen (iPhone)',
+  'camera-lost': 'the camera was taken by the system or another app',
+  'low-battery': 'stopped and saved by the app at 3% battery',
+  interrupted: 'cut off (crash or power-off); sealed when the app next opened',
+  error: 'camera error',
+};
+
 function groupDigits(n: number): string {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
@@ -111,6 +121,9 @@ export function hashReport(
     lines.push(
       `${String(record.sequence).padStart(4, '0')}  media/${mediaFile}`,
       `      Recorded:        ${formatIST(capture.startedAt, true)} to ${formatIST(capture.endedAt, true)}`,
+      ...(capture.endReason
+        ? [`      Ended:           ${END_REASONS[capture.endReason] ?? capture.endReason}${record.interrupted ? ' (end time is the file\'s last write)' : ''}`]
+        : []),
       `      Place:           ${formatPlace(record)}`,
       `      Size:            ${groupDigits(file.size)} bytes`,
       `      SHA-256:         ${file.sha256}`,

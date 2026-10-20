@@ -1,3 +1,4 @@
+import { markActive, markInactive } from '../locker/active';
 import type { LockerStore } from '../locker/store';
 import { extensionOf, mediaFileName, mediaTypeFor } from '../locker/media';
 import type { ClosedFile, EvidenceItem, FileDigests, SessionState } from '../types';
@@ -28,7 +29,7 @@ export type PipelineDeps = {
 /**
  * Takes each file as the camera closes it, in order, through: hash → move into the locker →
  * write and sign the record. Files are processed one at a time so that each record can chain
- * to the one before it, while the camera carries on recording the next segment.
+ * to the one before it, while the camera carries on recording (body-cam and bug mode pieces).
  */
 export class CaptureSession {
   private state: SessionState | null = null;
@@ -40,6 +41,27 @@ export class CaptureSession {
   private listeners = new Set<() => void>();
 
   constructor(private readonly deps: PipelineDeps) {}
+
+  /**
+   * Picks up an existing session, for example to seal a file cut off by a crash: numbering and
+   * the chain continue from its last sealed file.
+   */
+  static resume(deps: PipelineDeps, sessionId: string): CaptureSession {
+    const state = deps.store.readSession(sessionId);
+    if (!state) throw new Error('No such session');
+    const session = new CaptureSession(deps);
+    session.state = state;
+    session.sequence = state.items.reduce((max, item) => Math.max(max, item.sequence + 1), 0);
+    session.clips = state.items.reduce((max, item) => Math.max(max, (item.segment?.clip ?? -1) + 1), 0);
+    session.lastSealed = [...state.items].reverse().find((item) => item.status === 'sealed') ?? null;
+    markActive(state.id);
+    return session;
+  }
+
+  /** The session's state, creating the session if nothing has been recorded yet. */
+  ensureSession(): SessionState {
+    return this.session();
+  }
 
   get id(): string | null {
     return this.state?.id ?? null;
@@ -84,9 +106,16 @@ export class CaptureSession {
     await this.queue;
   }
 
+  /** Call when recording is over: waits for the queue, then lets the session be deleted. */
+  async finish(): Promise<void> {
+    await this.drain();
+    if (this.state) markInactive(this.state.id);
+  }
+
   private session(): SessionState {
     if (!this.state) {
       this.state = this.deps.store.createSession(this.deps.newId(), this.deps.now().toISOString());
+      markActive(this.state.id);
     }
     return this.state;
   }
@@ -103,11 +132,17 @@ export class CaptureSession {
       startedAt: file.startedAt.toISOString(),
       endedAt: file.endedAt.toISOString(),
       status: 'saved',
+      ...(file.interrupted ? { interrupted: true } : {}),
+      ...(file.endReason ? { endReason: file.endReason } : {}),
+    };
+    const releaseMarker = () => {
+      if (file.pendingMarker) this.deps.store.deletePending(session.id, file.pendingMarker);
     };
 
     try {
       if (!this.deps.hash) {
         this.deps.store.moveMedia(session.id, file.uri, item.media);
+        releaseMarker();
         this.commit(item);
         return item;
       }
@@ -119,6 +154,9 @@ export class CaptureSession {
       item.status = 'hashed';
       const movedUri = this.deps.store.moveMedia(session.id, file.uri, item.media);
       this.commit(item);
+      // From here the file is in the locker with its fingerprint noted; a crash now leaves a
+      // hashed file that "Check files" and the next seal can account for.
+      releaseMarker();
 
       if (this.deps.seal) {
         const sealed = await this.deps.seal({

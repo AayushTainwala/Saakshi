@@ -4,6 +4,37 @@ public class SaakshiEvidenceModule: Module {
   public func definition() -> ModuleDefinition {
     Name("SaakshiEvidence")
 
+    // The Android recorder (CameraRecorder.kt). On iPhone, expo-camera's AVCaptureMovieFileOutput
+    // already writes movie fragments every 10 seconds, so its files survive a cut-off.
+    Function("recorderSupported") { false }
+
+    Events("onVolumeDown")
+
+    OnCreate {
+      VolumeButtons.shared.onVolumeDown = { [weak self] in self?.sendEvent("onVolumeDown", [:]) }
+    }
+
+    AsyncFunction("volumeKeysStart") {
+      VolumeButtons.shared.start()
+    }.runOnQueue(.main)
+
+    AsyncFunction("volumeKeysStop") {
+      VolumeButtons.shared.stop()
+    }.runOnQueue(.main)
+
+    AsyncFunction("setScreenDimmed") { (dimmed: Bool) in
+      ScreenDimmer.set(dimmed: dimmed)
+    }.runOnQueue(.main)
+
+    // Body-cam mode on iPhone records with expo-camera (video) and expo-audio (sound); there is
+    // no foreground service, because Apple allows video only while the app is on screen.
+    Function("bodyCamRunning") { false }
+
+    // iPhone recordings are already QuickTime files that play everywhere; no copy is made.
+    AsyncFunction("remuxToMp4") { (_: String, _: String, _: Int?) -> String in
+      throw Exception(name: "ERR_UNSUPPORTED", description: "Remuxing is only needed for Android recordings")
+    }
+
     // Reads the file once and returns its size, SHA-256, SHA-1, MD5 and CRC-32.
     // Runs in a detached task so a large file doesn't hold up the module's queue.
     AsyncFunction("hashFile") { (uri: URL) async throws -> [String: Any] in

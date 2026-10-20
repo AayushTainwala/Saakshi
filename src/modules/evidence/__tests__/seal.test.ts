@@ -90,14 +90,20 @@ describe('sealing', () => {
     const r = records[1].record;
     expect(r).toMatchObject({
       type: 'saakshi.evidence.record',
-      version: '0.1',
+      version: '0.2',
       session: id,
       sequence: 1,
       segment: { clip: 0, index: 0 },
+      interrupted: false,
       file: { name: '0001-clip0-seg0.mp4', mediaType: 'video/mp4', size: 12 },
       capture: {
+        mode: 'camera',
         startedAt: '2026-10-20T09:02:03.123Z',
         endedAt: '2026-10-20T09:03:03.140Z',
+        endedAtSource: 'recorder',
+        endReason: 'stopped',
+        gapBeforeMs: null,
+        rotationDegrees: null,
         hashedAt: '2026-10-20T09:03:04.000Z',
         timeZone: 'Asia/Kolkata',
       },

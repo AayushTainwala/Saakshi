@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText, Button, Card, Screen } from '@/components';
 import { spacing, touchTarget, useTheme } from '@/theme';
 
+import { recoverInterruptedRecordings } from '../capture/recoverDevice';
 import { attestIfNeeded } from '../integrity/deviceKey';
 import { fileLocker } from '../locker/store';
 import { useSessions } from '../locker/useSessions';
@@ -20,12 +21,16 @@ export function RecordHome() {
   // succeeds (it needs the internet once). Failures are kept in device-key.json, never shown here.
   useEffect(() => {
     attestIfNeeded(fileLocker).catch(() => undefined);
+    // Seal anything a crash or forced power-off cut off last time (spec E1).
+    recoverInterruptedRecordings().catch(() => undefined);
   }, []);
 
   return (
     <Screen>
       <AppText>{t('intro')}</AppText>
       <Button label={t('openCamera')} onPress={() => router.push('/capture')} />
+      <Button variant="secondary" label={t('bodycam.open')} onPress={() => router.push('/bodycam')} />
+      <AppText color="textMuted">{t('bodycam.openHint')}</AppText>
 
       <AppText variant="heading">{t('locker.heading')}</AppText>
       {sessions.length === 0 ? <AppText color="textMuted">{t('locker.empty')}</AppText> : null}

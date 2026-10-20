@@ -8,6 +8,9 @@ import { spacing } from '@/theme';
 
 import { shareBundle } from '../export/bundle';
 import { runCheck } from '../locker/actions';
+import { deleteSession, SessionBusyError } from '../locker/delete';
+import { fileLocker } from '../locker/store';
+import { needsCopy, playVideo, shareVideo } from '../export/videoActions';
 import { useSession } from '../locker/useSessions';
 import { sendWitnessMessage, SmsUnavailableError } from '../witness/send';
 import type { EvidenceItem, SessionState } from '../types';
@@ -32,8 +35,36 @@ function StatusRow({ done, label, detail }: { done: boolean; label: string; deta
   );
 }
 
-function ItemCard({ item }: { item: EvidenceItem }) {
+function ItemCard({ item, session }: { item: EvidenceItem; session: SessionState }) {
   const { t } = useTranslation('record');
+  const [busy, setBusy] = useState(false);
+  const copy = session.copies?.[String(item.sequence)];
+  const isVideo = item.kind === 'video' && item.status === 'sealed';
+
+  const run = async (action: () => Promise<void>) => {
+    setBusy(true);
+    try {
+      await action();
+    } catch (error) {
+      Alert.alert(t('locker.errorTitle'), error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const share = () => {
+    if (!needsCopy(item)) {
+      void run(() => shareVideo(session.id, item, 'original', t('video.share')));
+      return;
+    }
+    // Android .ts: the original is the evidence; offer the MP4 copy for playing elsewhere.
+    Alert.alert(t('video.shareTitle'), t('video.shareBody'), [
+      { text: t('video.shareCopy'), onPress: () => void run(() => shareVideo(session.id, item, 'copy', t('video.share'))) },
+      { text: t('video.shareOriginal'), onPress: () => void run(() => shareVideo(session.id, item, 'original', t('video.share'))) },
+      { text: t('video.cancel'), style: 'cancel' },
+    ]);
+  };
+
   const status =
     item.status === 'sealed'
       ? t('locker.itemSealed')
@@ -48,7 +79,7 @@ function ItemCard({ item }: { item: EvidenceItem }) {
               clip: item.segment.clip + 1,
               index: item.segment.index + 1,
             })
-          : t('locker.photo')}
+          : t(item.kind === 'video' ? 'locker.video' : item.kind === 'audio' ? 'locker.audio' : 'locker.photo')}
       </AppText>
       <AppText color="textMuted">
         {formatIST(item.startedAt, true)}
@@ -57,10 +88,27 @@ function ItemCard({ item }: { item: EvidenceItem }) {
       <AppText color={item.status === 'failed' ? 'danger' : item.status === 'sealed' ? 'success' : 'textMuted'}>
         {status}
       </AppText>
+      {item.interrupted ? <AppText color="warning">{t('locker.itemInterrupted')}</AppText> : null}
       {item.digests ? (
         <AppText variant="mono" selectable accessibilityLabel={t('locker.sha256')}>
           SHA-256 {item.digests.sha256}
         </AppText>
+      ) : null}
+      {copy ? (
+        <AppText color="textMuted" selectable>
+          {t('video.copyMade', { sha256: copy.sha256 })}
+        </AppText>
+      ) : null}
+      {isVideo ? (
+        <View style={styles.videoButtons}>
+          <Button
+            variant="secondary"
+            label={needsCopy(item) ? t('video.playCopy') : t('video.play')}
+            busy={busy}
+            onPress={() => void run(() => playVideo(session.id, item, t('video.play')))}
+          />
+          <Button variant="secondary" label={t('video.share')} disabled={busy} onPress={share} />
+        </View>
       ) : null}
     </Card>
   );
@@ -117,6 +165,27 @@ export function SessionDetail({ id }: { id: string }) {
     } finally {
       setWitnessing(false);
     }
+  };
+
+  const confirmDelete = () => {
+    Alert.alert(t('locker.deleteTitle'), t('locker.deleteBody', { count: session.items.length }), [
+      { text: t('locker.deleteCancel'), style: 'cancel' },
+      {
+        text: t('locker.deleteConfirm'),
+        style: 'destructive',
+        onPress: () => {
+          try {
+            deleteSession(fileLocker, id);
+            router.back();
+          } catch (error) {
+            Alert.alert(
+              t('locker.errorTitle'),
+              error instanceof SessionBusyError ? t('locker.deleteBusy') : error instanceof Error ? error.message : String(error),
+            );
+          }
+        },
+      },
+    ]);
   };
 
   const exportBundle = async () => {
@@ -186,8 +255,10 @@ export function SessionDetail({ id }: { id: string }) {
 
       <AppText variant="heading">{t('locker.filesHeading')}</AppText>
       {session.items.map((item) => (
-        <ItemCard key={item.sequence} item={item} />
+        <ItemCard key={item.sequence} item={item} session={session} />
       ))}
+
+      <Button variant="danger" label={t('locker.delete')} onPress={confirmDelete} />
     </Screen>
   );
 }
@@ -196,4 +267,5 @@ const styles = StyleSheet.create({
   statusRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start', paddingVertical: spacing.xs },
   mark: { width: 24, textAlign: 'center' },
   statusText: { flex: 1, gap: 2 },
+  videoButtons: { gap: spacing.sm, marginTop: spacing.sm },
 });

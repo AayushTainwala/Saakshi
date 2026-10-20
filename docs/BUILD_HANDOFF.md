@@ -59,9 +59,16 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
 
 ## Stream A: Foundation and evidence
 
-**Status:** R1 evidence pipeline (E1, E2, E4, E5, E6) built and tested in code; not yet run on a phone. Owner decisions of 20 Oct (owner questions above) add: ordinary delete, one-file video, and body-cam mode (B1–B4) in R1.
+**Status:** R1 evidence pipeline (E1, E2, E4, E5, E6) merged (https://github.com/AayushTainwala/Saakshi/pull/2). The owner's decisions of 20 and 21 Oct are built on `stream-a/followup`, in one pull request with one commit per step:
+1. ordinary delete in the locker;
+2. one file per evidence-camera video, cut-off safe, with interrupted files sealed at the next start (evidence bundle format 0.2);
+3. body-cam mode (B1–B4);
+4. low-battery warnings and the 3% auto-save.
+
+None of it has run on a phone yet.
 - Shell: merged to `main` (https://github.com/AayushTainwala/Saakshi/pull/1). **Streams B, C and D can start.**
-- Evidence: https://github.com/AayushTainwala/Saakshi/pull/2 (`stream-a/evidence`), ready for review. The Native build workflow compiles the Android debug and iOS simulator apps successfully.
+- Evidence: merged (https://github.com/AayushTainwala/Saakshi/pull/2).
+- Follow-up: `stream-a/followup`; see the pull request for its checks.
 
 **Done, shell:**
 - Template demo screens and assets removed; Expo Router native tabs Record, SOS, Guides, Help, Settings; i18next with English and Hindi and a language switch; light and dark themes with a switch; module stubs for `evidence`, `sos`, `location`, `bugmode`, `cloud`, `guides`, `helplines`; jest-expo with tests for i18n completeness, language choice, preferences and colour contrast; Expo packages updated to SDK 58's expected patch versions.
@@ -90,10 +97,73 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
 - **Native code** compiles (Android debug and iOS simulator builds pass in `.github/workflows/native-build.yml`, which runs on every pull request that touches native code), but none of it has run. This container can't build either platform.
 - `tools/verify-bundle.mjs` does not check attestation chains (spec section 10, step 6). That is the next piece of tooling to write.
 
+**Cut-off-safe video: what it costs (researched 21 Oct, before building).** The question: does a video cut off by a forced power-off or crash stay playable, with our camera library, and what would it take?
+
+- **iPhone: no cost.** expo-camera records with `AVCaptureMovieFileOutput` to a `.mov` (`node_modules/expo-camera/ios/Current/CameraSessionManager.swift`, `CameraVideoRecording.swift`) and leaves `movieFragmentInterval` at Apple's default. Apple's documentation for [`movieFragmentInterval`](https://developer.apple.com/documentation/avfoundation/avcapturemoviefileoutput/moviefragmentinterval): "The default is 10 seconds", and with fragments "if the file is not written completely, the movie file is still usable (up to the point where the last fragment was written)". So a cut-off file loses at most about the last 10 seconds. A recording cut off in its first 10 seconds has no fragment and is not playable. Shortening the interval would mean patching expo-camera, which I have not done.
+- **Android: expo-camera can't do it.** It pins CameraX 1.6.0 (`node_modules/expo-camera/android/build.gradle`) and records through `Recorder` with `FileOutputOptions` to `.mp4`. MP4's index (`moov`) is written only when recording stops, so a cut-off file has none and does not play. CameraX's [`Recorder.Builder`](https://developer.android.com/reference/androidx/camera/video/Recorder.Builder) has no container option in 1.6; `setVideoMimeType`/`setAudioMimeType` only arrive in 1.7.0-alpha03, and even then pick WebM or MP4, not a fragmented or streaming format. [`MediaMuxer.OutputFormat`](https://developer.android.com/reference/android/media/MediaMuxer.OutputFormat) offers MPEG-4, WebM, 3GPP, HEIF and Ogg: no fragmented MP4. [`MediaRecorder.OutputFormat.MPEG_2_TS`](https://developer.android.com/reference/android/media/MediaRecorder.OutputFormat) (Android 8+, H.264 and AAC) is a transport stream, which needs nothing written at the end.
+- **The format check** (`modules/saakshi-evidence/verify/cutoff-formats.sh`, files made by ffmpeg, not by phones): 30-second 720p clips truncated at 60% of their bytes. MPEG-TS: 541 of 900 frames still decode (right up to the cut). QuickTime with 10-second fragments: 543. Plain MP4: none ("moov atom not found").
+- **What I built, and why the cost was reasonable:** body-cam mode needs its own Android recorder anyway, because expo-camera's camera is tied to the screen and stops when it goes off, and body-cam must keep recording through a foreground service. So the extra cost of cut-off safety on Android is small: one recorder (`CameraRecorder.kt`: Camera2 into `MediaRecorder` through a persistent input surface, MPEG-TS) and a preview view, used by the evidence camera's video mode and by body-cam mode. Photos on Android still use expo-camera.
+- **Limits:**
+  - Android 7 (API 24–25) has no MPEG-TS in MediaRecorder. There, and on any phone whose MediaRecorder refuses MPEG-TS, the recorder falls back to MP4, which is **not** cut-off safe.
+  - `MediaRecorder` with MPEG-TS from a camera surface is documented but little used. One old report (Galaxy Note 2) of an unplayable TS file is in my search results. It needs testing on several current Android phones, including Samsung.
+  - `.ts` plays in VLC, Android's players and ffmpeg. macOS QuickTime Player does not open `.ts`; an expert on a Mac would use VLC.
+  - Data still in memory when the phone goes off (typically under a second) is lost; a dead battery normally shuts the phone down cleanly, and step 4's auto-save at 3% avoids that case.
+- **Interrupted files** (both platforms): a marker in the session's `pending/` folder is written when recording starts and removed once the file is in the locker. When the app opens (Record tab), any marker left behind is sealed: hashed as it is, chained after the session's last file, with `interrupted: true` and `endReason: "interrupted"` in the record (spec 0.2, section 3). On iPhone the marker can't name the file in advance (expo-camera reports the path only when it stops), so recovery takes the first `.mov` in expo-camera's cache folder created after the recording started. iOS may empty that cache folder when storage is very low, which would lose the file.
+
+**Body-cam mode (B1–B4): how it works and every platform limit found (21 Oct).** Record tab → "Body-cam mode". The first time, the user must acknowledge how to unlock before Start is enabled. Pieces are 60 seconds (`BODYCAM_PIECE_SECONDS`), 720p by default with 1080p as an option, and are sealed through `createEvidenceSession()`. Nothing is uploaded in R1.
+
+- **Reading the volume buttons:**
+  - *Android, screen on:* key events reach the app's window while it is on screen. `VolumeKeys.kt` wraps the window's callback while the lock is showing, takes volume-down presses, and swallows both volume keys so the volume doesn't change.
+  - *Android, screen off:* apps get no key events. Volume keys go to the system, or to an active media session that takes remote volume handling ([`MediaSession.setPlaybackToRemote`](https://developer.android.com/reference/android/media/session/MediaSession): "This must be called to receive volume button events"). That would mean presenting a fake playing media session, so it isn't used. Unlocking needs the dark screen (which is on, at minimum brightness). If the user turns the screen off, recording carries on and they unlock the phone as usual.
+  - *iPhone, iOS 17.2+:* [`AVCaptureEventInteraction`](https://developer.apple.com/documentation/avkit/avcaptureeventinteraction): "The system sends capture events only to apps that actively use the camera. Backgrounded capture apps … don't receive events." Volume down is a "primary" event (WWDC 2025 session 253), and so are the **Action button and Camera Control**: pressing either twice also unlocks.
+  - *iPhone, iOS 16.4–17.1:* no public API reads the buttons. The fallback watches the system output volume and counts each decrease as a press, so it **does not work when the volume is already at zero**, and the presses do change the volume.
+- **Dark screen:** Android dims only Saakshi's window (no `WRITE_SETTINGS` permission; I removed expo-brightness, whose plugin would add it). iPhone sets the system brightness and restores the previous level on unlock; iOS also restores it when the phone locks. The screen stays on (keep-awake) so that it can be unlocked, which costs battery.
+- **Android foreground service** (`BodyCamService.kt`, types camera and microphone, partial wake lock):
+  - It can only be started while the app is on screen ([while-in-use rule](https://developer.android.com/develop/background-work/services/fgs/service-types)), which it always is when the user taps Start.
+  - Android 13+ shows its notification only if the user has allowed notifications. Per the owner's decision of 22 Oct, the app asks for that permission the first time body-cam starts. The notice has a Stop button, which ends the session as the in-app Stop does. If the user refuses, recording carries on, and the screen says the notice is under Active apps at the bottom of the notification shade. Per Android's [notification permission guide](https://developer.android.com/guide/topics/ui/notifiers/notification-permission), foreground-service notices then appear in the Task Manager but not the drawer. Stopping Saakshi from Active apps ends the whole app ([Android 13 Task Manager](https://developer.android.com/about/versions/13/changes/fgs-manager)); the piece being recorded is then sealed as interrupted at the next start.
+  - Some makers' battery managers (Xiaomi, Oppo, Vivo and others) may stop background services. Test.
+  - During a phone call Android may give the microphone to the call and silence other apps' recording; video continues. Not yet tested.
+  - Google Play requires a declaration for camera and microphone foreground services (Stream D).
+- **iPhone:**
+  - Apple allows video only while the app is on screen, as the spec says. Video pieces stop with `endReason: "app-left"` when the app leaves the screen, and a new clip starts on return; `gapBeforeMs` in the first piece's record gives the gap.
+  - The screen warns about this before Start, and again whenever it is unlocked. iOS gives no notice before the user leaves an app, so a warning at the moment of leaving isn't possible.
+  - Sound is recorded separately (expo-audio, background recording, `.m4a` pieces). Each piece starts before the last stops, so there is no silence, and records show a small negative `gapBeforeMs` for the overlap.
+  - A phone call interrupts sound recording. That piece ends `audio-interrupted`, and a new piece starts at the next minute if iOS allows it, which needs testing.
+  - Video and sound are separate files in the same session, matched by their times.
+  - There is no way to open the Low Power Mode setting directly, so the app explains where it is. On Android the button opens Battery Saver settings.
+- **Gaps between pieces:**
+  - Android: about the time to stop one `MediaRecorder` and start the next.
+  - iPhone video: the time between one `recordAsync` ending and the next starting.
+  - Both are recorded in `gapBeforeMs` and are untested on phones.
+- **For Stream C:** the chest-mount guide (G4) should teach the unlock (volume down, twice). The lock message deliberately doesn't name the buttons.
+- **Permissions:** `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, `SYSTEM_ALERT_WINDOW` and `VIBRATE` come from Expo's template and no feature uses them. All four are now blocked in every Android build through `ALWAYS_BLOCKED` in `app.config.ts`; Stream D had already blocked the first three, and I added `VIBRATE`, which nothing in the app uses and no library declares. `POST_NOTIFICATIONS` stays, for body-cam's notice.
+
+**Android videos: the original and its MP4 copy (owner decision of 22 Oct).** The `.ts` from the camera stays the original: the chain, the export bundle and the certificate use only it.
+- Play and Share on a video in the session screen offer an MP4 copy instead. The copy is made once, without re-encoding (Android `MediaExtractor` into `MediaMuxer`, `Remuxer.kt`), and stored in `copies/`. It is labelled in the app as a copy, not the original, and has its own signed record naming the original's record and file SHA-256 and the method (spec section 11). Sharing asks whether to send the copy or the original.
+- MPEG-TS has no field for rotation, so a `.ts` recorded upright may play on its side. The recorder's rotation is now in each record (`capture.rotationDegrees`) and is written into the MP4 copy.
+- Not tested on a phone: the remux itself, whether MediaExtractor reads our MediaRecorder `.ts` files, and how the copy plays.
+- iPhone videos are `.mov` and need no copy; Play opens Quick Look and Share sends the original.
+
+**Low-battery auto-save (SPEC E1, decided 21 Oct).** While the evidence camera or body-cam mode is recording, the app warns at 10% and 5% (a line on the camera screen, and on body-cam's dark screen, which stays dark) and at 3% stops and saves the recording itself (`endReason: "low-battery"` in the record). Logic: `src/modules/evidence/battery/monitor.ts`, tested.
+- Nothing happens while the phone is charging, since the battery isn't running down (owner confirmed 22 Oct).
+- expo-battery's level listener fires on Android only around the system's "battery low" point, so the app also reads the level every 30 seconds while recording.
+- Older iPhones and iOS versions may report the level only in 5% steps. Then the 3% stop comes at the first reading of 0–3%, which could be too late. Check on a phone.
+- **Bug mode (E8) has no 3% save** (owner, 22 Oct): its pieces are already short. Stream B: don't use `useLowBattery` there.
+
 **NEEDS OWNER REVIEW:**
 - **Certificate Part A text** (`src/modules/evidence/certificate/html.ts`): checked against the Gazette of India on 21.10.2026 (law.md section 1B). The wording matched, item 3 included; the layout now follows the Gazette too (unnumbered paragraphs, "Make & Model", "Son/daughter/spouse", em dashes). The owner's sign-off is what remains: until `FORM_TEXT_REVIEWED` is `true`, the PDF prints "DRAFT: the text of this form has not yet had its final legal review".
 - **Rights prompts** (`src/i18n/locales/{en,hi}/record.json` under `rights`, sources in `src/modules/evidence/rights/prompts.ts`): wording in English and Hindi. Sources: Art. 22(1); BNSS ss.36(a), 38, 47(1)–(2), 48; *Mihir Rajesh Shah* para 56; BNS ss.221, 262. All are rows marked VERIFIED (IK) in law.md, none checked against the Gazette yet.
 - **Certificate screen help text** (`certificate.*` in `record.json`), in both languages.
+
+**Follow-up: not verified.** Everything in the follow-up needs testing on real phones. Most important:
+- an Android recording cut off by force-stopping the app or holding the power button, then reopened: is the `.ts` playable, and is it sealed as interrupted?
+- the same on iPhone, with a recording longer than 10 seconds;
+- body-cam with the screen off on Android, through a phone call;
+- body-cam on iPhone leaving and returning to the app;
+- volume-down unlock on each platform, including iOS 16 and 17.0–17.1;
+- the 10%, 5% and 3% battery points.
+
+Kotlin and Swift compile only on GitHub's runners (Native build workflow).
 
 **Next:**
 - Owner and phone testing of R1 as above; fix what it finds.
