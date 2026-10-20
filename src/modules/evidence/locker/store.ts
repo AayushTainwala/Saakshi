@@ -1,6 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 
 import type { SessionState } from '../types';
+import type { PendingMarker } from './pending';
 
 /**
  * The evidence locker on disk, inside the app's private documents directory:
@@ -26,6 +27,11 @@ export interface LockerStore {
   readRecordText(sessionId: string, name: string): string;
   recordUri(sessionId: string, name: string): string;
   sessionFileUri(sessionId: string, name: string): string;
+  /** The session folder, as a file:// URI. */
+  sessionDirUri(sessionId: string): string;
+  listPending(sessionId: string): { name: string; marker: PendingMarker }[];
+  writePending(sessionId: string, name: string, marker: PendingMarker): void;
+  deletePending(sessionId: string, name: string): void;
   readDeviceKeyJson(): string | null;
   writeDeviceKeyJson(json: string): void;
 }
@@ -160,6 +166,34 @@ export const fileLocker: LockerStore = {
 
   sessionFileUri(sessionId, name) {
     return new File(sessionDir(sessionId), name).uri;
+  },
+
+  sessionDirUri(sessionId) {
+    return sessionDir(sessionId).uri;
+  },
+
+  listPending(sessionId) {
+    const dir = new Directory(sessionDir(sessionId), 'pending');
+    if (!dir.exists) return [];
+    const out: { name: string; marker: PendingMarker }[] = [];
+    for (const entry of dir.list()) {
+      if (!(entry instanceof File) || !entry.name.endsWith('.json')) continue;
+      try {
+        out.push({ name: entry.name, marker: JSON.parse(entry.textSync()) as PendingMarker });
+      } catch {
+        // A marker cut off mid-write; its file, if any, stays in incoming/ for the next check.
+      }
+    }
+    return out;
+  },
+
+  writePending(sessionId, name, marker) {
+    writeText(new File(ensure(new Directory(sessionDir(sessionId), 'pending')), name), JSON.stringify(marker));
+  },
+
+  deletePending(sessionId, name) {
+    const file = new File(sessionDir(sessionId), 'pending', name);
+    if (file.exists) file.delete();
   },
 
   readDeviceKeyJson() {

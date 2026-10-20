@@ -2,18 +2,23 @@ import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppState, BackHandler, Linking, Pressable, StyleSheet, View } from 'react-native';
+import SaakshiEvidence, { RecorderPreview } from '@native/saakshi-evidence';
+import { AppState, BackHandler, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, Button } from '@/components';
 import { palettes, radius, spacing, touchTarget } from '@/theme';
 
-import { SEGMENT_SECONDS } from '../constants';
+import { fileLocker } from '../locker/store';
 import { RightsOverlay } from '../rights/RightsOverlay';
 import type { MediaKind } from '../types';
 import { createPipelineDeps } from './deps';
 import { CaptureSession } from './pipeline';
 import { useLatestLocation } from './useLocation';
+import { androidVideoController, iosVideoController, type VideoController } from './video';
+
+/** Android records video with the app's own recorder (MPEG-TS, cut-off safe); iPhone with expo-camera. */
+const OWN_RECORDER = Platform.OS === 'android' && !!SaakshiEvidence?.recorderSupported();
 
 // The camera screen is always dark, whatever the app theme, so the preview reads clearly.
 const colors = palettes.dark;
@@ -40,7 +45,6 @@ export function CaptureScreen() {
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
   const recordingRef = useRef(false);
-  const loopDone = useRef<Promise<void>>(Promise.resolve());
   const [recordingSince, setRecordingSince] = useState(0);
   const [clock, setClock] = useState(0);
 
@@ -72,46 +76,49 @@ export function CaptureScreen() {
     }
   }, [busy, location, session]);
 
-  /** Records consecutive segments until stopped, handing each finished one to the pipeline. */
-  const recordSegments = useCallback(async () => {
-    const clip = session.nextClip();
-    for (let index = 0; recordingRef.current && camera.current; index++) {
-      const startedAt = new Date();
-      const result = await camera.current.recordAsync({ maxDuration: SEGMENT_SECONDS });
-      const endedAt = new Date();
-      if (result?.uri) {
-        void session.add({
-          uri: result.uri,
-          kind: 'video',
-          segment: { clip, index },
-          startedAt,
-          endedAt,
-          location: location(),
-        });
-      }
-    }
-  }, [location, session]);
+  const controller = useRef<VideoController | null>(null);
 
-  const startRecording = useCallback(() => {
+  // Android: the app's recorder owns the camera in video mode, and needs opening and closing.
+  useEffect(() => {
+    if (!OWN_RECORDER || mode !== 'video' || !SaakshiEvidence) return;
+    const native = SaakshiEvidence;
+    const ready = native.addListener('onRecorderReady', () => setReady(true));
+    void native.recorderOpen(720);
+    return () => {
+      ready.remove();
+      setReady(false);
+      void native.recorderClose();
+    };
+  }, [mode]);
+
+  /** One video, one file, from start to stop (spec E1). */
+  const startRecording = useCallback(async () => {
     if (recordingRef.current) return;
     recordingRef.current = true;
+    const common = { session, store: fileLocker, location, mode: 'camera' as const, clip: session.nextClip() };
+    const next = OWN_RECORDER ? androidVideoController({ ...common, quality: 720 }) : iosVideoController(camera, common);
+    controller.current = next;
     const now = Date.now();
     setRecordingSince(now);
     setClock(now);
     setRecording(true);
-    loopDone.current = recordSegments()
-      .catch(() => undefined)
-      .finally(() => {
-        recordingRef.current = false;
-        setRecording(false);
-      });
-  }, [recordSegments]);
+    try {
+      await next.start();
+    } catch {
+      recordingRef.current = false;
+      controller.current = null;
+      setRecording(false);
+    }
+  }, [location, session]);
 
   const stopRecording = useCallback(async () => {
     if (!recordingRef.current) return;
     recordingRef.current = false;
-    camera.current?.stopRecording();
-    await loopDone.current;
+    const current = controller.current;
+    controller.current = null;
+    await current?.stop();
+    if (current && 'dispose' in current) (current as { dispose: () => void }).dispose();
+    setRecording(false);
   }, []);
 
   const close = useCallback(async () => {
@@ -122,7 +129,7 @@ export function CaptureScreen() {
     else router.back();
   }, [session, stopRecording]);
 
-  // The camera can't record in the background; finish the current segment cleanly instead.
+  // The camera can't record in the background; close the file cleanly instead.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state !== 'active') void stopRecording();
@@ -138,7 +145,12 @@ export function CaptureScreen() {
     return () => subscription.remove();
   }, [close]);
 
-  useEffect(() => () => camera.current?.stopRecording(), []);
+  useEffect(
+    () => () => {
+      void controller.current?.stop();
+    },
+    [],
+  );
 
   if (!cameraPermission || !micPermission) return <View style={styles.fill} />;
 
@@ -170,13 +182,17 @@ export function CaptureScreen() {
 
   return (
     <View style={styles.fill}>
-      <CameraView
-        ref={camera}
-        style={StyleSheet.absoluteFill}
-        mode={mode === 'photo' ? 'picture' : 'video'}
-        videoQuality="720p"
-        onCameraReady={() => setReady(true)}
-      />
+      {OWN_RECORDER && mode === 'video' ? (
+        <RecorderPreview style={StyleSheet.absoluteFill} />
+      ) : (
+        <CameraView
+          ref={camera}
+          style={StyleSheet.absoluteFill}
+          mode={mode === 'photo' ? 'picture' : 'video'}
+          videoQuality="720p"
+          onCameraReady={() => setReady(true)}
+        />
+      )}
       <SafeAreaView style={styles.overlay} pointerEvents="box-none">
         <View style={styles.topBar}>
           <Pressable

@@ -1,8 +1,14 @@
 import { NativeModule, requireOptionalNativeModule } from 'expo';
 
-import type { FileHashes, KeyAttestation, NativeDeviceKey } from './SaakshiEvidence.types';
+import type {
+  FileHashes,
+  KeyAttestation,
+  NativeDeviceKey,
+  RecorderOptions,
+  SaakshiEvidenceEvents,
+} from './SaakshiEvidence.types';
 
-declare class SaakshiEvidenceModule extends NativeModule {
+declare class SaakshiEvidenceModule extends NativeModule<SaakshiEvidenceEvents> {
   /** Reads a local file once and returns its size, SHA-256, SHA-1, MD5 and CRC-32. */
   hashFile(uri: string): Promise<FileHashes>;
   /** The device key, or null before it is created. On iOS `attestation` is always null here. */
@@ -13,6 +19,13 @@ declare class SaakshiEvidenceModule extends NativeModule {
   attestDeviceKey(): Promise<KeyAttestation>;
   /** ES256 signature of the message's UTF-8 bytes, DER, in Base64. */
   signUtf8(message: string): Promise<string>;
+
+  /** True on Android, where the app records video itself (CameraRecorder). */
+  recorderSupported(): boolean;
+  recorderOpen(quality: number): Promise<void>;
+  recorderClose(): Promise<void>;
+  recorderStart(options: RecorderOptions): Promise<void>;
+  recorderStop(): Promise<void>;
 }
 
 /** Null where the native module isn't built in (unit tests, Expo Go). */

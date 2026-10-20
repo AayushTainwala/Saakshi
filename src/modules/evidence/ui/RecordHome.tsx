@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText, Button, Card, Screen } from '@/components';
 import { spacing, touchTarget, useTheme } from '@/theme';
 
+import { recoverInterruptedRecordings } from '../capture/recoverDevice';
 import { attestIfNeeded } from '../integrity/deviceKey';
 import { fileLocker } from '../locker/store';
 import { useSessions } from '../locker/useSessions';
@@ -20,6 +21,8 @@ export function RecordHome() {
   // succeeds (it needs the internet once). Failures are kept in device-key.json, never shown here.
   useEffect(() => {
     attestIfNeeded(fileLocker).catch(() => undefined);
+    // Seal anything a crash or forced power-off cut off last time (spec E1).
+    recoverInterruptedRecordings().catch(() => undefined);
   }, []);
 
   return (

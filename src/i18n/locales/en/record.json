@@ -61,7 +61,8 @@
     "deleteBody_other": "This deletes {{count}} files, their signed records and any certificate from this phone. It can't be undone. Copies you have already exported or sent are not affected.",
     "deleteCancel": "Keep it",
     "deleteConfirm": "Delete",
-    "deleteBusy": "This record is still being saved. Try again when recording has stopped."
+    "deleteBusy": "This record is still being saved. Try again when recording has stopped.",
+    "itemInterrupted": "Cut off before it was stopped (the app closed or the phone switched off). It plays up to the cut, and was sealed when the app next opened."
   },
   "witness": {
     "send": "Send witness message",

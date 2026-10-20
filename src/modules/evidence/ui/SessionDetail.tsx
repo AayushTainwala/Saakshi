@@ -59,6 +59,7 @@ function ItemCard({ item }: { item: EvidenceItem }) {
       <AppText color={item.status === 'failed' ? 'danger' : item.status === 'sealed' ? 'success' : 'textMuted'}>
         {status}
       </AppText>
+      {item.interrupted ? <AppText color="warning">{t('locker.itemInterrupted')}</AppText> : null}
       {item.digests ? (
         <AppText variant="mono" selectable accessibilityLabel={t('locker.sha256')}>
           SHA-256 {item.digests.sha256}

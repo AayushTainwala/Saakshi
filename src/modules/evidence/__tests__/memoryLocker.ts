@@ -1,4 +1,5 @@
 import type { LockerStore } from '../locker/store';
+import type { PendingMarker } from '../locker/pending';
 import type { SessionState } from '../types';
 
 /** An in-memory LockerStore for tests. `files` maps URIs to contents. */
@@ -7,6 +8,7 @@ export function memoryLocker(files: Map<string, Uint8Array> = new Map()) {
   const records = new Map<string, { body: string; signature: Uint8Array }>();
   let deviceKey: string | null = null;
   const sessionFiles = new Map<string, Uint8Array>();
+  const pending = new Map<string, Map<string, PendingMarker>>();
 
   const store: LockerStore = {
     createSession(id, createdAt) {
@@ -43,11 +45,19 @@ export function memoryLocker(files: Map<string, Uint8Array> = new Map()) {
     },
     recordUri: (sessionId, name) => `mem://${sessionId}/records/${name}`,
     sessionFileUri: (sessionId, name) => `mem://${sessionId}/${name}`,
+    sessionDirUri: (sessionId) => `mem://${sessionId}`,
+    listPending: (sessionId) =>
+      [...(pending.get(sessionId) ?? new Map()).entries()].map(([name, marker]) => ({ name, marker: structuredClone(marker) })),
+    writePending(sessionId, name, marker) {
+      if (!pending.has(sessionId)) pending.set(sessionId, new Map());
+      pending.get(sessionId)!.set(name, structuredClone(marker));
+    },
+    deletePending: (sessionId, name) => void pending.get(sessionId)?.delete(name),
     readDeviceKeyJson: () => deviceKey,
     writeDeviceKeyJson: (json) => {
       deviceKey = json;
     },
   };
 
-  return { store, files, sessions, records, sessionFiles };
+  return { store, files, sessions, records, sessionFiles, pending };
 }
