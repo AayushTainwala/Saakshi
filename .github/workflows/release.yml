@@ -1,0 +1,379 @@
+name: Release
+
+# Builds the app on EAS and publishes it:
+# - Android APK (profile `apk`, SMS auto-send on) to a GitHub Release, with its SHA-256 and the
+#   signing-certificate fingerprint, and to the Codeberg mirror when it is set up;
+# - Android App Bundle (profile `play`, SMS auto-send off) as a workflow artifact, for the owner to
+#   upload to Google Play;
+# - iPhone build (profile `ios`) to TestFlight through EAS Submit.
+#
+# A pushed tag v1.2.3 builds everything and publishes the release. A manual run (Actions → Release →
+# Run workflow) builds what you choose; it publishes a release only if you give it a tag.
+# One-time setup: docs/BUILD_HANDOFF.md, Stream D.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Which apps to build
+        type: choice
+        options: [all, android, ios]
+        default: all
+      testflight:
+        description: Send the iPhone build to TestFlight
+        type: boolean
+        default: true
+      release_tag:
+        description: Publish a GitHub Release with this tag, for example v1.0.0. Leave empty for a test build.
+        type: string
+        default: ''
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Check and plan
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+      prerelease: ${{ steps.plan.outputs.prerelease }}
+      android: ${{ steps.plan.outputs.android }}
+      ios: ${{ steps.plan.outputs.ios }}
+      testflight: ${{ steps.plan.outputs.testflight }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Work out what to build
+        id: plan
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EVENT: ${{ github.event_name }}
+          INPUT_PLATFORM: ${{ inputs.platform }}
+          INPUT_TESTFLIGHT: ${{ inputs.testflight }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::The EXPO_TOKEN secret is not set. See docs/BUILD_HANDOFF.md, Stream D, step 1."
+            exit 1
+          fi
+          version=$(node -p "require('./app.json').expo.version")
+          if [ "$EVENT" = push ]; then
+            tag="$GITHUB_REF_NAME"; platform=all; testflight=true
+          else
+            tag="$INPUT_TAG"; platform="$INPUT_PLATFORM"; testflight="$INPUT_TESTFLIGHT"
+          fi
+          prerelease=false
+          if [ -n "$tag" ]; then
+            if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+              echo "::error::Tag \"$tag\" must look like v1.2.3 or v1.2.3-beta.1."
+              exit 1
+            fi
+            base="${tag#v}"; base="${base%%-*}"
+            if [ "$base" != "$version" ]; then
+              echo "::error::Tag $tag does not match expo.version $version in app.json. Change one of them."
+              exit 1
+            fi
+            [[ "$tag" == *-* ]] && prerelease=true
+            # A tag that already exists must point at the commit being built.
+            existing=$(git ls-remote origin "refs/tags/$tag" "refs/tags/$tag^{}" | awk '{print $1}' | tail -1)
+            if [ -n "$existing" ] && [ "$existing" != "$GITHUB_SHA" ]; then
+              echo "::error::Tag $tag already points at $existing, not at $GITHUB_SHA."
+              exit 1
+            fi
+          fi
+          android=false; ios=false
+          [ "$platform" != ios ] && android=true
+          [ "$platform" != android ] && ios=true
+          if [ -n "$tag" ] && [ "$android" != true ]; then
+            echo "::error::A release needs the Android APK. Choose platform all or android."
+            exit 1
+          fi
+          {
+            echo "version=$version"; echo "tag=$tag"; echo "prerelease=$prerelease"
+            echo "android=$android"; echo "ios=$ios"; echo "testflight=$testflight"
+          } >> "$GITHUB_OUTPUT"
+          echo "Version $version, tag '${tag:-none}', Android $android, iPhone $ios, TestFlight $testflight" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npx eslint .
+      - name: Test
+        run: npx jest --ci
+
+  apk:
+    name: Android APK (GitHub)
+    needs: prepare
+    if: needs.prepare.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          packager: npm
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - name: Build on EAS
+        run: |
+          set -euo pipefail
+          eas build --platform android --profile apk --non-interactive --wait --json \
+            --message "APK $VERSION ($GITHUB_SHA)" > build.json
+      - name: Download the APK
+        id: apk
+        run: |
+          set -euo pipefail
+          url=$(jq -r '.[0].artifacts.buildUrl' build.json)
+          built=$(jq -r '.[0].appVersion' build.json)
+          code=$(jq -r '.[0].appBuildVersion' build.json)
+          [ "$built" = "$VERSION" ] || { echo "::error::EAS built $built, expected $VERSION."; exit 1; }
+          apk="Saakshi-$VERSION.apk"
+          curl -fsSL --retry 4 -o "$apk" "$url"
+          { echo "file=$apk"; echo "code=$code"; echo "eas=$(jq -r '.[0].id' build.json)"; } >> "$GITHUB_OUTPUT"
+      - name: Check signature and permissions
+        id: check
+        env:
+          APK: ${{ steps.apk.outputs.file }}
+        run: |
+          set -euo pipefail
+          bt=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          "$bt/apksigner" verify --verbose --print-certs "$APK" | tee signers.txt
+          [ "$(grep -c '^Signer #[0-9]* certificate SHA-256 digest:' signers.txt)" = 1 ] \
+            || { echo "::error::Expected exactly one signer."; exit 1; }
+          cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' signers.txt)
+          [[ "$cert" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::Could not read the certificate digest."; exit 1; }
+          # Play Protect in India blocks sideloaded apps that use any of these (CLAUDE.md, Privacy).
+          "$bt/aapt2" dump xmltree --file AndroidManifest.xml "$APK" > manifest.txt
+          "$bt/aapt2" dump permissions "$APK" | tee permissions.txt
+          if grep -E 'READ_SMS|RECEIVE_SMS|BIND_NOTIFICATION_LISTENER_SERVICE|BIND_ACCESSIBILITY_SERVICE' manifest.txt; then
+            echo "::error::The APK declares a permission that Play Protect blocks in India."
+            exit 1
+          fi
+          sha=$(sha256sum "$APK" | cut -d' ' -f1)
+          sha256sum "$APK" > SHA256SUMS
+          colon=$(echo "$cert" | tr a-f A-F | sed 's/../&:/g; s/:$//')
+          printf 'Saakshi Android signing certificate, SHA-256:\n%s\n' "$colon" > SIGNING-CERTIFICATE.txt
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "cert=$cert" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Android APK"
+            echo "- File: \`$APK\` (versionCode ${{ steps.apk.outputs.code }}, EAS build ${{ steps.apk.outputs.eas }})"
+            echo "- SHA-256: \`$sha\`"
+            echo "- Signing certificate SHA-256: \`$colon\`"
+            echo "- Permissions:"; echo '```'; grep -o "name='[^']*'" permissions.txt | sort -u; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: |
+            ${{ steps.apk.outputs.file }}
+            SHA256SUMS
+            SIGNING-CERTIFICATE.txt
+          if-no-files-found: error
+          retention-days: 30
+    outputs:
+      file: ${{ steps.apk.outputs.file }}
+      code: ${{ steps.apk.outputs.code }}
+      sha256: ${{ steps.check.outputs.sha256 }}
+      cert: ${{ steps.check.outputs.cert }}
+
+  play:
+    name: Android App Bundle (Google Play)
+    needs: prepare
+    if: needs.prepare.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          packager: npm
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - name: Build on EAS
+        run: |
+          set -euo pipefail
+          eas build --platform android --profile play --non-interactive --wait --json \
+            --message "Play $VERSION ($GITHUB_SHA)" > build.json
+      - name: Download and check the bundle
+        run: |
+          set -euo pipefail
+          aab="Saakshi-$VERSION-play.aab"
+          curl -fsSL --retry 4 -o "$aab" "$(jq -r '.[0].artifacts.buildUrl' build.json)"
+          # The bundle's manifest is protobuf, whose strings are stored as plain UTF-8.
+          unzip -p "$aab" base/manifest/AndroidManifest.xml > manifest.pb
+          for p in SEND_SMS READ_SMS RECEIVE_SMS; do
+            if grep -aq "android.permission.$p" manifest.pb; then
+              echo "::error::The Play bundle declares $p."
+              exit 1
+            fi
+          done
+          echo "### Play bundle: \`$aab\`, versionCode $(jq -r '.[0].appBuildVersion' build.json). Upload it in the Play Console." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: play-bundle
+          path: Saakshi-*-play.aab
+          if-no-files-found: error
+          retention-days: 30
+
+  ios:
+    name: iPhone (TestFlight)
+    needs: prepare
+    if: needs.prepare.outputs.ios == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          packager: npm
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - name: Build on EAS
+        run: |
+          set -euo pipefail
+          eas build --platform ios --profile ios --non-interactive --wait --json \
+            --message "iOS $VERSION ($GITHUB_SHA)" > build.json
+          echo "### iPhone build $(jq -r '.[0].appBuildVersion' build.json), EAS build $(jq -r '.[0].id' build.json)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Submit to TestFlight
+        if: needs.prepare.outputs.testflight == 'true'
+        run: |
+          set -euo pipefail
+          if [ -z "$(jq -r '.submit.ios.ios.ascAppId // empty' eas.json)" ]; then
+            echo "::warning::Not sent to TestFlight: add ascAppId to submit.ios.ios in eas.json (docs/BUILD_HANDOFF.md, Stream D)."
+            exit 0
+          fi
+          eas submit --platform ios --profile ios --id "$(jq -r '.[0].id' build.json)" \
+            --non-interactive --wait --what-to-test "Saakshi $VERSION ($GITHUB_SHA)"
+          echo "Sent to TestFlight." >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: Publish GitHub Release
+    needs: [prepare, apk]
+    if: needs.prepare.outputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.prepare.outputs.tag }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+          path: dist
+      - name: Write the notes
+        env:
+          TESTFLIGHT: ${{ vars.TESTFLIGHT_PUBLIC_LINK }}
+          CODEBERG_REPO: ${{ vars.CODEBERG_REPO }}
+        run: |
+          set -euo pipefail
+          mirror=()
+          [ -n "$CODEBERG_REPO" ] && mirror=(--mirror "https://codeberg.org/$CODEBERG_REPO/releases/tag/$TAG")
+          node tools/release-notes.mjs --version "$VERSION" --build "${{ needs.apk.outputs.code }}" \
+            --apk "${{ needs.apk.outputs.file }}" --sha256 "${{ needs.apk.outputs.sha256 }}" \
+            --cert-sha256 "${{ needs.apk.outputs.cert }}" --repo "$GITHUB_REPOSITORY" \
+            --testflight "$TESTFLIGHT" "${mirror[@]}" > dist/NOTES.md
+          (cd dist && sha256sum -c SHA256SUMS)
+      - name: Publish
+        env:
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          flags=()
+          [ "$PRERELEASE" = true ] && flags+=(--prerelease)
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "Saakshi $VERSION" \
+            --notes-file dist/NOTES.md "${flags[@]}" \
+            "dist/${{ needs.apk.outputs.file }}" dist/SHA256SUMS dist/SIGNING-CERTIFICATE.txt
+          echo "Published https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: dist/NOTES.md
+
+  codeberg:
+    # Optional mirror (docs/release/mirrors.md). Runs only when the repository variable CODEBERG_REPO
+    # (owner/name on codeberg.org) and the secret CODEBERG_TOKEN are set. A failure here does not undo
+    # the GitHub Release.
+    name: Mirror to Codeberg
+    needs: [prepare, release]
+    if: needs.prepare.outputs.tag != '' && vars.CODEBERG_REPO != ''
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.prepare.outputs.tag }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+      REPO: ${{ vars.CODEBERG_REPO }}
+      TOKEN: ${{ secrets.CODEBERG_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: dist
+      - name: Push the code and tag
+        run: |
+          set -euo pipefail
+          [ -n "$TOKEN" ] || { echo "::error::CODEBERG_TOKEN secret is not set."; exit 1; }
+          git fetch origin "refs/tags/$TAG:refs/tags/$TAG"
+          git push --force "https://${REPO%%/*}:$TOKEN@codeberg.org/$REPO.git" \
+            "refs/remotes/origin/main:refs/heads/main" "refs/tags/$TAG"
+      - name: Create the release and upload the files
+        run: |
+          set -euo pipefail
+          api="https://codeberg.org/api/v1/repos/$REPO/releases"
+          auth="Authorization: token $TOKEN"
+          body=$(jq -n --arg tag "$TAG" --arg name "Saakshi $VERSION" --rawfile notes dist/NOTES.md \
+            --argjson pre "$PRERELEASE" '{tag_name: $tag, name: $name, body: $notes, prerelease: $pre}')
+          id=$(curl -fsS -H "$auth" "$api/tags/$TAG" | jq -r .id 2>/dev/null || true)
+          if [ -z "$id" ] || [ "$id" = null ]; then
+            id=$(curl -fsS -X POST -H "$auth" -H 'Content-Type: application/json' -d "$body" "$api" | jq -r .id)
+          fi
+          for f in dist/*.apk dist/SHA256SUMS dist/SIGNING-CERTIFICATE.txt; do
+            curl -fsS -X POST -H "$auth" -F "attachment=@$f" "$api/$id/assets?name=$(basename "$f")" > /dev/null
+          done
+          echo "Mirrored to https://codeberg.org/$REPO/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"

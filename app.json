@@ -64,7 +64,8 @@
           "enableBackgroundRecording": true,
           "enableBackgroundPlayback": false
         }
-      ]
+      ],
+      "./modules/saakshi-sos/app.plugin.js"
     ],
     "experiments": {
       "typedRoutes": true,

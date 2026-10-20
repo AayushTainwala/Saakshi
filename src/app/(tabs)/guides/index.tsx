@@ -1,12 +1,8 @@
-import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router';
 
-import { AppText, Screen } from '@/components';
+import { GuideList } from '@/modules/guides';
 
 export default function GuidesScreen() {
-  const { t } = useTranslation('guides');
-  return (
-    <Screen>
-      <AppText>{t('intro')}</AppText>
-    </Screen>
-  );
+  const router = useRouter();
+  return <GuideList onOpen={(guide) => router.push({ pathname: '/guides/[guide]', params: { guide } })} />;
 }
