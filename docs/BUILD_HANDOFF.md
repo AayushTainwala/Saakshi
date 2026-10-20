@@ -37,8 +37,8 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
 ## Stream A: Foundation and evidence
 
 **Status:** R1 evidence pipeline (E1, E2, E4, E5, E6) built and tested in code; not yet run on a phone.
-- Shell: https://github.com/AayushTainwala/Saakshi/pull/1 (`stream-a/foundation`), open for review.
-- Evidence: https://github.com/AayushTainwala/Saakshi/pull/2 (`stream-a/evidence`), stacked on the shell. Retarget it to `main` once the shell merges.
+- Shell: merged to `main` (https://github.com/AayushTainwala/Saakshi/pull/1). **Streams B, C and D can start.**
+- Evidence: https://github.com/AayushTainwala/Saakshi/pull/2 (`stream-a/evidence`), ready for review. The Native build workflow compiles the Android debug and iOS simulator apps successfully.
 
 **Done, shell:**
 - Template demo screens and assets removed; Expo Router native tabs Record, SOS, Guides, Help, Settings; i18next with English and Hindi and a language switch; light and dark themes with a switch; module stubs for `evidence`, `sos`, `location`, `bugmode`, `cloud`, `guides`, `helplines`; jest-expo with tests for i18n completeness, language choice, preferences and colour contrast; Expo packages updated to SDK 58's expected patch versions.
@@ -64,7 +64,7 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
 
 **Not verified:**
 - Nothing has run on a phone. Camera capture, segment hand-over, the Keystore and Secure Enclave keys, App Attest, the share sheet, SMS composer and PDF printing need testing on a real Android phone and iPhone. App Attest does not work in the simulator.
-- **Native compile:** the Kotlin and Swift code cannot be compiled in this container (no Android SDK or Xcode). `.github/workflows/native-build.yml` builds a debug Android app and an iOS simulator app on GitHub's runners for every pull request that touches native code. See the evidence pull request's checks for the result.
+- **Native code** compiles (Android debug and iOS simulator builds pass in `.github/workflows/native-build.yml`, which runs on every pull request that touches native code), but none of it has run. This container can't build either platform.
 - `tools/verify-bundle.mjs` does not check attestation chains (spec section 10, step 6). That is the next piece of tooling to write.
 
 **NEEDS OWNER REVIEW:**
