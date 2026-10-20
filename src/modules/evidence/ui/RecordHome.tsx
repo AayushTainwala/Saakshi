@@ -1,10 +1,13 @@
 import { Link, router } from 'expo-router';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Button, Card, Screen } from '@/components';
 import { spacing, touchTarget, useTheme } from '@/theme';
 
+import { attestIfNeeded } from '../integrity/deviceKey';
+import { fileLocker } from '../locker/store';
 import { useSessions } from '../locker/useSessions';
 import { formatIST } from './format';
 
@@ -12,6 +15,12 @@ export function RecordHome() {
   const { t } = useTranslation('record');
   const { colors } = useTheme();
   const sessions = useSessions();
+
+  // Create the signing key ahead of the first recording and, on iPhone, retry App Attest until it
+  // succeeds (it needs the internet once). Failures are kept in device-key.json, never shown here.
+  useEffect(() => {
+    attestIfNeeded(fileLocker).catch(() => undefined);
+  }, []);
 
   return (
     <Screen>

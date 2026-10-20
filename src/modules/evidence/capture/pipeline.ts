@@ -13,7 +13,7 @@ export type SealInput = {
   previous: EvidenceItem | null;
 };
 
-export type SealResult = { record: string; recordSha256: string };
+export type SealResult = { record: { file: string; recordId: string }; recordSha256: string };
 
 export type PipelineDeps = {
   store: LockerStore;

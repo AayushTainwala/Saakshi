@@ -34,7 +34,8 @@ export type EvidenceItem = {
   endedAt: string;
   status: ItemStatus;
   digests?: FileDigests;
-  record?: string;
+  /** The signed record's file name in records/ and its id. */
+  record?: { file: string; recordId: string };
   recordSha256?: string;
   error?: string;
 };

@@ -1,6 +1,7 @@
 package expo.modules.saakshievidence
 
 import android.net.Uri
+import android.util.Base64
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
@@ -24,6 +25,31 @@ class SaakshiEvidenceModule : Module() {
         "md5" to result.md5,
         "crc32" to result.crc32.toDouble()
       )
+    }
+
+    // The device key's public part and attestation, or null before it is created.
+    AsyncFunction("getDeviceKey") Coroutine { ->
+      withContext(Dispatchers.IO) { if (DeviceKey.exists()) DeviceKey.info().toMap() else null }
+    }
+
+    AsyncFunction("createDeviceKey") Coroutine { ->
+      val context = appContext.reactContext ?: throw CodedException("ERR_NO_CONTEXT", "No Android context", null)
+      withContext(Dispatchers.IO) { DeviceKey.create(context).toMap() }
+    }
+
+    // Android attests when the key is created; this returns that attestation again.
+    AsyncFunction("attestDeviceKey") Coroutine { ->
+      withContext(Dispatchers.IO) {
+        DeviceKey.info().toMap()["attestation"]
+          ?: throw CodedException("ERR_NO_ATTESTATION", "This phone gave no key attestation", null)
+      }
+    }
+
+    // Signs the UTF-8 bytes of [message] with the device key; returns the DER signature in Base64.
+    AsyncFunction("signUtf8") Coroutine { message: String ->
+      withContext(Dispatchers.IO) {
+        Base64.encodeToString(DeviceKey.sign(message.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP)
+      }
     }
   }
 

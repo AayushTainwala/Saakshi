@@ -21,5 +21,24 @@ public class SaakshiEvidenceModule: Module {
         "crc32": Double(result.crc32),
       ]
     }
+
+    // The device key's public part, or null before it is created. The App Attest result is kept by
+    // the app (device-key.json), so `attestation` is always null here.
+    AsyncFunction("getDeviceKey") { () throws -> DeviceKeyRecord? in
+      try DeviceKey.current()
+    }
+
+    AsyncFunction("createDeviceKey") { () throws -> DeviceKeyRecord in
+      try DeviceKey.create()
+    }
+
+    AsyncFunction("attestDeviceKey") { () async throws -> [String: String] in
+      try await DeviceKey.attest()
+    }
+
+    // Signs the UTF-8 bytes of `message` with the device key; returns the DER signature in Base64.
+    AsyncFunction("signUtf8") { (message: String) throws -> String in
+      try DeviceKey.sign(Data(message.utf8)).base64EncodedString()
+    }
   }
 }
