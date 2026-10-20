@@ -1,0 +1,46 @@
+name: Privacy policy site
+
+# Publishes store/site/ (the privacy policy in English and Hindi) to GitHub Pages:
+# https://aayushtainwala.github.io/Saakshi/privacy/
+# and the live-location viewer (spec S3, web/live/) at https://aayushtainwala.github.io/Saakshi/live/.
+# Each deploy replaces the whole site, so both are published together.
+# One-time setup: repository → Settings → Pages → Source: GitHub Actions.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'store/site/**'
+      - 'web/live/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          cp -R store/site/. _site/
+          mkdir -p _site/live
+          cp -R web/live/. _site/live/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

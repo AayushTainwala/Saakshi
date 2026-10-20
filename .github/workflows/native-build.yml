@@ -11,6 +11,7 @@ on:
       - 'modules/**'
       - 'targets/**'
       - 'app.json'
+      - 'app.config.ts'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/native-build.yml'

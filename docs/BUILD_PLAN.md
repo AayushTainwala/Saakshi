@@ -68,7 +68,7 @@ The rules are in [CLAUDE.md](../CLAUDE.md). In short:
 2. **Apple.**
    - Register the App ID `in.aayushtainwala.saakshi` with App Attest.
    - Create the App Store Connect app record "Saakshi".
-   - Generate an App Store Connect API key (App Manager), and give it to EAS in the way Stream D sets out. The `.p8` file is never committed.
+   - Give EAS its credentials with one command on your own computer, following BUILD_HANDOFF.md, Stream D, "Owner's one-time steps". It creates the distribution certificate and the App Store Connect API key, or uploads one you made. The `.p8` file is never committed.
 3. **Google Play.** Personal account; an Android phone for device verification; 15–20 closed-test testers.
 4. **Cloud environment for build sessions** (claude.ai/code → environment selector under the message box → New environment):
    - **Name:** `saakshi`.

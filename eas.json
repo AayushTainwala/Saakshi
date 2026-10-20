@@ -1,0 +1,45 @@
+{
+  "cli": {
+    "version": ">= 25.2.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "apk": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "env": {
+        "SAAKSHI_CHANNEL": "github",
+        "SAAKSHI_SMS_AUTOSEND": "1"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "play": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "env": {
+        "SAAKSHI_CHANNEL": "play",
+        "SAAKSHI_SMS_AUTOSEND": "0"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      }
+    },
+    "ios": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "env": {
+        "SAAKSHI_CHANNEL": "appstore",
+        "SAAKSHI_SMS_AUTOSEND": "0"
+      }
+    }
+  },
+  "submit": {
+    "ios": {
+      "ios": {
+        "ascAppId": "6824945012"
+      }
+    }
+  }
+}

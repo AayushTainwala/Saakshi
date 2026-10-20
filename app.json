@@ -28,7 +28,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "in.aayushtainwala.saakshi"
+      "package": "in.aayushtainwala.saakshi",
+      "allowBackup": false
     },
     "plugins": [
       "expo-router",
