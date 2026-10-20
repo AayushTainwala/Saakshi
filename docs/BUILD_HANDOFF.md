@@ -47,7 +47,12 @@ Streams add questions here as `- [ ] (Stream X) question`.
 Things that must be done or decided before a release goes public. Streams add items as `- [ ] (Stream X, release) item`.
 
 - [ ] (Stream B, R2) **Supabase plan for live location.** `saakshi-live` stays on the free plan while testing (owner's answer). Before R2 goes public, review the plan: free-plan projects can be paused when inactive, which would break every live link without warning.
-- [ ] (Stream B, R2, for Stream D) **Privacy texts for live location.** Update the privacy policy, the Apple privacy label and Play's Data safety answers before an R2 build is published (facts in Stream B, "For Stream D").
+- [x] (Stream B, R2, for Stream D) **Privacy texts for live location.** Update the privacy policy, the Apple privacy label and Play's Data safety answers before an R2 build is published (facts in Stream B, "For Stream D"). *Done by Stream D, 21 Oct, NEEDS OWNER REVIEW.*
+  - The privacy policy, English and Hindi, describes live location's server, bug mode and its witness texts.
+  - Apple's label becomes **Location → Precise Location, App Functionality, not linked to you**.
+  - Play's Data safety declares **Precise location, collected, optional, for App functionality, encrypted in transit, deletable**, plus a foreground-service declaration for camera, microphone and location.
+  - The App Review notes drop "No server".
+  - Still open: Supabase's log retention for IP addresses (see `store/apple/privacy-label.md`).
 - [ ] (Review, beta) **Owner's sign-offs:** the certificate text (then set `FORM_TEXT_REVIEWED`), the rights prompts, and every Hindi string.
 - [ ] (Review, beta) **Design pass:** directions mocked up and chosen by the owner, then applied; a real app icon and launch screen in place of Expo's placeholders.
 - [ ] (Review, beta) **Phone testing:** every feature on at least one iPhone and two different Android phones (one Samsung, one Xiaomi, Oppo or Vivo), with what was found fixed.
@@ -543,6 +548,7 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
          - If you already made a key in App Store Connect, choose to give it instead (the `.p8` file path, key ID and issuer ID). EAS uploads it. Then delete the `.p8` from the clone folder, or move it to your password manager. **Never commit it.**
       4. **Exit.**
    4. Re-run step 3 whenever an iPhone capability or app extension is added (for example Stream B's Lock Screen controls or widgets in R2), and if a build says the provisioning profile has expired.
+   5. **Run step 3 again now, from the latest `main`** (21 Oct). R2 added a widget extension (`in.aayushtainwala.saakshi.widgets`) that needs its own provisioning profile. In a non-interactive (CI) build, EAS CLI 25.2.0 skips registering a new bundle ID with Apple (`SetUpTargetBuildCredentials`: `bestEffortAppStoreAuthenticateAsync` returns early when non-interactive), so the extension must be set up once interactively. First run `git checkout main && git pull`, then run the same `credentials` command, and choose the same menu items. It sets up both the app and the extension.
 4. **Back up the Android key** (after the first Release run; **required before the first Play upload**, because Play will sign with this key, as decided on 21 Oct). Losing it means no update can ever install over existing copies, and the published fingerprint changes.
    1. On the same computer, run `npx eas-cli@latest credentials --platform android`.
    2. Choose profile **apk** → **Keystore: Manage everything needed to build your project** → **Download existing keystore**.

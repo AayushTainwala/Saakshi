@@ -13,7 +13,7 @@ Other fields in App Review Information:
 ```text
 Saakshi helps people in India protect themselves and their rights. It is personal record-keeping for the user and their lawyer, and a way to alert the user's own trusted contacts. It is not an emergency service, and it does not report anything to the police or anyone else (Guideline 1.7).
 
-No sign-in: every feature works without an account. No server: this version sends nothing to the developer, and has no analytics, ads or tracking.
+No sign-in: every feature works without an account. The only server is for live location (below), and only while the user shares; nothing else is sent to the developer, and there are no analytics, ads or tracking.
 
 PERMISSIONS
 - Camera: to take photos and video in the app's evidence camera (Record tab). Files stay in the app's own storage.
@@ -54,9 +54,9 @@ If trusted contacts are picked with the system contact picker, no permission is 
 - Contacts: to pick trusted contacts from the address book. Only the chosen names and numbers are kept, on the phone.
 ```
 
-## Optional: R2 features (live location, bug mode, quick trigger)
+## R2 features (in builds from 21 Oct on: paste this too)
 
-Add when the build has Stream B's R2. It replaces "No server" in the main block for this build.
+Stream B's R2 is in `main` from 21 Oct, so every build from then on has these features.
 
 ```text
 R2 FEATURES
