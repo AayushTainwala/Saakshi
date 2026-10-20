@@ -18,7 +18,8 @@
       },
       "entitlements": {
         "com.apple.developer.devicecheck.appattest-environment": "production"
-      }
+      },
+      "appleTeamId": "5NYAUT5C56"
     },
     "android": {
       "adaptiveIcon": {
