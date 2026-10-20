@@ -2,16 +2,13 @@
 
 The pickup file for build sessions. Each stream keeps its own section current: status, what was done, what's next, questions for the owner. Read [CLAUDE.md](../CLAUDE.md) first.
 
-## Order
+## Where things stand (21 Oct 2026)
 
-1. **Stream A** starts first and merges the shell (navigation, i18n, theming, module layout) to `main`.
-2. **Streams C and D** may start before the shell is merged, on work that doesn't touch the app's code:
-   - C: helpline verification, the law-note checks, and drafting content in Markdown under `docs/content/`;
-   - D: `eas.json`, the GitHub Actions workflows, the credential steps, and store text in `store/`.
-
-   Each then rebases on `main` once the shell is merged, and moves its content into the app's structure.
-3. **Stream B** starts once the shell is merged, because its work is all app code.
-3. Each stream opens pull requests into `main`. The owner (or a review session) merges them.
+- **Merged into `main`:** #1–#9. That is R1 and R2 as planned, apart from E3 and E7, plus the law checks against the Gazette of India (#9). Typecheck, lint, all tests and both native builds pass on `main`.
+- **Pace:** no 24-hour deadline (owner, 21 Oct). The next goal is a beta for about 50 testers on iPhone and Android; see BUILD_PLAN.md, section 1, "Road to the beta".
+- **First Release run (21 Oct, iOS only):** the owner set up iOS credentials and the App Store Connect API key with EAS (role App Manager). The EAS build succeeded; the **Submit to TestFlight step failed**. Its log is visible only to someone signed in to GitHub, so the cause isn't known yet. The owner is submitting that build from his Mac with `eas submit --platform ios --latest`. **Stream D:** find the cause and fix the workflow.
+- **Owner's phone testing:** round 1 on iPhone through TestFlight, with a checklist and his notes on a claude.ai page (https://claude.ai/artifact/BQU34AZ76SbRZpBKE5iyc6). Android follows when his phone arrives (about 23 Oct). The review session turns his notes into fix work for the streams.
+- **Streams:** each opens pull requests into `main`; the owner or a review session merges them.
 
 ## Owner questions
 
@@ -34,14 +31,30 @@ Streams add questions here as `- [ ] (Stream X) question`.
 
   *Answered 21 Oct:* yes to both. Codeberg is the first mirror, and CI may use the Internet Archive's uploader. Both mirror jobs in `release.yml` stay off until their settings are added (docs/release/mirrors.md, sections 2 and 3).
 - [x] (Owner, 21 Oct) **The repository is public**, by the owner's decision. GitHub Pages may serve the privacy policy and the live-location viewer page (S3).
-- [ ] (Stream B) **Supabase region for live location (S3).** Which region should the project be created in? Mumbai (`ap-south-1`) keeps the data in India and is closest to users. Nothing will be created until you answer.
 - [x] (Stream B) **Phone backups.** Android backs up an app's files to the user's Google account unless the app turns this off (`android.allowBackup`), and iCloud backs up the documents directory. That would copy trusted contacts (and evidence) off the phone. Turn Android backup off for the whole app, keep it, or exclude only some files? This touches Stream A's evidence too. *Answered 20 Oct:* the user chooses whether anything is backed up and where: local only, or a cloud service of their own (Google Drive, iCloud or another). Nothing ever comes to us. So the app starts local-only, with the phone's automatic backups off for its files, and copies only where the user chooses. SPEC section 2. Work for Streams A and B: see Stream D, "For other streams".
 - [x] (Stream B, for Stream D) **Extra Android permissions.** `npx expo config --type introspect` shows the Expo defaults `SYSTEM_ALERT_WINDOW`, `READ_EXTERNAL_STORAGE` and `WRITE_EXTERNAL_STORAGE` in the manifest. No feature needs them; consider blocking them in `app.json` (`android.blockedPermissions`) so the Play listing and App Review notes stay short. *Done by Stream D:* `app.config.ts` blocks all three in every Android build.
+- [x] (Stream B) **Supabase region for live location (S3).** *Answered 20 Oct:* Mumbai (`ap-south-1`). Project `saakshi-live` created there.
+- [x] (Stream B) **Supabase plan for live location.** `saakshi-live` is in the "AT's Desk" organisation. Supabase pauses inactive projects on its free plan, which would break live links without warning. *Answered (owner's review of R2):* free while testing; the plan must be reviewed before R2 goes public. On the release checklist below.
+- [x] (Stream B, for Stream D) **Apple Team ID.** The widget extension needs `ios.appleTeamId` in `app.json`. *Answered (owner's review of R2):* `5NYAUT5C56` (not secret); set in `app.json`.
 - [ ] (Stream C) **Helpline list updates.** The Help tab fetches `helplines/helplines.json` from raw.githubusercontent.com each time it opens (a plain GET; nothing of the user's is sent, but GitHub sees the phone's IP address). Keep it automatic, or only on a "Check for updates" tap? And should the list be signed, so that a compromised `main` branch can't change numbers on every phone? Today it is only schema-checked.
 - [ ] (Stream C) **Lawyers and medics list.** The schema (`src/modules/helplines/schema.ts`, `helplines/README.md`) shows name, phone, city, state and languages, and records the registration number, consent date and an expiry (`listedUntil`) in the public file. Is publishing the registration number right, or should it be checked and kept off GitHub? Who collects the written consent, and where is it kept?
 - [ ] (Stream C) **"What police may ask of a phone"** (SPEC G5) is left out of the guide: `docs/research/law.md` has nothing on demands to unlock a phone or give a passcode. It needs its own research from statutes and judgments first. Shall I do that next?
 - [ ] (Stream C) **SPEC section 6, BNS s.37.** Read verbatim on 20 Oct (`docs/research/law.md`, section 2F). The SPEC says "Explanations 1 and 2 keep the right where the person is not known to be a public servant, or does not state or produce their authority when asked". In the text, the stating or producing of authority is only in Explanation 2. That Explanation covers someone acting *by the direction of* a public servant. Explanation 1, for the public servant themself, turns only on whether the person knows or has reason to believe they are one. Shall I correct the SPEC line? It affects the v1.1 unlawful-detention card.
 - [ ] (Stream C) **Carrying ID.** Should the "what to take" list tell people to carry a photo ID? It is left out because it has legal weight.
+
+## Release checklist
+
+Things that must be done or decided before a release goes public. Streams add items as `- [ ] (Stream X, release) item`.
+
+- [ ] (Stream B, R2) **Supabase plan for live location.** `saakshi-live` stays on the free plan while testing (owner's answer). Before R2 goes public, review the plan: free-plan projects can be paused when inactive, which would break every live link without warning.
+- [ ] (Stream B, R2, for Stream D) **Privacy texts for live location.** Update the privacy policy, the Apple privacy label and Play's Data safety answers before an R2 build is published (facts in Stream B, "For Stream D").
+- [ ] (Review, beta) **Owner's sign-offs:** the certificate text (then set `FORM_TEXT_REVIEWED`), the rights prompts, and every Hindi string.
+- [ ] (Review, beta) **Design pass:** directions mocked up and chosen by the owner, then applied; a real app icon and launch screen in place of Expo's placeholders.
+- [ ] (Review, beta) **Phone testing:** every feature on at least one iPhone and two different Android phones (one Samsung, one Xiaomi, Oppo or Vivo), with what was found fixed.
+- [ ] (Stream D, beta) **TestFlight Submit step** in the Release workflow works from CI.
+- [ ] (Stream D, beta) **Dependency audit:** `npm ci` reports 61 known vulnerabilities in build tools. Triage which, if any, reach the app; don't run `npm audit fix --force`.
+- [ ] (Stream D, beta) **TestFlight public link** (Apple's beta review) and **Play closed test** (12 or more testers for 14 days).
+- [ ] (Review, beta) **Rights and safety guides (G1, G2):** the owner decides whether they join the beta.
 
 ---
 
@@ -248,41 +261,119 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
 
 ## Stream B: Safety and alerts
 
-**Status:** R1 (S1, S2) built and tested in code, on branch `claude/stream-b-sos-efgu96`; pull request open. Not yet run on a phone. R2 next.
+**Status:**
+- **R1 (S1, S2):** merged (https://github.com/AayushTainwala/Saakshi/pull/6). Not yet run on a phone.
+- **R2 (S3, S4, E8, confiscation mode):** built and tested in code on `claude/stream-b-r2-efgu96`: https://github.com/AayushTainwala/Saakshi/pull/8. Stream A's #4 is now in `main` and merged into the branch. The owner's review of #8 is addressed (witness texts every 10 minutes at most, Apple Team ID, iCloud backup exclusion, Supabase plan on the release checklist). Not yet run on a phone.
 
-**Done, R1:**
-- **Local Expo module `modules/saakshi-sos`** (Kotlin and Swift):
-  - `pickPhoneNumber()`: the phone's own contact picker for one number, with **no contacts permission** on either platform. Android uses `ACTION_PICK` on `Phone.CONTENT_URI`, which grants read access to the picked number only; iPhone uses `CNContactPickerViewController`, which runs outside the app. `expo-contacts` was not used because its config plugin always adds `READ_CONTACTS` and `WRITE_CONTACTS`.
-  - `canSendDirectly()` and `sendDirect(phones, message)`: Android `SmsManager` (multipart where needed), waiting up to 60 s for the radio's "sent" report for each part. Reports `sent`, `failed` (with the SmsManager code) or `unknown` per recipient. `canSendDirectly()` is true only if the built manifest declares `SEND_SMS`.
-  - **Build flag:** `modules/saakshi-sos/app.plugin.js` declares `SEND_SMS` only when prebuild runs with `SAAKSHI_SMS_AUTOSEND=1`; otherwise it writes `SEND_SMS` with `tools:node="remove"`, so no library can add it to a Play build. Checked with `npx expo config --type introspect` both ways, and by `modules/saakshi-sos/__tests__/plugin.test.ts`.
-- **`@/modules/location`:** `getCurrentFix()` (a recent fix at once if the phone has one within 2 minutes and 100 m; else waits up to 6 s for a new fix; else the last fix the phone knows, with its own time; never throws), `mapsLink()` (`https://maps.google.com/?q=lat,lng`, opens in any browser), and permission helpers.
-- **`@/modules/sos`:**
-  - Trusted contacts, at most 10, in `sos-contacts.json` in the app's documents directory. Indian numbers are stored as `+91` and ten digits, so the same person isn't added twice. Added from the picker or typed in; removed one tap each.
-  - **SOS (S1):** the alert text is the title, a map link with accuracy and the fix time, and the time sent (IST), in the app's language. Without SEND_SMS the Messages composer opens with every contact and the text; the user taps Send. 112 stays at the top of the SOS tab.
-  - **Auto-send (S2):** where the build declares SEND_SMS and the user has allowed it (one card on the contacts screen asks), the alert sends itself after a 3-second countdown with "Send now" and "Don't send". Contacts the network didn't confirm can be sent to from the Messages app with one tap. If SmsManager throws (permission withdrawn, no SIM), the composer opens instead.
-  - `alertController` is one shared instance, so the R2 code pad and confiscation mode drive the same alert.
-  - **For Stream A:** `getTrustedContacts(): Promise<TrustedContact[]>` from `@/modules/sos` (`{ id, name, phone }`, phone in international form). The witness message can now fill in its recipients.
-- Routes: `src/app/(tabs)/sos/index.tsx` (SOS) and `src/app/(tabs)/sos/contacts.tsx` (trusted contacts). Strings in `sos.json`, English and Hindi (first pass; for Stream C to review).
+**Done, R1** (details in #6): trusted contacts kept only on the phone (picker with no contacts permission, or typed in); SOS text with map link, accuracy and times, by the Messages composer, or in the Android APK by itself after a 3-second countdown (`SAAKSHI_SMS_AUTOSEND=1` at prebuild declares SEND_SMS; every other build removes it); 112 always at the top; `getTrustedContacts()` for Stream A.
 
-**For Stream D:** set `SAAKSHI_SMS_AUTOSEND=1` in the `env` of the `apk` EAS profile only. The `play` and `ios` profiles leave it unset.
+**Done, R2:**
+- **S3, live location by link.**
+  - **Server:** Supabase project `saakshi-live` (ref `ppmaxuksrdjhnlnfcfgt`, Mumbai `ap-south-1`, as the owner chose), in the owner's organisation. Schema in `supabase/migrations/` (applied):
+    - `live.shares` (random 144-bit view token, SHA-256 of a secret only the phone knows, expiry of at most 24 h) and `live.positions` (latest 300 per share). Row-level security on, no policies, and the `live` schema is closed to the API, so the tables can't be read or written directly.
+    - Four functions are the whole API: `live_start`, `live_push`, `live_stop` (deletes the share and every position) and `live_view` (null once ended).
+    - A cron job deletes expired shares every 5 minutes, and another keeps the cron log to a day.
+    - Checked as the `anon` role: start, push, a wrong secret refused, view, stop, nothing left afterwards, future times clamped, trimming to 300, and no direct table or helper-function access. The Supabase security advisor flags the four functions as `SECURITY DEFINER` callable by anyone: that is the design.
+  - **Viewer:** `web/live/index.html`, a plain page in English and Hindi with no libraries. It reads the token after `#` (never sent to the page's host), shows the last position with its age and accuracy, links to Google Maps and OpenStreetMap, an OpenStreetMap map, the earlier positions, when sharing ends, a warning when no position has come for 5 minutes, and "call 112" (Saakshi is not an emergency service). It refreshes every 15 s.
+  - **App:** `@/modules/location` `liveShare`. Positions come from a background task (Android: a location foreground service; iPhone: the blue indicator). Both need only "while using" permission, so there is no `ACCESS_BACKGROUND_LOCATION`. Positions taken without signal wait on the phone (up to 120) and go when it returns; a stop made offline is repeated when the app opens. On the SOS tab: share for 1, 4, 8 or 24 hours, the link texted to contacts, last sent time, send again, stop.
+- **S4, code pad and triggers.**
+  - New module `@/modules/trigger`. The code pad (`/codepad`, full screen) sends on the third correct digit with no Send button and no countdown; a wrong code clears it silently; 112 is on the pad.
+  - Codes 100, 101, 102, 104, 108, 112, 181, 000, 911 and 999 are refused.
+  - Settings at SOS → Quick trigger: set the code, and choose what it does (SOS alert, or confiscation mode).
+  - **Android:** a home-screen widget and an optional ongoing notification ("Open code pad"), both opening `saakshi://codepad`. The notification comes back after a restart and in the current language when the app opens.
+  - **iPhone:** a widget extension (`targets/widget`, built by `@bacons/apple-targets`, MIT) with a Control Center, Lock Screen and Action Button control and a Lock Screen widget. An App Intent, "Open Saakshi code pad", is built into the app too, so it also appears in Shortcuts for Back Tap. It hands the request to the app through `modules/saakshi-sos` (`onOpenCodePad`, `consumeCodePadRequest`).
+- **E8, bug mode.** New module `@/modules/bugmode`; SOS → Bug mode.
+  - Pieces are 2 minutes long, recorded until stopped or the battery runs out, with the screen locked. Each is sealed through Stream A's pipeline with `capture.mode: "bug"` (spec 0.2).
+  - **Android:** the app's own recorder in a microphone foreground service (`BugModeService`). It writes cut-off-safe AAC (`.aac`, ADTS), so a piece cut off by a dead battery plays up to the cut. It uses Stream A's crash-recovery markers, so a piece the app didn't seal (killed, phone off) is sealed when the app next opens.
+  - **iPhone:** Stream A's `AudioPieces` (expo-audio background recording, two overlapping recorders, no silence between pieces), now taking a capture mode. There is also a Live Activity (Lock Screen and Dynamic Island) with a timer and the number of pieces saved.
+  - **Witness texts:** after a sealed piece, its chain head is texted to trusted contacts where the phone can send with no tap (the APK with SEND_SMS allowed).
+    - At most one witness message every 10 minutes (SPEC E8, owner's review), so bug mode can't use up the SMS the user may need for an SOS. With 2-minute pieces that is every fifth piece; a skipped piece is still covered by the next chain head.
+    - Also at most 20 texts in any 30 minutes, under Android's 30-text limit. With more than 6 contacts this cap is the tighter one.
+    - Many Indian prepaid plans cap SMS at about 100 a day. With 10 contacts, bug mode can still send up to 40 texts an hour, so a long recording could reach a daily cap. A daily budget would need the owner's decision.
+  - **E7 hook:** `setPieceUploader()` from `@/modules/bugmode`. Each sealed piece is handed to it as soon as it is saved; until Stream A sets it, pieces stay on the phone.
+- **Confiscation mode** (SOS tab): one button, then Start in the confirmation (2 taps). It starts bug mode and live location (8 hours), then sends the SOS alert at once with the live link in it.
+  - Each part starts even if another fails.
+  - The alert waits at most 8 s for the link; a link that comes later is texted on its own.
+  - It shows what is running, and stops live location and bug mode together.
+  - Each part can also be started on its own, and the code pad can start confiscation mode.
 
-**Verified:** 47 new tests (phone numbers, the contacts store, the alert text, the alert controller with countdown, cancel, fallback and partial failure, `getCurrentFix`, the config plugin, and the SOS and contacts screens). All 140 tests, typecheck and lint pass.
+**For Stream A:**
+- `src/modules/evidence` changes in this pull request:
+  - `AudioPieces` takes a `mode` (default `body-cam`).
+  - The public API gains `startAudioPieces()`, `piecePaths()`, and the `CaptureMode` and `EndReason` types.
+- **E7:** call `setPieceUploader()` from `@/modules/bugmode` with the Drive upload. Bug mode then uploads each piece the moment it is sealed.
+
+**For Stream D:**
+- **SMS flag:** `app.config.ts` and `modules/saakshi-sos/app.plugin.js` agree. Both use `SAAKSHI_SMS_AUTOSEND=1` and remove SEND_SMS otherwise. The app decides at run time from the built manifest, which comes to the same thing as `extra.smsAutoSend`.
+- **Pages:** I changed `.github/workflows/pages.yml` so it also publishes `web/live/` at `https://aayushtainwala.github.io/Saakshi/live/` (`LIVE_VIEWER_URL` in `src/modules/location/live/config.ts`). Each deploy replaces the whole site, so it now assembles `store/site/` and `web/live/` together.
+- **App Review notes:** I added an optional "R2 features" block to `store/apple/review-notes.md`, covering live location's server, background audio and location, the controls, and why the Location Always string exists though it is never requested. All blocks stay under 4000 bytes (checked by the store tests).
+- **Privacy label, Play Data safety and privacy policy for an R2 build.** The policy says it will be updated before live location ships. The facts:
+  - Positions (precise location) go to our Supabase server (Mumbai) only while the user shares, for App Functionality, and are deleted when sharing stops or after at most 24 hours.
+  - There is no account and nothing that identifies the user: the share is a random id and token.
+  - Supabase's request logs probably record the phone's IP address for their own retention period. I have not checked that period.
+  - Nothing else goes to us.
+- **iOS:**
+  - `ios.appleTeamId` is set (`5NYAUT5C56`).
+  - EAS needs signing for a second target: the widget extension `in.aayushtainwala.saakshi.widgets`.
+  - Prebuild adds `UIBackgroundModes` `fetch` (from a library plugin); no feature uses it.
+- **Play:** declare the foreground-service types `microphone` (bug mode, and body-cam) and `location` (live location) in the Play Console.
+
+**Backups (owner's decision of 20 Oct):**
+- **Android:** `android.allowBackup` is `false` in `app.json`, for the whole app (Stream A's files too), so Auto Backup copies nothing.
+- **iPhone:** new module `@/modules/backup`. `useBackupExclusion()` in the root layout marks the app's Documents folder and everything in it as excluded from iCloud device backup (`isExcludedFromBackup`, native in `modules/saakshi-sos/ios/BackupExclusion.swift`). It runs at launch and each time the app goes to the background. Everything the app keeps (evidence, contacts, settings, live-share state) is under Documents; caches and temporary files are never backed up.
+- When the user can choose iCloud as a destination (a later feature), call `setExcludedFromBackup(uri, false)` from `modules/saakshi-sos`.
+- **Not verified on a phone:** whether marking the folder alone also covers files created in it later (bug-mode pieces written while locked). Until the next background or launch marks them, they rely on the folder's mark.
+
+**Verified:**
+- All tests pass on the merged tree (R2 added 52: live-share client and API calls, code rules and the pad, trigger settings, confiscation orchestration, the bug-mode controller and witness rationing, iCloud backup exclusion, texts to contacts, the alert's live link and immediate start). Typecheck and lint pass.
+- The Supabase functions, checked as `anon` (above).
+- `npx expo prebuild --platform ios` generates the `SaakshiWidgets` target, with the intent in both targets. `npx expo config --type introspect` shows Live Activities, the `audio` and `location` background modes, and the Android location and microphone foreground-service permissions.
 
 **Not verified:**
-- Nothing has run on a phone. The picker, SmsManager sending and its reports, and the composer need testing on an Android phone (APK built with the flag, and without) and an iPhone.
-- The native code has not been compiled here (no Android SDK or Swift in this container); the Native build workflow compiles it on the pull request.
+- Nothing in R2 has run on a phone. Most important to test:
+  - Android bug mode with the screen off for over an hour, and a piece cut off by forcing the phone off.
+  - iPhone bug mode while locked, and through a phone call.
+  - Live location with the screen locked on both phones.
+  - The controls, Action Button and Back Tap, and the Android widget and notification.
+  - The code pad from a cold start.
+- Native code compiles only in the Native build workflow; this container has no Android SDK or Swift.
+- **ActivityKit:** pairing the app's Live Activity with the widget's view relies on the attributes type having the same name and fields in both (`modules/saakshi-sos/ios/BugModeActivity.swift` and `targets/widget/BugModeLiveActivity.swift`). This is common practice, not checked on a phone.
+- Whether the Hindi `Localizable.strings` in the widget target are picked up.
+- The viewer page has not been opened against the live server from a browser, because this container can't reach supabase.co.
 
-**Platform limits (R1):**
-- **iPhone can't send SMS by itself.** Apple's composer always needs the user to tap Send. A fully automatic iPhone alert needs a server path (spec S3's server, or an SMS gateway), which is out of R1.
-- **Android "sent" means the network accepted it,** not that it was delivered. Delivery reports are not requested.
-- **Dual-SIM phones set to "ask every time"** have no default SMS SIM; SmsManager may then fail. Not tested. If it fails, the app offers the Messages app for those contacts.
-- **Android rate limit:** Android asks the user to confirm when an app sends more than 30 texts in 30 minutes. Ten contacts allow three alerts in that window before the prompt.
-- **Sideloaded APK and SEND_SMS:** `docs/research/platforms-and-stores.md` 1.5 says Play Protect's India pilot doesn't list SEND_SMS, but that list may have grown. Not tested; test the APK sideloaded through Chrome on an Indian phone.
-- Alert texts in Hindi use Unicode SMS (70 characters a part), so each is about three parts.
+**Platform limits (R2):**
+- **iPhone, sending:** the code pad and confiscation mode still open Messages for the SOS text; Apple requires the Send tap. Bug mode's witness texts can't be sent at all on iPhone (no one can tap Send with the screen locked).
+- **iPhone, triggers and indicators:**
+  - From a locked iPhone, opening the app from a control or widget asks for Face ID or the passcode (spec S4 accepts this).
+  - Controls need iOS 18; the extension targets iOS 18.0, so phones on iOS 16 or 17 get no widget, control or Live Activity, though everything in the app works.
+  - The orange microphone dot and the Live Activity are visible to anyone holding the phone (spec E8 accepts this).
+  - iOS ends a Live Activity after 8 hours; recording carries on.
+- **iPhone, background:** if the app is force-quit, iOS stops both bug mode and live location. A phone call takes the microphone; `AudioPieces` keeps the current piece and retries a piece later.
+- **Android, foreground services:**
+  - Bug mode and live location must start while Saakshi is on screen (Android 14 forbids starting microphone and location services from the background). The code pad and confiscation mode are on screen, so they can; the widget alone can't start recording.
+  - Without notification permission (Android 13+), the recording and sharing notifications show only in the Task Manager.
+  - Some makers kill background apps despite foreground services (dontkillmyapp.com). Not tested.
+- **Android:** the widget and notification ask the user to unlock before the pad opens. A user can dismiss the quick-alert notification on Android 14+; it comes back when the app opens.
+- **Bug mode, gaps and size:**
+  - Android pieces have a gap of the time the old recorder takes to stop (expected well under a second), recorded in `capture.gapBeforeMs`.
+  - iPhone pieces are `.m4a`, which spec 0.2 already says is not cut-off safe.
+  - Android records 64 kbit/s mono, about 29 MB an hour.
+- **Live location, server:** the server has no accounts, so anyone with the public key can create shares. Abuse is bounded by the 24-hour limit, 300 positions a share and 20,000 active shares, but there is no per-device rate limit.
+- **Live location, Supabase plan:** Supabase pauses inactive free-plan projects. The project stays on the free plan while testing; reviewing it is on the release checklist.
+- **Live location, how often:** positions every 30 s or 20 m, whichever comes later per the platform's rules.
+- **Supabase MCP:** applying a migration through the MCP timed out whenever a function body held an `INSERT … SELECT` or a `DELETE … NOT IN (SELECT …)`. The same logic was applied as two small helper functions, `live.add_positions` and `live.keep_latest`; the repository migration matches what is applied.
+
+**NEEDS OWNER REVIEW** (none of it is legal content):
+- Every new string in `sos.json` (bug mode, live location, trigger, confiscation mode), English and Hindi. The Hindi is a first pass for Stream C; "ज़ब्ती मोड" for confiscation mode needs a check.
+- The viewer page text (`web/live/index.html`), in both languages.
+- The refused-code list (`src/modules/trigger/code.ts`): 102, 108 and 112 are in Stream C's verified helpline list; 100, 101, 104 and 181 are refused to be safe and are not verified here.
 
 **Owner questions:** see the list at the top (Stream B items).
 
-**Next (R2):** S4 code pad and triggers, S3 live location (waits on the region), E8 bug mode, confiscation mode.
+**Next:**
+- Phone testing of R1 and R2; fix what it finds.
+- After E7 lands, check the Drive upload through `setPieceUploader()`.
+- v1.1: WhatsApp, Signal and Telegram for alerts and live links.
 
 **Start prompt** (model Opus, effort high):
 
@@ -429,12 +520,12 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
   - In non-interactive mode, `eas submit` then uses "the key assigned to your app", and the submit profile needs `ascAppId`.
 
 **Owner's one-time steps:**
-1. **Expo token.** If not done yet (BUILD_PLAN section 5, step 1):
+1. **Expo token.** *Done 20 Oct.* If not done yet (BUILD_PLAN section 5, step 1):
    - revoke the token that was shared in chat;
    - at expo.dev → your account → Settings → Access tokens, create a new one;
    - on GitHub, open Saakshi → Settings → Secrets and variables → Actions → **New repository secret**, named `EXPO_TOKEN`.
 2. **Android: nothing.** The first run of the Release workflow makes the signing key.
-3. **iPhone: one command on your own computer (Mac, Windows or Linux), once.** It can't run in a cloud session, because it needs your Apple ID login and the two-factor code on your phone.
+3. **iPhone: one command on your own computer (Mac, Windows or Linux), once.** *Done 21 Oct on the owner's Mac (`~/Code/Saakshi`): distribution certificate and provisioning profiles for the app and the widget, and an App Store Connect API key (App Manager) for EAS Submit.* It can't run in a cloud session, because it needs your Apple ID login and the two-factor code on your phone.
    1. Install Node.js 22 (nodejs.org) and Git.
    2. In a terminal:
       ```bash

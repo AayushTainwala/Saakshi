@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<title>Saakshi live location</title>
+<!--
+  Saakshi live location viewer (spec S3). Opened from a link a Saakshi user sent to their trusted
+  contacts. The share token is after the # so it is never sent to the server hosting this page; the
+  page sends it only to the live-location database, which returns the latest positions while the
+  user is sharing. No cookies, no analytics, no other requests besides the map.
+-->
+<style>
+  :root {
+    --bg: #ffffff; --text: #111418; --muted: #4a5059; --card: #f2f3f5; --border: #9aa0a8;
+    --link: #0b57d0; --warn: #8a5300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0e1013; --text: #f3f4f6; --muted: #b8bec7; --card: #1c1f24; --border: #5c636e;
+      --link: #a8c7fa; --warn: #ffb95c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 18px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+  h1 { font-size: 24px; margin: 0; }
+  .hi { color: var(--muted); }
+  .card { background: var(--card); border-radius: 16px; padding: 16px; display: grid; gap: 8px; }
+  .big { font-size: 22px; font-weight: 700; }
+  .warn { color: var(--warn); font-weight: 600; }
+  a { color: var(--link); }
+  .links { display: flex; flex-wrap: wrap; gap: 12px; }
+  .links a { display: inline-block; padding: 12px 16px; border: 2px solid var(--border); border-radius: 12px;
+    text-decoration: none; font-weight: 600; min-height: 48px; }
+  iframe { width: 100%; height: 360px; border: 0; border-radius: 16px; }
+  ol { margin: 0; padding-left: 24px; }
+  small { color: var(--muted); font-size: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Live location <span class="hi">· लाइव लोकेशन</span></h1>
+    <small>Shared with you through Saakshi by someone who trusts you. <span class="hi">आप पर भरोसा करने वाले किसी व्यक्ति ने साक्षी से यह आपके साथ शेयर किया है।</span></small>
+  </header>
+
+  <section id="status" class="card" aria-live="polite">
+    <div>Loading… <span class="hi">लोड हो रहा है…</span></div>
+  </section>
+
+  <section id="where" class="card" hidden>
+    <div class="big" id="ago"></div>
+    <div id="detail"></div>
+    <div class="links">
+      <a id="gmaps" target="_blank" rel="noopener noreferrer">Google Maps</a>
+      <a id="osm" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>
+    </div>
+    <iframe id="map" title="Map" loading="lazy" referrerpolicy="no-referrer"></iframe>
+    <div id="ends"></div>
+  </section>
+
+  <section id="trail" class="card" hidden>
+    <div><strong>Earlier positions</strong> <span class="hi">· पहले की लोकेशन</span></div>
+    <ol id="trailList"></ol>
+  </section>
+
+  <section class="card">
+    <small>If they may be in danger, call 112. Saakshi is not an emergency service and does not alert the police.
+      <span class="hi">अगर वे ख़तरे में हो सकते हैं, तो 112 पर कॉल करें। साक्षी कोई इमरजेंसी सेवा नहीं है और पुलिस को ख़बर नहीं करता।</span></small>
+  </section>
+</main>
+<script>
+  // Public by design: the publishable key only lets a browser call the four live_* functions.
+  var SUPABASE_URL = 'https://ppmaxuksrdjhnlnfcfgt.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_HTTTU0RIQO5b6Cn9G6kHqA_H7kyg4cG';
+  var REFRESH_MS = 15000;
+
+  var token = decodeURIComponent((location.hash || '').replace(/^#/, ''));
+  var $ = function (id) { return document.getElementById(id); };
+  var timer = null;
+  var lastMap = '';
+
+  function time(iso) {
+    return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  }
+  function ago(iso) {
+    var s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+    if (s < 60) return { en: s + ' seconds ago', hi: s + ' सेकंड पहले' };
+    var m = Math.round(s / 60);
+    if (m < 60) return { en: m + (m === 1 ? ' minute ago' : ' minutes ago'), hi: m + ' मिनट पहले' };
+    var h = Math.round(m / 60);
+    return { en: h + (h === 1 ? ' hour ago' : ' hours ago'), hi: h + ' घंटे पहले' };
+  }
+  function status(en, hi, warn) {
+    var el = $('status');
+    el.hidden = false;
+    el.innerHTML = '';
+    var div = document.createElement('div');
+    if (warn) div.className = 'warn';
+    div.textContent = en + ' ';
+    var span = document.createElement('span');
+    span.className = 'hi';
+    span.textContent = hi;
+    div.appendChild(span);
+    el.appendChild(div);
+  }
+  function ended() {
+    $('where').hidden = true;
+    $('trail').hidden = true;
+    status('Sharing has ended. The location has been deleted.', 'शेयर करना बंद हो गया है। लोकेशन मिटा दी गई है।');
+    if (timer) clearInterval(timer);
+  }
+
+  function show(data) {
+    var positions = data.positions || [];
+    if (positions.length === 0) {
+      status('Sharing is on, but no position has arrived yet. This page checks again every 15 seconds.',
+        'शेयरिंग चालू है, पर अभी कोई लोकेशन नहीं आई। यह पेज हर 15 सेकंड में फिर देखता है।');
+      $('where').hidden = true;
+      return;
+    }
+    var p = positions[0];
+    var a = ago(p.at);
+    var old = Date.now() - new Date(p.at).getTime() > 5 * 60 * 1000;
+    status(old ? 'No new position for a while. The phone may be off, out of signal, or taken.' : 'Sharing now.',
+      old ? 'कुछ समय से नई लोकेशन नहीं आई। फ़ोन बंद हो सकता है, नेटवर्क से बाहर हो सकता है, या छीन लिया गया हो सकता है।' : 'अभी शेयर हो रही है।', old);
+    $('where').hidden = false;
+    $('ago').textContent = 'Last seen ' + a.en + ' · ' + a.hi;
+    var acc = p.acc != null ? ' · ±' + Math.round(p.acc) + ' m' : '';
+    $('detail').textContent = time(p.at) + acc + ' · ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5);
+    var lat = p.lat.toFixed(5), lng = p.lng.toFixed(5);
+    $('gmaps').href = 'https://maps.google.com/?q=' + lat + ',' + lng;
+    $('osm').href = 'https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lng + '#map=17/' + lat + '/' + lng;
+    var d = 0.004;
+    var map = 'https://www.openstreetmap.org/export/embed.html?bbox=' + (p.lng - d) + '%2C' + (p.lat - d) + '%2C' +
+      (p.lng + d) + '%2C' + (p.lat + d) + '&layer=mapnik&marker=' + lat + '%2C' + lng;
+    if (map !== lastMap) { $('map').src = map; lastMap = map; }
+    $('ends').textContent = 'Sharing ends ' + time(data.expiresAt) + ' unless they stop it sooner. · ' +
+      'शेयरिंग ' + time(data.expiresAt) + ' पर ख़त्म होगी, अगर वे पहले बंद न करें।';
+
+    var list = $('trailList');
+    list.innerHTML = '';
+    positions.slice(1, 11).forEach(function (q) {
+      var li = document.createElement('li');
+      var link = document.createElement('a');
+      link.href = 'https://maps.google.com/?q=' + q.lat.toFixed(5) + ',' + q.lng.toFixed(5);
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = time(q.at) + (q.acc != null ? ' (±' + Math.round(q.acc) + ' m)' : '');
+      li.appendChild(link);
+      list.appendChild(li);
+    });
+    $('trail').hidden = list.children.length === 0;
+  }
+
+  function load() {
+    fetch(SUPABASE_URL + '/rest/v1/rpc/live_view', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ view_token: token }),
+      referrerPolicy: 'no-referrer',
+      cache: 'no-store',
+    })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (data) { if (data == null) ended(); else show(data); })
+      .catch(function () {
+        status('Could not reach the server. Trying again…', 'सर्वर तक नहीं पहुँच सके। फिर कोशिश हो रही है…', true);
+      });
+  }
+
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) {
+    status('This link is incomplete. Ask for the link again.', 'यह लिंक अधूरा है। लिंक फिर से माँगें।', true);
+  } else {
+    load();
+    timer = setInterval(load, REFRESH_MS);
+  }
+</script>
+</body>
+</html>

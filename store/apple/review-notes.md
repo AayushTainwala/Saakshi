@@ -53,3 +53,14 @@ If trusted contacts are picked with the system contact picker, no permission is 
 ```text
 - Contacts: to pick trusted contacts from the address book. Only the chosen names and numbers are kept, on the phone.
 ```
+
+## Optional: R2 features (live location, bug mode, quick trigger)
+
+Add when the build has Stream B's R2. It replaces "No server" in the main block for this build.
+
+```text
+R2 FEATURES
+- Live location (SOS tab): while the user shares it, positions go to our server (Supabase, Mumbai) so the user's contacts can follow a web link. Deleted when sharing stops, or after 24 hours at most. Uses When In Use with the blue indicator (location background mode). Location Always is never requested; the string exists because the location library writes it.
+- Bug mode (SOS tab): records sound in pieces, each fingerprinted and signed, until stopped. Background audio mode with a Live Activity; the orange indicator shows.
+- Quick trigger: a Control Center, Lock Screen and Action Button control (App Intent) opens a code pad; the right code opens Messages with the SOS, which the user sends.
+```

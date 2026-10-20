@@ -14,6 +14,7 @@ on:
   pull_request:
     paths:
       - 'modules/**'
+      - 'targets/**'
       - 'app.json'
       - 'app.config.ts'
       - 'package.json'

@@ -60,6 +60,7 @@ In v1.1, C2PA Content Credentials and motion, compass and network readings are a
 **E8. Bug mode.** The phone becomes a voice recorder:
 - audio is saved in fixed short pieces of 1–3 minutes;
 - each piece is hashed, signed and chained as it is saved, its hash sent to contacts, and the piece uploaded to the user's cloud the moment it is saved, with its link shared with contacts. Pieces saved without signal upload as soon as it returns. This continues until the battery runs out;
+- the hash sent to contacts is rationed: at most one witness message every 10 minutes, so bug mode can't use up the SMS the user may need for an SOS. A piece whose hash isn't sent is still covered, because each record carries the previous record's hash, so the next hash sent vouches for every piece before it (owner's review of R2);
 - pieces are not joined together;
 - there is no 3% auto-save in bug mode: its pieces are already short, so a dying battery loses at most the piece being recorded (decided 22 Oct);
 - recording continues with the screen locked;

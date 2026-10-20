@@ -4,12 +4,21 @@ How v1 ([SPEC.md](SPEC.md)) gets built and shipped: releases, architecture, buil
 
 ## 1. Releases
 
-| Release | Modules (codes from the spec) | Target |
+| Release | Modules (codes from the spec) | Status |
 |---|---|---|
-| **R1** | Shell, navigation, English and Hindi throughout (F1, G6); evidence camera with signed, chained fingerprint (E1); witness SMS (E2); BSA s.63 certificate (E4); locker and export (E5); rights prompts while recording (E6); body-cam mode (B1–B4); contacts and SOS by SMS, sending itself in the Android APK (S1, S2); helplines (G3); chest-mount guide (G4); digital safety (G5); offline-communication guide (O1); signed APK with checksums on GitHub Releases and mirrors, and iPhone build to TestFlight and App Store review (F2) | Android APK about 1.5–2 days after the build streams start |
-| **R2** | Public timestamp (E3); copies to Google Drive (E7); bug mode (E8); live location by link (S3); trigger and code pad (S4); confiscation mode | About 2–4 days after R1 |
+| **R1** | Shell, navigation, English and Hindi throughout (F1, G6); evidence camera with signed, chained fingerprint (E1); witness SMS (E2); BSA s.63 certificate (E4); locker and export (E5); rights prompts while recording (E6); body-cam mode (B1–B4); contacts and SOS by SMS, sending itself in the Android APK (S1, S2); helplines (G3); chest-mount guide (G4); digital safety (G5); offline-communication guide (O1); signed APK with checksums on GitHub Releases and mirrors, and iPhone build to TestFlight and App Store review (F2) | Built and merged 20–21 Oct 2026; phone testing under way |
+| **R2** | Public timestamp (E3); copies to Google Drive (E7); bug mode (E8); live location by link (S3); trigger and code pad (S4); confiscation mode | Built and merged 21 Oct 2026, except E3 and E7; phone testing under way |
 
-Total is about 70 agent-hours across four parallel streams, plus the owner's review and testing on phones.
+**Pace (owner's direction, 21 Oct 2026).** There is no 24-hour deadline. The project is long-term. The next goal is a solid version that about 50 people can test on iPhone and Android, reached at a steady production pace with proper quality checks, and released at the earliest reasonable time. Streams work to that standard rather than to a clock.
+
+**Road to the beta:**
+1. **Phone testing.** The owner tests on his iPhone through TestFlight (round 1: R1 and R2 as merged), then on Android once his phone arrives. Fixes go through pull requests as usual.
+2. **Design pass.** No visual design has been done yet, and the app icon and launch screen are Expo's placeholders. Two or three directions are mocked up for the owner to choose from before anything visual is built; then the chosen design and icon are applied.
+3. **Owner's sign-offs.** The certificate text (`FORM_TEXT_REVIEWED`), the rights prompts, and the Hindi text.
+4. **Beta for about 50 testers:** a TestFlight public link (needs Apple's beta review) and a Google Play closed test (a new developer account needs 12 or more testers for 14 days before production). The bar: every feature tested on at least one iPhone and two different Android phones, the sign-offs done, the design applied, the privacy texts current, and the release checklist in BUILD_HANDOFF.md clear.
+5. **Public release** on GitHub, the App Store and Google Play.
+
+Still to build after R1 and R2: E3 (public timestamp), E7 (Google Drive), and whatever the owner decides on G1 and G2 (rights and safety guides), which are set for v1.1 in the spec.
 
 ## 2. Architecture
 

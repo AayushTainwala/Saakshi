@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="saakshi_quick_widget_label">साक्षी क्विक अलर्ट</string>
+  <string name="saakshi_quick_widget_description">कोड पैड खोलता है जिससे आपके भरोसेमंद लोगों को अलर्ट जाता है</string>
+  <string name="saakshi_quick_widget_text">SOS</string>
+  <string name="saakshi_quick_channel">क्विक अलर्ट</string>
+</resources>

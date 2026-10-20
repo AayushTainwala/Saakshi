@@ -14,8 +14,18 @@ export { useLowBattery } from './battery/useLowBattery';
 export { BodyCamScreen } from './bodycam/BodyCamScreen';
 export { CaptureScreen } from './capture/CaptureScreen';
 export { createEvidenceSession } from './capture/deps';
+export { type AudioPiecesHandle, piecePaths, startAudioPieces } from './capture/pieces';
 export { CertificateForm } from './ui/CertificateForm';
 export { RecordHome } from './ui/RecordHome';
 export { SessionDetail } from './ui/SessionDetail';
-export type { ClosedFile, EvidenceItem, LocationSnapshot, MediaKind, SegmentRef, SessionState } from './types';
+export type {
+  CaptureMode,
+  ClosedFile,
+  EndReason,
+  EvidenceItem,
+  LocationSnapshot,
+  MediaKind,
+  SegmentRef,
+  SessionState,
+} from './types';
 export type { CaptureSession };

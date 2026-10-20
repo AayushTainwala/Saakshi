@@ -9,7 +9,9 @@ import { contactsStore } from './contacts/fileStore';
 import type { TrustedContact } from './contacts/store';
 
 export { alertController, useAlertState } from './alert/instance';
-export type { AlertOutcome, AlertState } from './alert/controller';
+export { liveInvite, startLiveLocation, stopLiveLocation } from './alert/live';
+export { canTextWithoutTap, textTrustedContacts, type TextOutcome } from './alert/text';
+export type { AlertOutcome, AlertState, StartOptions } from './alert/controller';
 export type { TrustedContact } from './contacts/store';
 export { useTrustedContacts } from './contacts/fileStore';
 export { ContactsEditor } from './ui/ContactsEditor';

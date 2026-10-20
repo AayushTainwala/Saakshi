@@ -12,6 +12,8 @@ export type AlertLabels = {
   noLocation: string;
   /** "Sent" */
   sent: string;
+  /** "Live location" */
+  live: string;
 };
 
 /**
@@ -21,8 +23,10 @@ export type AlertLabels = {
  *   Saakshi alert: I may need help.
  *   My location: https://maps.google.com/?q=19.07600,72.87770 (±20 m, 14:31 IST)
  *   Sent: 20/10/2026 14:32 IST
+ *
+ * With live location on (S3), a line with its link comes before the time sent.
  */
-export function alertMessage(where: FixResult, sentAt: Date, labels: AlertLabels): string {
+export function alertMessage(where: FixResult, sentAt: Date, labels: AlertLabels, liveLink?: string): string {
   const lines = [labels.title];
   if (where.status === 'fixed') {
     const { fix } = where;
@@ -35,6 +39,7 @@ export function alertMessage(where: FixResult, sentAt: Date, labels: AlertLabels
   } else {
     lines.push(labels.noLocation);
   }
+  if (liveLink) lines.push(`${labels.live}: ${liveLink}`);
   lines.push(`${labels.sent}: ${formatIST(sentAt)}`);
   return lines.join('\n');
 }
