@@ -3,12 +3,15 @@ import { StatusBar } from 'expo-status-bar';
 import { useMemo } from 'react';
 
 import { initI18n } from '@/i18n';
+import { registerLiveLocationTask } from '@/modules/location';
 import { PreferencesProvider } from '@/preferences/PreferencesProvider';
 import { loadPreferences } from '@/preferences/store';
 import { useTheme } from '@/theme';
 
 const initialPreferences = loadPreferences();
 initI18n(initialPreferences.language);
+// Live location's background task must exist before the system delivers positions to it.
+registerLiveLocationTask();
 
 export default function RootLayout() {
   return (

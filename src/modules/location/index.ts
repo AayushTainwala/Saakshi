@@ -15,3 +15,6 @@ export {
   mapsLink,
   requestLocationPermission,
 } from './current';
+export { LIVE_HOURS_CHOICES, type LiveHours } from './live/config';
+export type { LiveShare, TrackerNotice } from './live/share';
+export { liveShare, LocationDeniedError, registerLiveLocationTask, useLiveShare } from './live/task';
