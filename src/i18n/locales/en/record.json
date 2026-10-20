@@ -1,4 +1,33 @@
 {
   "title": "Record",
-  "intro": "Photos and videos you take here are fingerprinted and signed on your phone, as a record for you and your lawyer."
+  "intro": "Photos and videos you take here are fingerprinted and signed on your phone, as a record for you and your lawyer.",
+  "openCamera": "Open evidence camera",
+  "capture": {
+    "photo": "Photo",
+    "video": "Video",
+    "takePhoto": "Take photo",
+    "startVideo": "Start recording",
+    "stopVideo": "Stop recording",
+    "close": "Close camera",
+    "sealing_one": "Sealing {{count}} file…",
+    "sealing_other": "Sealing {{count}} files…",
+    "saved_one": "{{count}} file saved",
+    "saved_other": "{{count}} files saved",
+    "cameraPermissionTitle": "Camera access",
+    "cameraPermissionBody": "To record evidence, Saakshi needs your camera. Photos and videos stay on your phone.",
+    "micPermissionTitle": "Microphone access",
+    "micPermissionBody": "Videos record sound too, so Saakshi needs your microphone.",
+    "allow": "Allow",
+    "openSettings": "Open Settings"
+  },
+  "locker": {
+    "heading": "Your records",
+    "empty": "Nothing recorded yet.",
+    "files_one": "{{count}} file",
+    "files_other": "{{count}} files",
+    "sessionTitle": "Record",
+    "missing": "This record is no longer on your phone.",
+    "photo": "Photo",
+    "segment": "Video {{clip}}, part {{index}}"
+  }
 }

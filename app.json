@@ -12,7 +12,8 @@
       "bundleIdentifier": "in.aayushtainwala.saakshi",
       "supportsTablet": false,
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleAllowMixedLocalizations": true
       }
     },
     "android": {
@@ -36,7 +37,21 @@
         }
       ],
       "expo-localization",
-      "expo-image"
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Saakshi uses the camera to record photos and videos for your own records. They are fingerprinted and signed on your phone.",
+          "microphonePermission": "Saakshi records sound with your videos, for your own records.",
+          "recordAudioAndroid": true,
+          "barcodeScannerEnabled": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Saakshi adds where a photo or video was taken to its record, and to messages you choose to send."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -46,6 +61,10 @@
       "eas": {
         "projectId": "7baf841e-820d-423e-a69b-6f813010fe02"
       }
+    },
+    "locales": {
+      "en": "./src/i18n/native/en.json",
+      "hi": "./src/i18n/native/hi.json"
     }
   }
 }

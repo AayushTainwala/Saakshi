@@ -7,4 +7,6 @@
  * Public API of this module. Other code imports only from `@/modules/evidence`, never from files
  * inside it.
  */
-export {};
+export { CaptureScreen } from './capture/CaptureScreen';
+export { RecordHome } from './ui/RecordHome';
+export { SessionDetail } from './ui/SessionDetail';
