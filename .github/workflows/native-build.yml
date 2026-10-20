@@ -62,7 +62,15 @@ jobs:
       - run: npx expo prebuild --platform android --no-install
       - name: Gradle build
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        # Compiler errors are also raised as annotations, so they can be read without the log.
+        run: |
+          set +e
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+          grep -E '^e: |error: |What went wrong' -A2 build.log | head -40 | while IFS= read -r line; do
+            echo "::error::${line}"
+          done
+          exit "$status"
       - name: Name the APK
         id: apk
         run: |
@@ -95,10 +103,14 @@ jobs:
       - name: Xcode build
         working-directory: ios
         run: |
-          set -o pipefail
+          set +e
           xcodebuild -workspace Saakshi.xcworkspace -scheme Saakshi -configuration Release \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build | tail -200
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build > build.log 2>&1
+          status=$?
+          tail -200 build.log
+          grep -E 'error: ' build.log | head -40 | while IFS= read -r line; do echo "::error::${line}"; done
+          exit "$status"
       - name: Zip the app
         id: app
         run: |
