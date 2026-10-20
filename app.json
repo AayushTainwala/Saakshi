@@ -55,7 +55,8 @@
           "locationWhenInUsePermission": "Saakshi adds where a photo or video was taken to its record, and to messages you choose to send."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "./modules/saakshi-sos/app.plugin.js"
     ],
     "experiments": {
       "typedRoutes": true,

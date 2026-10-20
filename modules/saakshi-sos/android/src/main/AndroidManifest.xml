@@ -1,0 +1,3 @@
+<manifest>
+  <!-- SEND_SMS is added by app.plugin.js only when SAAKSHI_SMS_AUTOSEND=1 at prebuild (the APK). -->
+</manifest>
