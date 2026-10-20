@@ -28,9 +28,11 @@ Streams add questions here as `- [ ] (Stream X) question`.
   I recommend (b). Decide before the first Play upload: it can't easily be changed afterwards. (b) needs the keystore backup (Stream D, step 4) and Google's key-export steps in the Console, which I couldn't read from here. *Answered 21 Oct: (b).* At the first Play upload, choose to upload your own app signing key, using the EAS keystore from step 4, rather than letting Google make one. The keystore backup is therefore required before the first Play upload.
 - [x] (Stream D) **Public contact email** for the privacy policy, TestFlight feedback, App Review contact and the Play developer page. *Answered 21 Oct:* `tainwala.aayush@gmail.com`. It is now in the privacy policy (both languages) and the store text.
 - [x] (Stream D) **Play target audience.** I suggest 18 and over. Your call. *Answered 21 Oct:* 18 and over.
-- [ ] (Stream D) **Mirrors.** *21 Oct: on hold until the owner confirms.* The Codeberg job stays off: it runs only once `CODEBERG_REPO` is set.
+- [x] (Stream D) **Mirrors.**
   - Is Codeberg fine as the first mirror (docs/release/mirrors.md)?
   - The Internet Archive's official uploader is AGPL. May CI use it (it never enters the app), or should a later session use plain `curl` instead?
+
+  *Answered 21 Oct:* yes to both. Codeberg is the first mirror, and CI may use the Internet Archive's uploader. Both mirror jobs in `release.yml` stay off until their settings are added (docs/release/mirrors.md, sections 2 and 3).
 - [x] (Owner, 21 Oct) **The repository is public**, by the owner's decision. GitHub Pages may serve the privacy policy and the live-location viewer page (S3).
 - [ ] (Stream B) **Supabase region for live location (S3).** Which region should the project be created in? Mumbai (`ap-south-1`) keeps the data in India and is closest to users. Nothing will be created until you answer.
 - [x] (Stream B) **Phone backups.** Android backs up an app's files to the user's Google account unless the app turns this off (`android.allowBackup`), and iCloud backs up the documents directory. That would copy trusted contacts (and evidence) off the phone. Turn Android backup off for the whole app, keep it, or exclude only some files? This touches Stream A's evidence too. *Answered 20 Oct:* the user chooses whether anything is backed up and where: local only, or a cloud service of their own (Google Drive, iCloud or another). Nothing ever comes to us. So the app starts local-only, with the phone's automatic backups off for its files, and copies only where the user chooses. SPEC section 2. Work for Streams A and B: see Stream D, "For other streams".
@@ -327,6 +329,7 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
   4. **Play bundle:** checked for SMS permissions and kept as a workflow artifact for 30 days, for you to upload in the Play Console.
   5. **iPhone:** `eas submit` to TestFlight. This is skipped, with a warning, until `ascAppId` is in `eas.json`.
   6. **Codeberg mirror:** pushes `main` and the tag, then creates the same release there. It runs only once `CODEBERG_REPO` and `CODEBERG_TOKEN` are set.
+  7. **Internet Archive mirror** (added 21 Oct): uploads the APK, `SHA256SUMS` and `SIGNING-CERTIFICATE.txt` as one archive.org item per release, using the official uploader `internetarchive` 5.12.0 (AGPL-3.0; owner-approved, CI only). It runs only once `IA_IDENTIFIER_PREFIX` and the other settings are in place.
 - **`.github/workflows/native-build.yml`** (21 Oct; Stream A's compile check) now also uploads two test builds on every run, with the JavaScript bundled in so no development server is needed:
   - an Android release APK signed with the debug key, with the GitHub APK's flags (SMS auto-send on);
   - a zipped iOS Simulator `Saakshi.app` in the Release configuration, checked to contain `main.jsbundle`.
@@ -395,6 +398,7 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
    4. Don't create the release by hand in GitHub's Releases page. The workflow creates it, and would fail if it already exists.
 8. **Optional, when ready:**
    - **Codeberg mirror:** the steps in docs/release/mirrors.md, section 2.
+   - **Internet Archive mirror:** the steps in docs/release/mirrors.md, section 3. It needs two secrets and three variables.
    - **TestFlight public link:** once Apple approves the first external build, set the repository variable `TESTFLIGHT_PUBLIC_LINK` (Settings → Secrets and variables → Actions → Variables), and releases will include it.
 
 **Verified:**
