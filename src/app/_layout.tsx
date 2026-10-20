@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 
 import { initI18n } from '@/i18n';
 import { registerLiveLocationTask } from '@/modules/location';
+import { useQuickTriggers } from '@/modules/trigger';
 import { PreferencesProvider } from '@/preferences/PreferencesProvider';
 import { loadPreferences } from '@/preferences/store';
 import { useTheme } from '@/theme';
@@ -23,6 +24,8 @@ export default function RootLayout() {
 
 function ThemedStack() {
   const { scheme, colors } = useTheme();
+  // The code pad opens from the iPhone controls and Action Button, and Android's notification.
+  useQuickTriggers();
   const navigationTheme = useMemo(() => {
     const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
     return {
