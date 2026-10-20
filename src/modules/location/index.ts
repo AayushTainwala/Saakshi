@@ -4,4 +4,14 @@
  * Public API of this module. Other code imports only from `@/modules/location`, never from files
  * inside it.
  */
-export {};
+export {
+  type Fix,
+  type FixOptions,
+  type FixResult,
+  getCurrentFix,
+  getLocationPermission,
+  type LocationApi,
+  type LocationPermission,
+  mapsLink,
+  requestLocationPermission,
+} from './current';

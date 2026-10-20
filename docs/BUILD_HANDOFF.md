@@ -21,6 +21,9 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [x] (Stream A) **Segment length.** *Answered 20 Oct:* the evidence camera saves one file from start to stop, with no segments and no joining; the format must survive a sudden cut-off (check its cost on both platforms first and report in this handoff). Segments are for bug mode and body-cam mode only. SPEC E1, E8, body-cam mode.
 - [x] (Stream A) **Certificate language.** *Answered 20 Oct:* English only for now, with the Hindi help text kept. SPEC E4.
 - [x] (Stream A) **App Attest environment.** *Answered 20 Oct:* `production` confirmed.
+- [ ] (Stream B) **Supabase region for live location (S3).** Which region should the project be created in? Mumbai (`ap-south-1`) keeps the data in India and is closest to users. Nothing will be created until you answer.
+- [ ] (Stream B) **Phone backups.** Android backs up an app's files to the user's Google account unless the app turns this off (`android.allowBackup`), and iCloud backs up the documents directory. That would copy trusted contacts (and evidence) off the phone. Turn Android backup off for the whole app, keep it, or exclude only some files? This touches Stream A's evidence too.
+- [ ] (Stream B, for Stream D) **Extra Android permissions.** `npx expo config --type introspect` shows the Expo defaults `SYSTEM_ALERT_WINDOW`, `READ_EXTERNAL_STORAGE` and `WRITE_EXTERNAL_STORAGE` in the manifest. No feature needs them; consider blocking them in `app.json` (`android.blockedPermissions`) so the Play listing and App Review notes stay short.
 - [ ] (Stream C) **Helpline list updates.** The Help tab fetches `helplines/helplines.json` from raw.githubusercontent.com each time it opens (a plain GET; nothing of the user's is sent, but GitHub sees the phone's IP address). Keep it automatic, or only on a "Check for updates" tap? And should the list be signed, so that a compromised `main` branch can't change numbers on every phone? Today it is only schema-checked.
 - [ ] (Stream C) **Lawyers and medics list.** The schema (`src/modules/helplines/schema.ts`, `helplines/README.md`) shows name, phone, city, state and languages, and records the registration number, consent date and an expiry (`listedUntil`) in the public file. Is publishing the registration number right, or should it be checked and kept off GitHub? Who collects the written consent, and where is it kept?
 - [ ] (Stream C) **"What police may ask of a phone"** (SPEC G5) is left out of the guide: `docs/research/law.md` has nothing on demands to unlock a phone or give a passcode. It needs its own research from statutes and judgments first. Shall I do that next?
@@ -119,7 +122,41 @@ Set up by Stream A in the shell pull request. Follow these so streams don't coll
 
 ## Stream B: Safety and alerts
 
-**Status:** waits on Stream A's shell.
+**Status:** R1 (S1, S2) built and tested in code, on branch `claude/stream-b-sos-efgu96`; pull request open. Not yet run on a phone. R2 next.
+
+**Done, R1:**
+- **Local Expo module `modules/saakshi-sos`** (Kotlin and Swift):
+  - `pickPhoneNumber()`: the phone's own contact picker for one number, with **no contacts permission** on either platform. Android uses `ACTION_PICK` on `Phone.CONTENT_URI`, which grants read access to the picked number only; iPhone uses `CNContactPickerViewController`, which runs outside the app. `expo-contacts` was not used because its config plugin always adds `READ_CONTACTS` and `WRITE_CONTACTS`.
+  - `canSendDirectly()` and `sendDirect(phones, message)`: Android `SmsManager` (multipart where needed), waiting up to 60 s for the radio's "sent" report for each part. Reports `sent`, `failed` (with the SmsManager code) or `unknown` per recipient. `canSendDirectly()` is true only if the built manifest declares `SEND_SMS`.
+  - **Build flag:** `modules/saakshi-sos/app.plugin.js` declares `SEND_SMS` only when prebuild runs with `SAAKSHI_SMS_AUTOSEND=1`; otherwise it writes `SEND_SMS` with `tools:node="remove"`, so no library can add it to a Play build. Checked with `npx expo config --type introspect` both ways, and by `modules/saakshi-sos/__tests__/plugin.test.ts`.
+- **`@/modules/location`:** `getCurrentFix()` (a recent fix at once if the phone has one within 2 minutes and 100 m; else waits up to 6 s for a new fix; else the last fix the phone knows, with its own time; never throws), `mapsLink()` (`https://maps.google.com/?q=lat,lng`, opens in any browser), and permission helpers.
+- **`@/modules/sos`:**
+  - Trusted contacts, at most 10, in `sos-contacts.json` in the app's documents directory. Indian numbers are stored as `+91` and ten digits, so the same person isn't added twice. Added from the picker or typed in; removed one tap each.
+  - **SOS (S1):** the alert text is the title, a map link with accuracy and the fix time, and the time sent (IST), in the app's language. Without SEND_SMS the Messages composer opens with every contact and the text; the user taps Send. 112 stays at the top of the SOS tab.
+  - **Auto-send (S2):** where the build declares SEND_SMS and the user has allowed it (one card on the contacts screen asks), the alert sends itself after a 3-second countdown with "Send now" and "Don't send". Contacts the network didn't confirm can be sent to from the Messages app with one tap. If SmsManager throws (permission withdrawn, no SIM), the composer opens instead.
+  - `alertController` is one shared instance, so the R2 code pad and confiscation mode drive the same alert.
+  - **For Stream A:** `getTrustedContacts(): Promise<TrustedContact[]>` from `@/modules/sos` (`{ id, name, phone }`, phone in international form). The witness message can now fill in its recipients.
+- Routes: `src/app/(tabs)/sos/index.tsx` (SOS) and `src/app/(tabs)/sos/contacts.tsx` (trusted contacts). Strings in `sos.json`, English and Hindi (first pass; for Stream C to review).
+
+**For Stream D:** set `SAAKSHI_SMS_AUTOSEND=1` in the `env` of the `apk` EAS profile only. The `play` and `ios` profiles leave it unset.
+
+**Verified:** 47 new tests (phone numbers, the contacts store, the alert text, the alert controller with countdown, cancel, fallback and partial failure, `getCurrentFix`, the config plugin, and the SOS and contacts screens). All 140 tests, typecheck and lint pass.
+
+**Not verified:**
+- Nothing has run on a phone. The picker, SmsManager sending and its reports, and the composer need testing on an Android phone (APK built with the flag, and without) and an iPhone.
+- The native code has not been compiled here (no Android SDK or Swift in this container); the Native build workflow compiles it on the pull request.
+
+**Platform limits (R1):**
+- **iPhone can't send SMS by itself.** Apple's composer always needs the user to tap Send. A fully automatic iPhone alert needs a server path (spec S3's server, or an SMS gateway), which is out of R1.
+- **Android "sent" means the network accepted it,** not that it was delivered. Delivery reports are not requested.
+- **Dual-SIM phones set to "ask every time"** have no default SMS SIM; SmsManager may then fail. Not tested. If it fails, the app offers the Messages app for those contacts.
+- **Android rate limit:** Android asks the user to confirm when an app sends more than 30 texts in 30 minutes. Ten contacts allow three alerts in that window before the prompt.
+- **Sideloaded APK and SEND_SMS:** `docs/research/platforms-and-stores.md` 1.5 says Play Protect's India pilot doesn't list SEND_SMS, but that list may have grown. Not tested; test the APK sideloaded through Chrome on an Indian phone.
+- Alert texts in Hindi use Unicode SMS (70 characters a part), so each is about three parts.
+
+**Owner questions:** see the list at the top (Stream B items).
+
+**Next (R2):** S4 code pad and triggers, S3 live location (waits on the region), E8 bug mode, confiscation mode.
 
 **Start prompt** (model Opus, effort high):
 
