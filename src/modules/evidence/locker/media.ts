@@ -8,7 +8,12 @@ const MEDIA_TYPES: Record<string, string> = {
   mp4: 'video/mp4',
   mov: 'video/quicktime',
   m4a: 'audio/mp4',
+  aac: 'audio/aac',
+  wav: 'audio/wav',
 };
+
+const DEFAULT_TYPE: Record<MediaKind, string> = { photo: 'image/jpeg', video: 'video/mp4', audio: 'audio/mp4' };
+const DEFAULT_EXTENSION: Record<MediaKind, string> = { photo: 'jpg', video: 'mp4', audio: 'm4a' };
 
 export function extensionOf(uri: string): string {
   const name = uri.split(/[?#]/)[0].split('/').pop() ?? '';
@@ -17,10 +22,10 @@ export function extensionOf(uri: string): string {
 }
 
 export function mediaTypeFor(extension: string, kind: MediaKind): string {
-  return MEDIA_TYPES[extension] ?? (kind === 'photo' ? 'image/jpeg' : 'video/mp4');
+  return MEDIA_TYPES[extension] ?? DEFAULT_TYPE[kind];
 }
 
-/** `0000-photo.jpg`, `0003-clip1-seg2.mp4`: sortable, and readable in a court bundle. */
+/** `0000-photo.jpg`, `0003-clip1-seg2.mp4`, `0004-audio0-seg0.m4a`: sortable, and readable in a court bundle. */
 export function mediaFileName(
   sequence: number,
   kind: MediaKind,
@@ -28,8 +33,9 @@ export function mediaFileName(
   extension: string,
 ): string {
   const prefix = String(sequence).padStart(4, '0');
-  const label = kind === 'photo' || !segment ? kind : `clip${segment.clip}-seg${segment.index}`;
-  return `${prefix}-${label}.${extension || (kind === 'photo' ? 'jpg' : 'mp4')}`;
+  const clip = kind === 'audio' ? 'audio' : 'clip';
+  const label = kind === 'photo' || !segment ? kind : `${clip}${segment.clip}-seg${segment.index}`;
+  return `${prefix}-${label}.${extension || DEFAULT_EXTENSION[kind]}`;
 }
 
 export function recordFileName(sequence: number): string {

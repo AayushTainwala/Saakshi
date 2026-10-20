@@ -1,4 +1,5 @@
 import { CaptureSession, type PipelineDeps } from '../capture/pipeline';
+import { mediaFileName, mediaTypeFor } from '../locker/media';
 import type { ClosedFile, FileDigests } from '../types';
 import { memoryLocker } from './memoryLocker';
 
@@ -95,5 +96,15 @@ describe('CaptureSession', () => {
     expect(results[0].error).toBe('disk error');
     expect(locker.store.readSession(session.id!)!.items).toHaveLength(2);
     expect(session.pending).toBe(0);
+  });
+});
+
+describe('media names', () => {
+  it('names photos, video segments and audio segments', () => {
+    expect(mediaFileName(0, 'photo', null, 'jpg')).toBe('0000-photo.jpg');
+    expect(mediaFileName(3, 'video', { clip: 1, index: 2 }, 'mp4')).toBe('0003-clip1-seg2.mp4');
+    expect(mediaFileName(4, 'audio', { clip: 0, index: 0 }, '')).toBe('0004-audio0-seg0.m4a');
+    expect(mediaTypeFor('m4a', 'audio')).toBe('audio/mp4');
+    expect(mediaTypeFor('', 'audio')).toBe('audio/mp4');
   });
 });

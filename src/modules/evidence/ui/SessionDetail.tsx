@@ -44,7 +44,10 @@ function ItemCard({ item }: { item: EvidenceItem }) {
     <Card>
       <AppText variant="label">
         {item.segment
-          ? t('locker.segment', { clip: item.segment.clip + 1, index: item.segment.index + 1 })
+          ? t(item.kind === 'audio' ? 'locker.audioSegment' : 'locker.segment', {
+              clip: item.segment.clip + 1,
+              index: item.segment.index + 1,
+            })
           : t('locker.photo')}
       </AppText>
       <AppText color="textMuted">

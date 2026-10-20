@@ -1,4 +1,4 @@
-export type MediaKind = 'photo' | 'video';
+export type MediaKind = 'photo' | 'video' | 'audio';
 
 export type SegmentRef = { clip: number; index: number };
 

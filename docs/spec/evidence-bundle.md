@@ -12,8 +12,8 @@ What this format does and does not show:
 
 ## 1. Terms
 
-- **Capture session:** everything recorded between opening the evidence camera and closing it. A session holds one or more photos and videos, in the order they were taken.
-- **Segment:** a video is saved as consecutive files ("segments") of at most 60 seconds each, so that a long recording cut short (battery, seizure, crash) keeps every finished segment. A photo is a single file.
+- **Capture session:** everything recorded between opening the evidence camera and closing it, or during one run of an audio recorder such as bug mode. A session holds one or more photos, videos and audio recordings, in the order they were taken.
+- **Segment:** a video is saved as consecutive files ("segments") of at most 60 seconds each, so that a long recording cut short (battery, seizure, crash) keeps every finished segment. Audio recordings are segmented the same way, with the segment length set by the recorder. A photo is a single file.
 - **Record:** a small JSON document, one per file, describing it. Records are signed and chained.
 - **Device key:** an ECDSA P-256 key pair created once per app install inside the phone's security hardware. Its private half never leaves the hardware.
 - **Bundle:** a ZIP file holding a session's files, records, the device key's public part with its attestation, and the reports.
@@ -95,7 +95,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 | `id` | UUID (version 4) of this record. |
 | `session` | UUID of the capture session. |
 | `sequence` | Position in the session, from 0, counting every file (photos and segments) in the order they closed. |
-| `segment` | For video: `clip` (the video's number in the session, from 0) and `index` (the segment's number within the video, from 0). For a photo: null. |
+| `segment` | For video and audio: `clip` (the recording's number in the session, from 0) and `index` (the segment's number within the recording, from 0). For a photo: null. |
 | `previous` | Null for `sequence` 0. Otherwise the previous record in the session: its `id`, the SHA-256 of its record file (section 5) and the SHA-256 of its media file. |
 | `file` | The media file: its name inside the bundle's `media/` folder, IANA media type, size in bytes, and fingerprints. |
 | `capture.startedAt`, `endedAt` | When the camera started and stopped writing this file, by the phone's clock. Equal for a photo. |
@@ -170,6 +170,7 @@ manifest.json
 device-key.json
 media/0000-photo.jpg
 media/0001-clip0-seg0.mp4
+media/0002-audio0-seg0.m4a
 records/0000.json
 records/0000.json.sig
 records/0001.json

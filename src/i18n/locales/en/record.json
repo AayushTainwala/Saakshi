@@ -53,7 +53,8 @@
     "checkProblemBody_other": "{{count}} problems were found. A file or record has changed or is missing since it was recorded.",
     "errorTitle": "Something went wrong",
     "chainHead": "Fingerprint of this record",
-    "chainHeadHelp": "The SHA-256 of the last signed record. It covers every file above."
+    "chainHeadHelp": "The SHA-256 of the last signed record. It covers every file above.",
+    "audioSegment": "Audio {{clip}}, part {{index}}"
   },
   "witness": {
     "send": "Send witness message",
