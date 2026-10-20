@@ -48,8 +48,10 @@ class SaakshiEvidenceModule : Module() {
     }
 
     AsyncFunction("bodyCamStop") {
-      val context = appContext.reactContext ?: return@AsyncFunction
-      context.startService(Intent(context, BodyCamService::class.java).apply { action = BodyCamService.ACTION_STOP })
+      appContext.reactContext?.let { context ->
+        context.startService(Intent(context, BodyCamService::class.java).apply { action = BodyCamService.ACTION_STOP })
+      }
+      Unit
     }
 
     Function("bodyCamRunning") { BodyCamService.running }
