@@ -35,7 +35,8 @@ A free, open-source phone app that helps people in India protect themselves and 
 - the record is signed with a key held in the phone's security chip, with key attestation showing it came from the genuine app on an untampered phone;
 - a video runs from start to stop as **one file**, straight from the camera, with one fingerprint and one signed record. That one file is what is identified, fingerprinted, played, shared and certified. Each record also carries the previous record's hash, so a session's files are chained and nothing can be added or removed unnoticed;
 - the recording format is chosen so that a video cut off suddenly (the phone forced off, the app crashing) stays playable up to the moment it stopped. Such a file is fingerprinted and signed when the app next opens, and its record says the recording was interrupted. The build cost of this format on each phone is checked and reported before it is built;
-- **Proposed:** while recording, the app warns at 10% and 5% battery, and at 3% stops and saves the recording itself, so a dying battery never cuts a file off.
+- **Android videos (decided 22 Oct).** On Android the original is an MPEG-TS file (`.ts`), exactly as it came from the camera, and it stays the evidence: the export bundle and the certificate always use it. When the user plays or shares an Android video, the app offers an MP4 copy made without re-encoding (a remux), labelled in the app as a copy. The copy has its own signed record naming the original's SHA-256 and the method;
+- while recording (evidence camera and body-cam mode), the app warns at 10% and 5% battery, and at 3% stops and saves the recording itself, so a dying battery never cuts a file off (decided 21 Oct). Nothing is done while the phone is charging, since the battery isn't running down (decided 22 Oct).
 
 Physical damage to the phone during a recording is not solved for in v1.
 
@@ -60,6 +61,7 @@ In v1.1, C2PA Content Credentials and motion, compass and network readings are a
 - audio is saved in fixed short pieces of 1–3 minutes;
 - each piece is hashed, signed and chained as it is saved, its hash sent to contacts, and the piece uploaded to the user's cloud the moment it is saved, with its link shared with contacts. Pieces saved without signal upload as soon as it returns. This continues until the battery runs out;
 - pieces are not joined together;
+- there is no 3% auto-save in bug mode: its pieces are already short, so a dying battery loses at most the piece being recorded (decided 22 Oct);
 - recording continues with the screen locked;
 - on iPhone, Apple shows an orange dot and a Live Activity while recording, which is acceptable.
 
@@ -69,6 +71,7 @@ In v1.1, C2PA Content Credentials and motion, compass and network readings are a
 - **Saving:** like bug mode, in fixed short pieces, each fingerprinted, signed and chained as it is saved, and not joined together. In R1 the pieces stay on the phone; from R2, each uploads the moment it is saved (E7).
 - **Quality:** 720p by default; the user can raise it.
 - **Calls, messages and notifications keep working.** On Android, recording continues with the screen off through a foreground service while the user takes calls and uses other apps. On iPhone, Apple allows video only while the app is on screen: before the user leaves the app, it warns that video will stop; if they leave anyway, or a call comes in, sound keeps recording, and video restarts when they return. Every gap is logged in the record.
+- **Android notice (decided 22 Oct).** On Android 13 and later, the first time body-cam mode starts, the app asks for permission to show notifications, so the foreground-service notice with its Stop button appears. If the user refuses, recording carries on, and the app says where to find the running service (Active apps, at the bottom of the notification shade).
 
 **E9 (v1.1). Vault, disguised icon, quick lock**, learning from Tella. Quick delete of evidence is held back pending Aayush's decision.
 

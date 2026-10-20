@@ -56,6 +56,15 @@
         }
       ],
       "expo-sharing",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Saakshi records sound with your videos, for your own records.",
+          "recordAudioAndroid": true,
+          "enableBackgroundRecording": true,
+          "enableBackgroundPlayback": false
+        }
+      ],
       "./modules/saakshi-sos/app.plugin.js"
     ],
     "experiments": {

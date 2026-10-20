@@ -25,19 +25,20 @@ Points to check against the Console's help text:
 
 ## Permissions in the Play build
 
-From the generated manifest (`npx expo prebuild`, 20 Oct 2026, with the `play` profile's flags):
+From the generated manifest (`npx expo prebuild`, 21 Oct 2026, with the `play` profile's flags) and the manifests of the libraries and local modules merged into it:
 
 | Permission | Used for |
 |---|---|
-| CAMERA | the evidence camera |
-| RECORD_AUDIO | sound with videos |
+| CAMERA | the evidence camera and body-cam mode |
+| RECORD_AUDIO, MODIFY_AUDIO_SETTINGS | sound with videos (MODIFY_AUDIO_SETTINGS comes from expo-audio) |
 | ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION | where a photo or video was taken, and the location in messages the user sends; foreground only |
+| FOREGROUND_SERVICE, FOREGROUND_SERVICE_CAMERA, FOREGROUND_SERVICE_MICROPHONE, WAKE_LOCK | body-cam mode keeps recording with the screen dark (`BodyCamService`, types camera and microphone) |
+| POST_NOTIFICATIONS | body-cam's recording notice, with its Stop button (Android 13+, asked when body-cam first starts) |
 | INTERNET | downloading the helpline list; nothing about the user is sent |
-| VIBRATE | feedback |
 
-`app.config.ts` removes SEND_SMS, READ_SMS, RECEIVE_SMS, SYSTEM_ALERT_WINDOW and the external-storage permissions from this build, and the release workflow checks the bundle for the SMS ones. **No restricted-permission declaration is needed** (SMS, call log, background location).
+`app.config.ts` removes SEND_SMS, READ_SMS, RECEIVE_SMS, SYSTEM_ALERT_WINDOW, VIBRATE and the external-storage permissions from this build, and the release workflow checks the bundle for the SMS ones. **No restricted-permission declaration is needed** (SMS, call log, background location).
 
-**To add when body-cam mode lands:** on Android it records with the screen off through a foreground service, so Play's **Foreground service** declaration will need the service types (camera, microphone) with a short video. Stream A should note the types in the handoff.
+**Foreground service declaration: needed.** Body-cam mode records with the screen dark through a foreground service of types **camera** and **microphone**, so Play's foreground-service declaration (App content) must list both types. Suggested description: "Body-cam mode: the user starts it, and it records video and sound for the user's own records while the screen is dark and locked; it shows an ongoing notice with a Stop button and ends when the user stops it." Play asks for a short video of the feature; record one from a test phone. Google's exact form couldn't be read from this session.
 
 ## Other App content declarations
 
