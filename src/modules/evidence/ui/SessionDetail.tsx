@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, View } from 'react-native';
@@ -162,6 +163,12 @@ export function SessionDetail({ id }: { id: string }) {
       <Button label={t('witness.send')} busy={witnessing} disabled={sealed === 0} onPress={witness} />
       <AppText color="textMuted">{t('witness.help')}</AppText>
       <Button variant="secondary" label={t('locker.export')} busy={exporting} disabled={sealed === 0} onPress={exportBundle} />
+      <Button
+        variant="secondary"
+        label={session.certificate ? t('certificate.openAgain') : t('certificate.open')}
+        disabled={sealed === 0}
+        onPress={() => router.push({ pathname: '/record/certificate', params: { session: id } })}
+      />
       <Button variant="secondary" label={t('locker.check')} busy={checking} disabled={sealed === 0} onPress={check} />
 
       {head ? (

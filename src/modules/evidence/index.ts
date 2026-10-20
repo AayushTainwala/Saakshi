@@ -8,5 +8,6 @@
  * inside it.
  */
 export { CaptureScreen } from './capture/CaptureScreen';
+export { CertificateForm } from './ui/CertificateForm';
 export { RecordHome } from './ui/RecordHome';
 export { SessionDetail } from './ui/SessionDetail';

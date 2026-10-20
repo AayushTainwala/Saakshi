@@ -3,7 +3,7 @@ import * as Sharing from 'expo-sharing';
 
 import { attestIfNeeded } from '../integrity/deviceKey';
 import { appInfo } from '../integrity/environment';
-import type { EvidenceRecord } from '../integrity/record';
+import { loadSealed } from '../locker/records';
 import { fileLocker } from '../locker/store';
 import {
   type BundledRecord,
@@ -49,22 +49,20 @@ export async function writeBundle(id: string): Promise<string> {
   const now = new Date();
   const encode = (text: string) => new TextEncoder().encode(text);
 
-  const sealed = session.items.filter((item) => item.status === 'sealed' && item.record && item.digests);
-  const records: BundledRecord[] = [];
+  const sealed = loadSealed(fileLocker, id);
+  const records: BundledRecord[] = sealed.map((entry) => entry.bundled);
   const entries: ZipEntry[] = [];
 
-  for (const item of sealed) {
-    const body = fileLocker.readRecordText(id, item.record!.file);
-    const record = JSON.parse(body) as EvidenceRecord;
+  for (const { item, body, bundled } of sealed) {
+    const { record, recordFile } = bundled;
     const media = new File(fileLocker.mediaUri(id, item.media));
     if (!media.exists || media.size !== record.file.size) {
       throw new Error(`${item.media} is missing or has changed size; run Check files.`);
     }
-    records.push({ record, recordFile: item.record!.file, mediaFile: item.media, recordSha256: item.recordSha256! });
     entries.push(
       fileEntry(`media/${item.media}`, media, record.file.size, item.digests!.crc32, new Date(record.capture.endedAt)),
-      bytesEntry(`records/${item.record!.file}`, encode(body), now),
-      bytesEntry(`records/${item.record!.file}.sig`, fileLocker.readRecordBytes(id, `${item.record!.file}.sig`), now),
+      bytesEntry(`records/${recordFile}`, encode(body), now),
+      bytesEntry(`records/${recordFile}.sig`, fileLocker.readRecordBytes(id, `${recordFile}.sig`), now),
     );
   }
 
