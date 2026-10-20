@@ -4,7 +4,7 @@ type: research
 project: "[[Protestor Assist — Hub]]"
 hub: "[[Protestor Assist Research — Hub]]"
 created: 2026-10-16
-updated: 2026-10-16
+updated: 2026-10-20
 tags: [protestor-assist, research]
 ---
 
@@ -284,3 +284,31 @@ Link: https://indiankanoon.org/doc/3510545/
 5. **Madras HC case:** *R. v. B.*, 2024 SCC OnLine Mad 6084, was seen only as cited in *Pune Bar Association*.
 6. **Post-July-2024 HC case law on BSA s.63:** run an exhaustive SCC Online search. Mine was a limited Indian Kanoon search.
 7. **Telecom shutdowns:** check the current suspension rules under the Telecommunications Act, 2023.
+
+### Results of the checks, 20 October 2026 (Stream C)
+
+**None of the seven checks could be completed from an official source.** From this build environment, every official site (India Code, eGazette, `upload.indiacode.nic.in`, sci.gov.in, mha.gov.in, nalsa.gov.in, nhm.gov.in), and Indian Kanoon too, failed to resolve (DNS lookup failed), both by `curl` and by the web-fetch tool. Only a web search tool worked; it returns a search engine's summary of pages, not the pages. What it gave is recorded below as **leads for the owner**, with the official document to open. Nothing below is VERIFIED, and nothing here changes the status of any row above.
+
+| # | Check | Result | Lead (not verified) | Official document to open |
+|---|---|---|---|---|
+| 1 | BSA Schedule against the central Gazette | **Not done.** India Code's own Schedule file for Act 47 of 2023 appeared in search results, but could not be opened. Its search snippet shows the heading "THE SCHEDULE [See section 63(4)(c)] CERTIFICATE PART A" and the fragment "(Hash report to be enclosed with the certificate) (Name and signature) Date (DD/MM/YYYY)", which matches section 1B, items 6–7. | India Code Schedule file | https://upload.indiacode.nic.in/schedulefile?aid=AC_CEN_5_23_00049_2023-47_1719292804654&rid=1163 ; Act page https://indiacode.gov.in/items/9e461245-2c13-4171-9d9d-267425c01e1d |
+| 2 | BSA, BNSS and BNS commencement notifications | **Not done.** Secondary sources (Taxmann; an Odisha government s3waas PDF of reference material) give: BSA **S.O. 849(E)**, BNSS **S.O. 848(E)**, BNS **S.O. 850(E)**, all dated **23.02.2024**, each appointing **1 July 2024**. Leads say BNS s.106(2) was excluded from commencement, and the BNSS First Schedule entry for it too. | Taxmann posts; https://cdnbbsr.s3waas.gov.in/s3ec0369f268fb2ba1068615b3219c6e8f/uploads/2024/06/2024061512.pdf | The three S.O.s in the Gazette of India, Extraordinary, Part II, s.3(ii), on egazette.gov.in |
+| 3 | DPDP Rules and the Act's commencement | **Not done.** Secondary sources give: Rules **G.S.R. 846(E)** and Act commencement **G.S.R. 843(E)**, both 13.11.2025 (Wikipedia says 14.11.2025). In force from 13.11.2025: Rules 1, 2, 17–21 and Act ss.1(2), 2, 18–26, 35, 38–43, 44(1), (3). From 13.11.2026: Rule 4, Act ss.6(9), 27(1)(d). From 13.05.2027: Rules 3, 5–16, 22, 23 and the rest of the Act, including ss.3–5, 7–17. On these leads, the notice, consent and security duties in section 3A (ss.5, 6, 8) are **not yet in force today**. | Legal 500, AZB & Partners, dpdpa.com summaries | G.S.R. 843(E) and 846(E) on egazette.gov.in or meity.gov.in |
+| 4 | D.K. Basu para 35; Arnesh Kumar para 11 | **Not done.** Search found only commentary, none quoting paragraph numbers from a numbered text. | — | SCC reports (1997) 1 SCC 416 and (2014) 8 SCC 273, or the numbered judgments on sci.gov.in |
+| 5 | Madras HC, *R. v. B.*, 2024 SCC OnLine Mad 6084 | **Not done.** Commentary (JSA Prism, June 2026; Lawful Legal) describes it as a matrimonial case holding that only a notified s.79A Examiner may sign Part B, consistent with how *Pune Bar Association* paras 5–7 describe it. The judgment itself was not found. | https://www.jsalaw.com/wp-content/uploads/2026/06/JSA-Prism-Dispute-Resolution-June-2026-Electronic-Evidence.Final_.pdf | The judgment on mhc.tn.gov.in or SCC Online |
+| 6 | Post-July-2024 HC case law on BSA s.63 | **Not done.** No exhaustive search is possible without SCC Online or Manupatra. | — | SCC Online search |
+| 7 | Telecom suspension rules under the Telecommunications Act, 2023 | **Not done.** Secondary sources (IFF, SFLC.in, Khaitan & Co, Mondaq) say the **Telecommunications (Temporary Suspension of Services) Rules, 2024** were notified on **22.11.2024** under s.20(2)(b) and (4), read with s.56(2)(t), (u), replacing the 2017 Rules. The G.S.R. number was not found. Sources disagree on whether the draft's 15-day cap and 5-day review survived into the notified text. | https://internetfreedom.in/first-read-telecom-suspension-rules-2024/ ; https://sflc.in/telecom-suspension-rules-2024/ | The notification on egazette.gov.in or dot.gov.in |
+| — | BNS s.37 verbatim (section 2F) | **Not done**, for the same reason. | — | Act 45 of 2023 on India Code |
+
+**What would let these be done:** add `egazette.gov.in`, `indiacode.nic.in`, `upload.indiacode.nic.in`, `sci.gov.in`, `main.sci.gov.in` and `indiankanoon.org` to the environment's allowed domains (cloud environment settings → Network access), or have the owner open the documents above.
+
+## Helpline sources (G3), 20 October 2026
+
+Recorded in `helplines/helplines.json` with `"how": "search-extract"`: the official pages could not be opened (same DNS failure), so each number rests on a search engine's extract of an official page. Open each page and change `how` to `page-read` before release.
+
+| Number | What the extract says | Official page |
+|---|---|---|
+| 112 | ERSS: "integrated emergency response system with a single emergency number 112"; features page lists police, fire, medical and disaster teams, 24x7; existing numbers 100, 101, 108, 181 "will be integrated". MHA: deployed state by state; calls forwarded to police, health, fire, disaster, women, children or railway helplines. | https://112.gov.in/about ; https://www.mha.gov.in/en/commoncontent/emergency-response-support-system-erss |
+| 108 | Rajya Sabha, unstarred question 258 (session 262, going by the file name), answered 05.12.2023: Dial 108 for critical care, trauma and accident cases; supported under NHM. NHM Uttarakhand: 108 free, 24x7, in all its districts. | https://rsdebate.nic.in/bitstream/123456789/745837/1/PQ_262_05122023_U258_p352_p353.pdf ; https://nhm.uk.gov.in/service/108-emergency/ |
+| 102 | Same Rajya Sabha answer: Dial 102 mainly for basic patient transport of pregnant women and children under JSSK. | as above |
+| 15100 | NALSA FAQ: call 15100 for urgent legal assistance; NALSA "Promoting Inclusive Legal System": call 15100 or contact the nearest legal services institution. Hours not found, so the app doesn't state them. | https://nalsa.gov.in/faqs/ ; https://nalsa.gov.in/promoting-inclusive-legal-system/ |
