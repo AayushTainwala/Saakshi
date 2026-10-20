@@ -31,9 +31,15 @@ export function memoryLocker(files: Map<string, Uint8Array> = new Map()) {
       records.set(`${sessionId}/${name}`, { body, signature });
     },
     readRecordBytes(sessionId, name) {
+      const signature = name.endsWith('.sig');
+      const record = records.get(`${sessionId}/${signature ? name.slice(0, -4) : name}`);
+      if (!record) throw new Error(`no such record: ${name}`);
+      return signature ? record.signature : new TextEncoder().encode(record.body);
+    },
+    readRecordText(sessionId, name) {
       const record = records.get(`${sessionId}/${name}`);
       if (!record) throw new Error(`no such record: ${name}`);
-      return new TextEncoder().encode(record.body);
+      return record.body;
     },
     recordUri: (sessionId, name) => `mem://${sessionId}/records/${name}`,
     sessionFileUri: (sessionId, name) => `mem://${sessionId}/${name}`,

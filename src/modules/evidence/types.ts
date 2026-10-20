@@ -55,6 +55,8 @@ export type SessionState = {
   items: EvidenceItem[];
   witness: WitnessEntry[];
   certificate: { file: string; createdAt: string } | null;
+  /** The last on-phone check of files, records and chain. */
+  lastCheck?: { at: string; ok: boolean; problems: { sequence: number; problem: string }[] };
 };
 
 export type LocationFix = {

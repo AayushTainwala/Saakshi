@@ -21,7 +21,9 @@ export interface LockerStore {
   moveMedia(sessionId: string, sourceUri: string, name: string): string;
   mediaUri(sessionId: string, name: string): string;
   writeRecord(sessionId: string, name: string, body: string, signatureDer: Uint8Array): void;
+  /** Reads a file in the session's records/ folder (a record or its .sig). */
   readRecordBytes(sessionId: string, name: string): Uint8Array;
+  readRecordText(sessionId: string, name: string): string;
   recordUri(sessionId: string, name: string): string;
   sessionFileUri(sessionId: string, name: string): string;
   readDeviceKeyJson(): string | null;
@@ -143,6 +145,10 @@ export const fileLocker: LockerStore = {
 
   readRecordBytes(sessionId, name) {
     return new File(sessionDir(sessionId), 'records', name).bytesSync();
+  },
+
+  readRecordText(sessionId, name) {
+    return new File(sessionDir(sessionId), 'records', name).textSync();
   },
 
   recordUri(sessionId, name) {

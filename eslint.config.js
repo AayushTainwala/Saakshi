@@ -26,6 +26,10 @@ module.exports = defineConfig([
     },
   },
   {
+    files: ['tools/**/*.mjs'],
+    languageOptions: { globals: { Buffer: 'readonly', process: 'readonly', console: 'readonly' } },
+  },
+  {
     // Node's types are loaded for tests; keep Node-only APIs out of the app itself.
     files: ['src/**/*.{ts,tsx}', 'modules/*/src/**/*.ts', 'modules/*/index.ts'],
     ignores: ['**/__tests__/**', '**/*.test.{ts,tsx}'],
