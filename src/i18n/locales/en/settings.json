@@ -1,0 +1,20 @@
+{
+  "title": "Settings",
+  "language": {
+    "heading": "Language",
+    "system": "Phone's language",
+    "en": "English",
+    "hi": "हिन्दी"
+  },
+  "theme": {
+    "heading": "Appearance",
+    "system": "Same as phone",
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "about": {
+    "heading": "About",
+    "version": "Version {{version}}",
+    "licence": "Free and open source (MIT licence). Nothing you record leaves your phone unless you choose to send it."
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "appName": "Saakshi",
+  "tabs": {
+    "record": "Record",
+    "sos": "SOS",
+    "guides": "Guides",
+    "help": "Help",
+    "settings": "Settings"
+  },
+  "actions": {
+    "ok": "OK",
+    "cancel": "Cancel",
+    "close": "Close",
+    "continue": "Continue",
+    "retry": "Try again",
+    "share": "Share"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "back": "Go to Record"
+  }
+}
