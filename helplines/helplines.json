@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "updated": "2026-10-20",
+  "public": [
+    {
+      "id": "erss-112",
+      "number": "112",
+      "name": {
+        "en": "Emergency (112)",
+        "hi": "इमरजेंसी (112)"
+      },
+      "description": {
+        "en": "India's single emergency number for police, fire and medical help, day and night.",
+        "hi": "पुलिस, फ़ायर और मेडिकल मदद के लिए भारत का एक इमरजेंसी नंबर, दिन-रात।"
+      },
+      "scope": "national",
+      "sources": [
+        {
+          "url": "https://112.gov.in/about",
+          "checked": "2026-10-20",
+          "how": "search-extract"
+        },
+        {
+          "url": "https://www.mha.gov.in/en/commoncontent/emergency-response-support-system-erss",
+          "checked": "2026-10-20",
+          "how": "search-extract"
+        }
+      ]
+    },
+    {
+      "id": "ambulance-108",
+      "number": "108",
+      "name": {
+        "en": "Ambulance (108)",
+        "hi": "एम्बुलेंस (108)"
+      },
+      "description": {
+        "en": "Emergency ambulance for accidents, injuries and serious illness. Each state runs its own service, so it differs from state to state.",
+        "hi": "दुर्घटना, चोट और गंभीर बीमारी के लिए इमरजेंसी एम्बुलेंस। हर राज्य अपनी सेवा ख़ुद चलाता है, इसलिए यह राज्य के हिसाब से अलग हो सकती है।"
+      },
+      "scope": "national",
+      "sources": [
+        {
+          "url": "https://rsdebate.nic.in/bitstream/123456789/745837/1/PQ_262_05122023_U258_p352_p353.pdf",
+          "checked": "2026-10-20",
+          "how": "search-extract"
+        },
+        {
+          "url": "https://nhm.uk.gov.in/service/108-emergency/",
+          "checked": "2026-10-20",
+          "how": "search-extract"
+        }
+      ]
+    },
+    {
+      "id": "ambulance-102",
+      "number": "102",
+      "name": {
+        "en": "Ambulance for mothers and children (102)",
+        "hi": "माँ और बच्चों के लिए एम्बुलेंस (102)"
+      },
+      "description": {
+        "en": "Transport to hospital, mainly for pregnant women and young children. Each state runs its own service. For an accident or injury, call 108 or 112.",
+        "hi": "अस्पताल तक पहुँचाने की गाड़ी, ख़ासकर गर्भवती महिलाओं और छोटे बच्चों के लिए। हर राज्य अपनी सेवा ख़ुद चलाता है। दुर्घटना या चोट के लिए 108 या 112 पर कॉल करें।"
+      },
+      "scope": "national",
+      "sources": [
+        {
+          "url": "https://rsdebate.nic.in/bitstream/123456789/745837/1/PQ_262_05122023_U258_p352_p353.pdf",
+          "checked": "2026-10-20",
+          "how": "search-extract"
+        }
+      ]
+    },
+    {
+      "id": "nalsa-15100",
+      "number": "15100",
+      "name": {
+        "en": "Free legal aid (NALSA, 15100)",
+        "hi": "मुफ़्त क़ानूनी सहायता (NALSA, 15100)"
+      },
+      "description": {
+        "en": "Toll-free helpline of the National Legal Services Authority, for legal advice and to be put in touch with free legal aid.",
+        "hi": "राष्ट्रीय विधिक सेवा प्राधिकरण (NALSA) की टोल-फ़्री हेल्पलाइन। क़ानूनी सलाह के लिए, और मुफ़्त क़ानूनी सहायता से जुड़ने के लिए।"
+      },
+      "scope": "national",
+      "sources": [
+        {
+          "url": "https://nalsa.gov.in/faqs/",
+          "checked": "2026-10-20",
+          "how": "search-extract"
+        },
+        {
+          "url": "https://nalsa.gov.in/promoting-inclusive-legal-system/",
+          "checked": "2026-10-20",
+          "how": "search-extract"
+        }
+      ]
+    }
+  ],
+  "people": []
+}
