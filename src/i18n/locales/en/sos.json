@@ -2,5 +2,79 @@
   "title": "SOS",
   "intro": "Alert your trusted contacts with your location. Saakshi is not an emergency service.",
   "call112": "Call 112",
-  "call112Hint": "Calls India's emergency number"
+  "call112Hint": "Calls India's emergency number",
+  "setup": {
+    "heading": "Choose who to alert",
+    "body": "Add the people you trust. When you send an alert, each of them gets a text message with where you are and the time.",
+    "add": "Add trusted contacts"
+  },
+  "alert": {
+    "button": "Alert my trusted contacts",
+    "hintDirect_one": "Texts {{count}} contact 3 seconds after you tap. You can cancel.",
+    "hintDirect_other": "Texts {{count}} contacts 3 seconds after you tap. You can cancel.",
+    "hintComposer_one": "Opens your SMS app with the message to {{count}} contact. Tap Send there.",
+    "hintComposer_other": "Opens your SMS app with the message to {{count}} contacts. Tap Send there.",
+    "countdown_one": "Texting your contacts in {{count}} second…",
+    "countdown_other": "Texting your contacts in {{count}} seconds…",
+    "sendNow": "Send now",
+    "cancel": "Don't send",
+    "locating": "Finding where you are…",
+    "sending": "Sending…",
+    "sentAll_one": "Sent to your {{count}} contact.",
+    "sentAll_other": "Sent to all {{count}} contacts.",
+    "sentSome": "Sent to {{sent}} of {{total}} contacts.",
+    "notConfirmed": "Not confirmed: {{names}}",
+    "sendRest": "Send to the rest from my SMS app",
+    "composerSent": "Your SMS app sent the message.",
+    "composerCancelled": "Not sent. The message was closed without sending.",
+    "composerUnknown": "Your SMS app opened with the message. Check that it went.",
+    "noLocation": "Your location wasn't available, so the message has no map link.",
+    "noSms": "This phone can't send text messages.",
+    "unexpected": "The alert could not be sent: {{detail}}",
+    "done": "Done",
+    "again": "Send again"
+  },
+  "message": {
+    "title": "Saakshi alert: I may need help.",
+    "location": "My location",
+    "noLocation": "My location: not available",
+    "sent": "Sent"
+  },
+  "contacts": {
+    "title": "Trusted contacts",
+    "summary_one": "{{count}} trusted contact: {{names}}",
+    "summary_other": "{{count}} trusted contacts: {{names}}",
+    "manage": "Manage trusted contacts",
+    "intro": "These people get your alerts by text message. The list is kept only on this phone.",
+    "count": "{{count}} of {{max}}",
+    "remove": "Remove",
+    "removeLabel": "Remove {{name}}",
+    "noName": "No name",
+    "pick": "Choose from my contacts",
+    "typeHeading": "Or type a number",
+    "name": "Name (optional)",
+    "phone": "Phone number",
+    "phoneHint": "A 10-digit mobile number, or one starting with +",
+    "add": "Add",
+    "invalid": "That doesn't look like a phone number.",
+    "duplicate": "That number is already on the list.",
+    "full": "The list is full. Remove someone to add another.",
+    "pickFailed": "Your contacts couldn't be opened: {{detail}}"
+  },
+  "direct": {
+    "heading": "Send with no tap",
+    "body": "This version of Saakshi can text your contacts by itself, so an alert goes out even if you can't tap Send. Android asks you once to allow it.",
+    "on": "On: alerts go out by themselves after a 3-second countdown.",
+    "allow": "Allow Saakshi to send SMS",
+    "denied": "Not allowed. You can allow it in Android Settings, under Apps, Saakshi, Permissions.",
+    "rationaleTitle": "Send alerts with no tap",
+    "rationaleBody": "Saakshi sends texts only when you send an alert, and only to your trusted contacts."
+  },
+  "location": {
+    "heading": "Location",
+    "body": "Allow location so your alerts include a map link to where you are.",
+    "allow": "Allow location",
+    "denied": "Location is off for Saakshi. Alerts will go without a map link until you allow it in the phone's Settings.",
+    "openSettings": "Open Settings"
+  }
 }
