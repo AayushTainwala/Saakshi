@@ -141,7 +141,7 @@ describe('evidence bundle', () => {
 
     for (const path of [folder, zip.path]) {
       const { code, out } = runVerifier(path);
-      expect(out).toContain('OK: signatures, files and chain check out.');
+      expect(out).toContain('OK: signatures, files, checkpoints and chain check out.');
       expect(out).toContain(`Chain head: ${records[2].recordSha256}`);
       expect(out).toContain('Records: 3');
       expect(code).toBe(0);
@@ -218,7 +218,9 @@ describe('evidence bundle', () => {
       media: 'media/0001-clip0-seg0.mp4',
       recordSha256: records[1].recordSha256,
       fileSha256: records[1].record.file.sha256,
+      recording: null,
     });
+    expect(manifest.checkpoints).toEqual([]);
     expect(bundleFileName(state)).toMatch(/^saakshi-[0-9a-f-]{8}-\d{8}-\d{4}\.zip$/);
   });
 });

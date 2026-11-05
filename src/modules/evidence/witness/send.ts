@@ -1,5 +1,6 @@
 import * as SMS from 'expo-sms';
 
+import { lastLink } from '../capture/pipeline';
 import type { EvidenceRecord } from '../integrity/record';
 import { fileLocker } from '../locker/store';
 import type { WitnessEntry } from '../types';
@@ -24,11 +25,13 @@ export async function sendWitnessMessage(
   const last = sealed[sealed.length - 1];
   if (!last) throw new Error('Nothing in this session has been sealed yet');
   const record = JSON.parse(fileLocker.readRecordText(sessionId, last.record!.file)) as EvidenceRecord;
+  // The head of the whole chain, which may be a checkpoint signed after the last file (format 0.5).
+  const head = lastLink(session)?.recordSha256 ?? last.recordSha256!;
 
-  const { result } = await SMS.sendSMSAsync(recipients, witnessMessage(last.recordSha256!, record, labels));
+  const { result } = await SMS.sendSMSAsync(recipients, witnessMessage(head, record, labels));
   const entry: WitnessEntry = {
     sentAt: new Date().toISOString(),
-    chainHead: last.recordSha256!,
+    chainHead: head,
     recipients: recipients.length,
     result,
   };

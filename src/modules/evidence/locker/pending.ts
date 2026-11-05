@@ -23,6 +23,8 @@ export type PendingMarker = {
   gapBeforeMs?: number | null;
   rotationDegrees?: number | null;
   location?: LocationSnapshot;
+  /** The recorder's id for the file, which its checkpoints carry (body-cam, format 0.5). */
+  recording?: string | null;
 };
 
 export function markerName(marker: Pick<PendingMarker, 'file' | 'startedAt'>): string {

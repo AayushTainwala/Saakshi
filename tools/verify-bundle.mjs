@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // Checks a Saakshi evidence bundle (docs/spec/evidence-bundle.md, section 10, steps 2 to 5):
 // the public key matches its id, every record's signature verifies, every file matches its record,
-// and the records form an unbroken chain. It does not check the key attestation (step 6).
+// and the records form an unbroken chain. From format 0.5 it also checks every checkpoint: that the
+// first bytes of its file, as many as the checkpoint names, have the SHA-256 it signed. It does not
+// check the key attestation (step 6).
 //
 // Usage: node verify-bundle.mjs <bundle.zip | unzipped folder>
 // Needs Node.js 18 or later and nothing else. Exits 0 if the bundle checks out, 1 if not.
@@ -9,8 +11,11 @@
 import { createHash, createPublicKey, verify } from 'node:crypto';
 import { closeSync, createReadStream, existsSync, openSync, readdirSync, readFileSync, readSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
 
-const SUPPORTED_VERSIONS = ['0.1', '0.2', '0.3', '0.4'];
+const SUPPORTED_VERSIONS = ['0.1', '0.2', '0.3', '0.4', '0.5'];
+const RECORD_TYPE = 'saakshi.evidence.record';
+const CHECKPOINT_TYPE = 'saakshi.evidence.checkpoint';
 
 // ---- Reading a bundle from a folder or a stored (uncompressed) ZIP --------------------------
 
@@ -20,6 +25,7 @@ function folderSource(dir) {
     names: () => listFolder(dir, ''),
     read: (name) => readFileSync(join(dir, name)),
     sha256: (name) => hashStream(createReadStream(join(dir, name))),
+    stream: (name) => createReadStream(join(dir, name)),
     size: (name) => statSync(join(dir, name)).size,
     close: () => {},
   };
@@ -117,6 +123,12 @@ function zipSource(path) {
       const start = dataOffset(e);
       return hashStream(createReadStream(path, { start, end: start + e.size - 1 }));
     },
+    stream: (name) => {
+      const e = entry(name);
+      if (e.size === 0) return Readable.from([]);
+      const start = dataOffset(e);
+      return createReadStream(path, { start, end: start + e.size - 1 });
+    },
     size: (name) => entry(name).size,
     close: () => closeSync(fd),
   };
@@ -128,6 +140,40 @@ function hashStream(stream) {
     stream.on('data', (chunk) => hash.update(chunk));
     stream.on('error', reject);
     stream.on('end', () => resolve(hash.digest('hex')));
+  });
+}
+
+/**
+ * Reads a file once and returns its SHA-256 and size, and the SHA-256 of its first `n` bytes for
+ * each `n` in `offsets` (format 0.5 checkpoints). Offsets past the end are left out of `prefixes`.
+ */
+function hashWithPrefixes(stream, offsets) {
+  const want = [...new Set(offsets)].sort((a, b) => a - b);
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha256');
+    const prefixes = new Map();
+    let position = 0;
+    let next = 0;
+    const snapshot = () => {
+      while (next < want.length && want[next] === position) {
+        prefixes.set(want[next], hash.copy().digest('hex'));
+        next++;
+      }
+    };
+    snapshot();
+    stream.on('data', (chunk) => {
+      let at = 0;
+      while (at < chunk.length) {
+        const target = next < want.length ? want[next] : Infinity;
+        const take = Math.min(chunk.length - at, target - position);
+        hash.update(chunk.subarray(at, at + take));
+        at += take;
+        position += take;
+        snapshot();
+      }
+    });
+    stream.on('error', reject);
+    stream.on('end', () => resolve({ sha256: hash.digest('hex'), size: position, prefixes }));
   });
 }
 
@@ -163,6 +209,9 @@ export async function verifyBundle(path) {
 
     let previous = null;
     let lastBodyHash = null;
+    // Checkpoints by recording, waiting for their file's record (which comes after them).
+    const pending = new Map();
+    let checkpointCount = 0;
     for (const [index, name] of recordNames.entries()) {
       const body = source.read(name);
       const bodyHash = createHash('sha256').update(body).digest('hex');
@@ -182,18 +231,49 @@ export async function verifyBundle(path) {
         previous = null;
         continue;
       }
-      if (record.type !== 'saakshi.evidence.record') fail(`${label}: not a Saakshi record`);
+      const isCheckpoint = record.type === CHECKPOINT_TYPE;
+      if (record.type !== RECORD_TYPE && !isCheckpoint) fail(`${label}: not a Saakshi record`);
       if (!SUPPORTED_VERSIONS.includes(record.version)) fail(`${label}: unknown version ${record.version}`);
       if (record.key?.id !== keyFile.keyId) fail(`${label}: signed by a different key (${record.key?.id})`);
       if (record.sequence !== index) fail(`${label}: sequence ${record.sequence}, expected ${index} (a record is missing or out of order)`);
 
-      const media = `media/${record.file?.name}`;
-      if (!source.has(media)) {
-        fail(`${label}: ${media} is missing`);
+      if (isCheckpoint) {
+        // Checked against its file when the file's record comes.
+        checkpointCount++;
+        if (!pending.has(record.recording)) pending.set(record.recording, []);
+        pending.get(record.recording).push({ label, record });
       } else {
-        if (source.size(media) !== record.file.size) fail(`${media}: size differs from its record`);
-        const sha = await source.sha256(media);
-        if (sha !== record.file.sha256) fail(`${media}: SHA-256 ${sha} differs from its record (${record.file.sha256})`);
+        const media = `media/${record.file?.name}`;
+        const checkpoints = record.recording ? (pending.get(record.recording) ?? []) : [];
+        if (record.recording) pending.delete(record.recording);
+        if (!source.has(media)) {
+          fail(`${label}: ${media} is missing`);
+        } else {
+          if (source.size(media) !== record.file.size) fail(`${media}: size differs from its record`);
+          const read = await hashWithPrefixes(
+            source.stream(media),
+            checkpoints.map((c) => c.record.file?.size),
+          );
+          if (read.sha256 !== record.file.sha256) {
+            fail(`${media}: SHA-256 ${read.sha256} differs from its record (${record.file.sha256})`);
+          }
+          // Numbers rise; a gap is allowed (a checkpoint that could not be signed is left out, and the
+          // next one vouches for its bytes too).
+          let lastSize = 0;
+          let lastNumber = -1;
+          for (const { label: at, record: checkpoint } of checkpoints) {
+            if (!(checkpoint.checkpoint > lastNumber)) fail(`${at}: checkpoint ${checkpoint.checkpoint} comes after checkpoint ${lastNumber}`);
+            lastNumber = checkpoint.checkpoint;
+            if (!(checkpoint.file?.size > lastSize)) fail(`${at}: covers ${checkpoint.file?.size} bytes, not more than the checkpoint before it`);
+            lastSize = checkpoint.file?.size;
+            const prefix = read.prefixes.get(checkpoint.file?.size);
+            if (prefix === undefined) {
+              fail(`${at}: covers ${checkpoint.file?.size} bytes, but ${media} has only ${read.size}`);
+            } else if (prefix !== checkpoint.file.sha256) {
+              fail(`${at}: the first ${checkpoint.file.size} bytes of ${media} have SHA-256 ${prefix}, not ${checkpoint.file.sha256}`);
+            }
+          }
+        }
       }
 
       const expected = previous
@@ -213,11 +293,15 @@ export async function verifyBundle(path) {
       lastBodyHash = bodyHash;
     }
 
+    for (const [recording, checkpoints] of pending) {
+      fail(`${checkpoints[0].label}: checkpoint of recording ${recording}, whose file's record is not in the bundle`);
+    }
+
     if (source.has('manifest.json')) {
       const manifest = JSON.parse(source.read('manifest.json').toString('utf8'));
       if (manifest.chainHead !== lastBodyHash) fail(`manifest.json: chainHead differs from the last record (${lastBodyHash})`);
     }
-    notes.push(`Records: ${recordNames.length}`);
+    notes.push(`Records: ${recordNames.length}${checkpointCount ? ` (${checkpointCount} of them checkpoints)` : ''}`);
     notes.push(`Chain head: ${lastBodyHash}`);
   } catch (error) {
     fail(error instanceof Error ? error.message : String(error));
@@ -237,6 +321,6 @@ if (process.argv[1]?.endsWith('verify-bundle.mjs')) {
   const result = await verifyBundle(path);
   for (const note of result.notes) console.log(note);
   for (const failure of result.failures) console.log(`FAIL ${failure}`);
-  console.log(result.ok ? 'OK: signatures, files and chain check out.' : 'NOT OK: see the failures above.');
+  console.log(result.ok ? 'OK: signatures, files, checkpoints and chain check out.' : 'NOT OK: see the failures above.');
   process.exit(result.ok ? 0 : 1);
 }

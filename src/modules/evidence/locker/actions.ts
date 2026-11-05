@@ -25,6 +25,18 @@ export async function runCheck(id: string): Promise<NonNullable<SessionState['la
       file,
     });
   }
+  for (const checkpoint of session.checkpoints ?? []) {
+    if (checkpoint.status !== 'sealed' || !checkpoint.record) continue;
+    const body = fileLocker.readRecordText(id, checkpoint.record.file);
+    inputs.push({
+      sequence: checkpoint.sequence,
+      kind: 'checkpoint',
+      body,
+      bodySha256: await sha256Hex(body),
+      sealedRecordSha256: checkpoint.recordSha256,
+      file: null,
+    });
+  }
 
   const problems = checkSession(inputs);
   const lastCheck = { at: new Date().toISOString(), ok: problems.length === 0, problems };

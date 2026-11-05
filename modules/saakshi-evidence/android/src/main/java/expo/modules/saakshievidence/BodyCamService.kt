@@ -56,14 +56,18 @@ class BodyCamService : Service() {
     val quality = intent.getIntExtra(EXTRA_QUALITY, 720)
     CameraRecorder.setPreview(null)
     CameraRecorder.open(this, quality)
+    // One continuous file from start to stop (owner's decision of 5 Nov 2026), fingerprinted
+    // every few seconds while it is written. Pieces only if the app asks for them.
     CameraRecorder.startRecording(
       CameraRecorder.Config(
         outputDir = File(intent.getStringExtra(EXTRA_OUTPUT_DIR)!!),
         pendingDir = File(intent.getStringExtra(EXTRA_PENDING_DIR)!!),
-        pieceMillis = intent.getLongExtra(EXTRA_PIECE_MILLIS, 60_000L),
+        pieceMillis = intent.getLongExtra(EXTRA_PIECE_MILLIS, 0L).takeIf { it > 0 },
         quality = quality,
         clip = intent.getIntExtra(EXTRA_CLIP, 0),
         mode = "body-cam",
+        checkpointMillis = intent.getLongExtra(EXTRA_CHECKPOINT_MILLIS, 0L).takeIf { it > 0 },
+        segmented = true,
       ),
     )
     running = true
@@ -133,6 +137,7 @@ class BodyCamService : Service() {
     const val EXTRA_OUTPUT_DIR = "outputDir"
     const val EXTRA_PENDING_DIR = "pendingDir"
     const val EXTRA_PIECE_MILLIS = "pieceMillis"
+    const val EXTRA_CHECKPOINT_MILLIS = "checkpointMillis"
     const val EXTRA_QUALITY = "quality"
     const val EXTRA_CLIP = "clip"
     const val EXTRA_TITLE = "title"

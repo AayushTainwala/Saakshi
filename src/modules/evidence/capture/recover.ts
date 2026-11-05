@@ -66,6 +66,7 @@ export async function recoverPending(deps: PipelineDeps, files: RecoveryFiles): 
             interrupted: !closed,
             gapBeforeMs: marker.gapBeforeMs ?? null,
             rotationDegrees: marker.rotationDegrees ?? null,
+            recording: marker.recording ?? null,
             pendingMarker: name,
           }),
         );

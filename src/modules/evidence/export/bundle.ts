@@ -3,7 +3,7 @@ import * as Sharing from 'expo-sharing';
 
 import { attestIfNeeded } from '../integrity/deviceKey';
 import { appInfo } from '../integrity/environment';
-import { loadSealed } from '../locker/records';
+import { loadCheckpoints, loadSealed } from '../locker/records';
 import { fileLocker } from '../locker/store';
 import {
   type BundledRecord,
@@ -51,6 +51,8 @@ export async function writeBundle(id: string): Promise<string> {
 
   const sealed = loadSealed(fileLocker, id);
   const records: BundledRecord[] = sealed.map((entry) => entry.bundled);
+  const checkpointEntries = loadCheckpoints(fileLocker, id);
+  const checkpoints = checkpointEntries.map((entry) => entry.bundled);
   const entries: ZipEntry[] = [];
 
   for (const { item, body, bundled } of sealed) {
@@ -66,10 +68,18 @@ export async function writeBundle(id: string): Promise<string> {
     );
   }
 
+  // Checkpoints signed while body-cam files were being written (format 0.5).
+  for (const { body, bundled } of checkpointEntries) {
+    entries.push(
+      bytesEntry(`records/${bundled.recordFile}`, encode(body), now),
+      bytesEntry(`records/${bundled.recordFile}.sig`, fileLocker.readRecordBytes(id, `${bundled.recordFile}.sig`), now),
+    );
+  }
+
   const certificate = new File(fileLocker.sessionFileUri(id, CERTIFICATE_FILE));
   const hasCertificate = !!session.certificate && certificate.exists;
-  const manifest = buildManifest(session, records, now, appInfo(), hasCertificate);
-  const report = hashReport(session, records, key, now, session.items.length - sealed.length);
+  const manifest = buildManifest(session, records, now, appInfo(), hasCertificate, checkpoints);
+  const report = hashReport(session, records, key, now, session.items.length - sealed.length, checkpoints);
 
   const head: ZipEntry[] = [
     bytesEntry('manifest.json', encode(JSON.stringify(manifest, null, 2)), now),
