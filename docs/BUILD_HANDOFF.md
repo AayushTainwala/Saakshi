@@ -17,7 +17,7 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 | Group | State |
 |---|---|
 | 1. Body-cam: back swipe, and sound in the video (C2, C6) | Built: https://github.com/AayushTainwala/Saakshi/pull/16 (branch `claude/determined-goodall-wl89xn`), with test steps for the owner. Not yet run on a phone. |
-| 2. Body-cam: other fixes (C1–C3) | Built on branch `claude/fix-round-1-group-2`, stacked on group 1 at the owner's request (5 Nov); pull request open. Not yet run on a phone. |
+| 2. Body-cam: other fixes (C1–C3) | Built: https://github.com/AayushTainwala/Saakshi/pull/17 (branch `claude/fix-round-1-group-2`), stacked on group 1 at the owner's request (5 Nov), with test steps for the owner. Not yet run on a phone. |
 | 2a. Body-cam: one continuous file, with checkpoints | Not started (built separately from group 1) |
 | 3–9 | Not started |
 
