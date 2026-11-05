@@ -52,7 +52,7 @@ function fakeRecorder(name: string, log: string[], files: Map<string, Uint8Array
   return recorder;
 }
 
-describe('AudioPieces (iPhone body-cam sound)', () => {
+describe('AudioPieces (iPhone bug-mode sound)', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 

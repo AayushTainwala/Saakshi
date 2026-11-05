@@ -9,7 +9,9 @@ export type CaptureMode = 'camera' | 'body-cam' | 'bug';
  * Why a file ended. `interrupted`: cut off (crash or forced power-off) and sealed when the app
  * next opened. `app-left`: on iPhone, video stops when the user leaves the app. `low-battery`:
  * the app stopped and saved the recording itself at 3% battery. `audio-interrupted`: the system
- * stopped sound recording (for example, a phone call on iPhone).
+ * stopped sound recording (for example, a phone call on iPhone). iPhone body-cam only:
+ * `sound-resumed`, a video piece recorded without sound ended so that the next one has sound again;
+ * `video-resumed`, a sound-only file ended because video with sound started again.
  */
 export type EndReason =
   | 'stopped'
@@ -18,6 +20,8 @@ export type EndReason =
   | 'camera-lost'
   | 'low-battery'
   | 'audio-interrupted'
+  | 'sound-resumed'
+  | 'video-resumed'
   | 'interrupted'
   | 'error';
 

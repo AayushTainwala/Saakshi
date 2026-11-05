@@ -1,13 +1,13 @@
 # Saakshi evidence bundle format
 
-**Version 0.2** (draft, 21 October 2026; 0.1 was 20 October 2026). Status: in use by the app from its first release; may change before 1.0, always with a new version number.
+**Version 0.3** (draft, 5 November 2026; 0.2 was 21 October 2026, 0.1 was 20 October 2026). Status: in use by the app from its first release; may change before 1.0, always with a new version number.
 
 This document defines how Saakshi records the integrity of photos and videos, and the bundle it exports. It is written so that anyone (a lawyer, a court-appointed expert, another app) can check a bundle with standard tools and without Saakshi. Other apps and forks may produce and read this format. The key words MUST, SHOULD and MAY are used as in RFC 2119.
 
 What this format does and does not show:
 
 - It shows that each file is byte-for-byte the file the app saved when the capture closed, that its record was signed by a key held in the phone's security hardware, and that the files of one capture session (including the pieces of a body-cam or bug-mode recording) are in order with nothing removed or inserted between them.
-- It does not prove the time or place: they come from the phone's clock and location services, which the phone's user can change. A public timestamp (version 0.3, below) proves a record existed no later than a given time.
+- It does not prove the time or place: they come from the phone's clock and location services, which the phone's user can change. A public timestamp (a later version, below) proves a record existed no later than a given time.
 - It does not make a recording unquestionable, and the app's signing key is not an "electronic signature" under the Information Technology Act, 2000 (see `docs/research/law.md`, section 1D). Under BSA s.63(4) a certificate in the Schedule form is still needed; the app pre-fills Part A (section 8).
 
 ## 1. Terms
@@ -35,15 +35,22 @@ What this format does and does not show:
 
 1. The app records with the platform camera into a file. Nothing is drawn onto the image or video: on-screen prompts (E6) are separate views over the preview.
 2. **Containers.** Video is written in a container that survives a cut-off:
-   - **iPhone:** QuickTime (`.mov`, `video/quicktime`) from `AVCaptureMovieFileOutput`, which writes a movie fragment every 10 seconds. A cut-off file plays up to its last fragment, so at most about 10 seconds are lost; a file cut off in its first 10 seconds has no fragment and does not play.
+   - **iPhone, evidence camera:** QuickTime (`.mov`, `video/quicktime`) from `AVCaptureMovieFileOutput`, which writes a movie fragment every 10 seconds. A cut-off file plays up to its last fragment, so at most about 10 seconds are lost; a file cut off in its first 10 seconds has no fragment and does not play.
+   - **iPhone, body-cam mode (from 0.3):** QuickTime (`.mov`, H.264 video and AAC sound) from the app's own recorder (`AVAssetWriter`), also with a movie fragment every 10 seconds, so it is cut-off safe in the same way.
    - **Android 8 and later:** MPEG transport stream (`.ts`, `video/mp2t`, H.264 and AAC) from the app's own recorder. It needs nothing written at the end, so a cut-off file plays up to the last data written.
    - **Android 7, or a phone that refuses MPEG-TS:** MP4 (`.mp4`), which is **not** cut-off safe: a cut-off MP4 has no index and does not play.
-   - **Audio pieces** (`.m4a`, AAC in MP4) are not cut-off safe. They are short, so a cut-off loses at most the piece being recorded.
+   - **Audio pieces** (`.m4a`, AAC in MP4: bug mode on iPhone, and body-cam's sound-only pieces on iPhone) are not cut-off safe. They are short, so a cut-off loses at most the piece being recorded.
 3. **Markers.** When a recording starts, the app writes a small marker in the session folder (`pending/`) naming the file, its start time and what is recording, and updates it when the file closes. The marker is removed once the file has been hashed and moved into the locker.
 4. When the camera closes the file (a photo is saved, recording stops, or a piece is complete), the app reads the file once, in fixed-size chunks, and computes SHA-256, SHA-1, MD5 and the size. It does this before moving the file into the evidence locker, and never writes to the file again. Moving within the app's storage does not change the bytes.
 5. The app then writes the record (section 4) and signs it (section 5).
 6. **Interrupted files.** When the app next opens, it looks for markers left behind. A file whose recorder never closed it (the app was killed or the phone went off) is hashed and sealed as it is, with `interrupted: true` and `capture.endReason: "interrupted"`; its `endedAt` is the file's last-write time. It is chained after the last file sealed in that session. A file that closed normally but was not yet sealed is sealed as usual. A marker whose file is missing or empty is removed.
-7. **Pieces.** In body-cam mode the next piece starts as soon as the previous one closes. The gap is usually well under a second and is given in `capture.gapBeforeMs`. On iPhone, video can only be recorded while the app is on screen, so body-cam video stops when the user leaves the app (`endReason: "app-left"`) and restarts as a new clip when they return; sound carries on in separate audio pieces.
+7. **Pieces.** In body-cam mode the next piece starts as soon as the previous one closes. The gap is usually well under a second and is given in `capture.gapBeforeMs`.
+8. **Body-cam on iPhone (from 0.3).** One microphone stream feeds every file of the session, so the sound has no gap of its own:
+   - While the app is on screen, each video piece holds its sound in the same file.
+   - iOS allows video only while the app is on screen. When the app leaves the screen or the phone locks, the video piece ends (`endReason: "app-left"`, or `"camera-lost"` if iOS stopped the camera for another reason) and the sound carries on in sound-only pieces (`.m4a`), a new clip. The first sound-only piece starts about half a second before the video ended.
+   - When the user returns, video with sound starts again as a new clip, and the sound-only piece ends about half a second later (`endReason: "video-resumed"`).
+   - If the phone stops sound recording (for example, for a phone call), the current files end with `"audio-interrupted"` and video carries on without sound in the next piece of the same clip. When sound recording comes back, that piece ends with `"sound-resumed"` and the next piece has sound again.
+   - `capture.gapBeforeMs` of a video file counts from the end of the previous video file (the gap in the picture). Of a sound-only file, it counts from the end of the previous file that carried sound (the gap in the sound); a negative value means the two overlap.
 
 ## 4. Record
 
@@ -52,7 +59,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 ```json
 {
   "type": "saakshi.evidence.record",
-  "version": "0.2",
+  "version": "0.3",
   "id": "3f0a1c9e-5d0b-4a8e-9a3c-2f1b7c6d5e4f",
   "session": "8c2d4b6a-1e3f-4a5b-9c7d-0e1f2a3b4c5d",
   "sequence": 3,
@@ -106,7 +113,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 
 | Member | Meaning |
 |---|---|
-| `type`, `version` | Always `"saakshi.evidence.record"` and `"0.2"` for this version. |
+| `type`, `version` | Always `"saakshi.evidence.record"` and `"0.3"` for this version. |
 | `id` | UUID (version 4) of this record. |
 | `session` | UUID of the capture session. |
 | `sequence` | Position in the session, from 0, counting every file (photos, videos and pieces) in the order they closed. |
@@ -117,7 +124,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 | `capture.mode` | `"camera"` (the evidence camera), `"body-cam"` or `"bug"`. |
 | `capture.startedAt`, `endedAt` | When the camera started and stopped writing this file, by the phone's clock. Equal for a photo. |
 | `capture.endedAtSource` | `"recorder"`: the recorder reported the end. `"file-modified"`: the file's last-write time, for an interrupted file. |
-| `capture.endReason` | `"stopped"` (by the user), `"piece-complete"`, `"app-left"` (iPhone video stopped because the app left the screen), `"camera-lost"` (the system or another app took the camera), `"low-battery"` (the app stopped and saved the recording at 3% battery), `"audio-interrupted"` (the system stopped sound recording, for example for a phone call on iPhone), `"interrupted"` or `"error"`. For a piece, a negative `gapBeforeMs` means it started before the previous piece stopped (iPhone sound pieces overlap so there is no silence). |
+| `capture.endReason` | `"stopped"` (by the user), `"piece-complete"`, `"app-left"` (iPhone video stopped because the app left the screen), `"camera-lost"` (the system or another app took the camera), `"low-battery"` (the app stopped and saved the recording at 3% battery), `"audio-interrupted"` (the system stopped sound recording, for example for a phone call on iPhone), `"sound-resumed"` (from 0.3, iPhone body-cam: a video piece recorded without sound ended because sound recording came back; the next piece has sound), `"video-resumed"` (from 0.3, iPhone body-cam: a sound-only piece ended because video with sound started again), `"interrupted"` or `"error"`. For a piece, a negative `gapBeforeMs` means it started before the previous piece stopped (iPhone sound pieces overlap so there is no silence; section 3, step 8). |
 | `capture.rotationDegrees` | Degrees clockwise to turn the picture to show it upright, as the recorder set it when the file started. Given only for MPEG-TS files, whose container has no field for it, so a player may show them on their side; null otherwise (QuickTime and MP4 carry their own rotation, and photos and audio have none). |
 | `capture.gapBeforeMs` | For a piece: milliseconds between the end of the previous piece of the same recording and the start of this one. Otherwise null. |
 | `capture.hashedAt` | When hashing finished. |
@@ -161,7 +168,7 @@ Apple's attestation object (CBOR, with a certificate chain to Apple's App Attest
 ```json
 {
   "type": "saakshi.device-key",
-  "version": "0.2",
+  "version": "0.3",
   "keyId": "…",
   "algorithm": "ES256",
   "publicKeySpki": "<Base64 of DER SubjectPublicKeyInfo>",
@@ -207,7 +214,7 @@ README.txt
 ```json
 {
   "type": "saakshi.evidence.bundle",
-  "version": "0.2",
+  "version": "0.3",
   "session": "8c2d4b6a-…",
   "createdAt": "2026-10-20T10:15:00.000Z",
   "app": { "id": "in.aayushtainwala.saakshi", "version": "1.0.0", "build": "1" },
@@ -265,7 +272,7 @@ With standard tools (`unzip`, `sha256sum`, `openssl`):
    - Android: verify the certificate chain up to a Google hardware attestation root, check the leaf's public key equals the device key, and read the attestation extension (package name `in.aayushtainwala.saakshi`, the app's signing-certificate digest published with each release, security level, verified-boot state). Also check Google's attestation revocation list.
    - iPhone: verify the App Attest object as Apple documents for servers ("Validating apps that connect to your server"), with App ID `<Team ID>.in.aayushtainwala.saakshi` and `clientDataHash` equal to SHA-256 of the device key's DER public key.
 
-`tools/verify-bundle.mjs` in the Saakshi repository runs steps 2–5 with Node.js and no other dependencies. The tool reads versions 0.1 and 0.2, and does not yet check attestation chains (step 6).
+`tools/verify-bundle.mjs` in the Saakshi repository runs steps 2–5 with Node.js and no other dependencies. The tool reads versions 0.1 to 0.3, and does not yet check attestation chains (step 6).
 
 ## 11. Playable copies (Android)
 
@@ -292,8 +299,9 @@ To check a copy against its original: verify the copy record's signature as in s
 ## 12. Versions
 
 - **0.1** (20 October 2026): records, signatures and chain; Android Key Attestation and Apple App Attest; bundle; certificate Part A; witness message.
-- **0.2** (this document): one file per evidence-camera video, in a cut-off-safe container; pieces for body-cam and bug mode; markers and interrupted files; new record members `interrupted`, `capture.mode`, `capture.endedAtSource`, `capture.endReason`, `capture.gapBeforeMs` and `capture.rotationDegrees`; playable copies of Android videos with their own signed records (section 11).
-- **0.3** (planned, R2): OpenTimestamps proofs for each chain head and record, in `timestamps/<recordSha256>.ots`, listed in the manifest's `timestamps`; upload state for copies in the user's cloud drive.
+- **0.2** (21 October 2026): one file per evidence-camera video, in a cut-off-safe container; pieces for body-cam and bug mode; markers and interrupted files; new record members `interrupted`, `capture.mode`, `capture.endedAtSource`, `capture.endReason`, `capture.gapBeforeMs` and `capture.rotationDegrees`; playable copies of Android videos with their own signed records (section 11).
+- **0.3** (this document, 5 November 2026): body-cam on iPhone records video and sound in the same file while the app is on screen, and sound-only pieces only while video can't record (section 3, step 8); new `capture.endReason` values `"sound-resumed"` and `"video-resumed"`. No record member was added or removed; only the version and the allowed `endReason` values changed.
+- **Later (planned, R2):** OpenTimestamps proofs for each chain head and record, in `timestamps/<recordSha256>.ots`, listed in the manifest's `timestamps`; upload state for copies in the user's cloud drive.
 - **1.1 of the app** (planned): C2PA Content Credentials and sensor readings.
 
 A reader MUST reject a record whose `version` it does not know, and SHOULD tell the user which version it found.

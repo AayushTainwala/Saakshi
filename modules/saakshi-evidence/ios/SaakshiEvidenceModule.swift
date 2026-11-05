@@ -8,10 +8,13 @@ public class SaakshiEvidenceModule: Module {
     // already writes movie fragments every 10 seconds, so its files survive a cut-off.
     Function("recorderSupported") { false }
 
-    Events("onVolumeDown")
+    Events("onVolumeDown", "onRecordingClosed", "onRecorderError")
 
     OnCreate {
       VolumeButtons.shared.onVolumeDown = { [weak self] in self?.sendEvent("onVolumeDown", [:]) }
+      BodyCamRecorder.shared.emit = { [weak self] name, body in
+        self?.sendEvent(name, body.mapValues { $0 as Any? })
+      }
     }
 
     AsyncFunction("volumeKeysStart") {
@@ -26,9 +29,39 @@ public class SaakshiEvidenceModule: Module {
       ScreenDimmer.set(dimmed: dimmed)
     }.runOnQueue(.main)
 
-    // Body-cam mode on iPhone records with expo-camera (video) and expo-audio (sound); there is
-    // no foreground service, because Apple allows video only while the app is on screen.
-    Function("bodyCamRunning") { false }
+    // Body-cam mode on iPhone: the app's own recorder (BodyCamRecorder.swift). Video and sound go
+    // into the same file while Saakshi is on screen; sound carries on alone while it can't be.
+    Function("bodyCamRunning") { BodyCamRecorder.shared.isRunning }
+
+    AsyncFunction("bodyCamStart") { (options: BodyCamStartOptions, promise: Promise) in
+      guard let outputDir = URL(string: options.outputDir), outputDir.isFileURL,
+        let pendingDir = URL(string: options.pendingDir), pendingDir.isFileURL
+      else {
+        promise.reject("ERR_BODYCAM_OPTIONS", "outputDir and pendingDir must be file:// URIs")
+        return
+      }
+      let config = BodyCamRecorder.Config(
+        outputDir: outputDir,
+        pendingDir: pendingDir,
+        pieceSeconds: max(options.pieceSeconds, 10),
+        quality: options.quality,
+        firstClip: options.clip,
+        mode: options.mode
+      )
+      BodyCamRecorder.shared.start(config) { error in
+        if let error {
+          promise.reject("ERR_BODYCAM_START", error.localizedDescription)
+        } else {
+          promise.resolve()
+        }
+      }
+    }
+
+    // Resolves once every file is closed, with the onRecordingClosed events of those closed by
+    // the stop (they are also sent as events).
+    AsyncFunction("bodyCamStop") { (promise: Promise) in
+      BodyCamRecorder.shared.stop { events in promise.resolve(events as Any) }
+    }
 
     // iPhone recordings are already QuickTime files that play everywhere; no copy is made.
     AsyncFunction("remuxToMp4") { (_: String, _: String, _: Int?) -> String in
@@ -72,4 +105,15 @@ public class SaakshiEvidenceModule: Module {
       try DeviceKey.sign(Data(message.utf8)).base64EncodedString()
     }
   }
+}
+
+/// What JavaScript passes to `bodyCamStart` (BodyCamOptions in SaakshiEvidence.types.ts). The
+/// notification texts are Android's and are ignored here.
+struct BodyCamStartOptions: Record {
+  @Field var outputDir: String = ""
+  @Field var pendingDir: String = ""
+  @Field var pieceSeconds: Double = 60
+  @Field var quality: Int = 720
+  @Field var clip: Int = 0
+  @Field var mode: String = "body-cam"
 }

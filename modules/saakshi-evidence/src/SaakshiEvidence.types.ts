@@ -56,10 +56,26 @@ export type RecordingStartedEvent = {
   rotationDegrees: number | null;
 };
 
+/** Why the recorder closed a file (the record's `capture.endReason`, docs/spec/evidence-bundle.md). */
+export type RecorderEndReason =
+  | 'stopped'
+  | 'piece-complete'
+  | 'camera-lost'
+  | 'error'
+  // iPhone body-cam only:
+  | 'app-left'
+  | 'audio-interrupted'
+  | 'sound-resumed'
+  | 'video-resumed';
+
 export type RecordingClosedEvent = RecordingStartedEvent & {
   endedAt: string;
-  endReason: 'stopped' | 'piece-complete' | 'camera-lost' | 'error';
+  endReason: RecorderEndReason;
   gapBeforeMs: number | null;
+  /** iPhone body-cam: `audio` for a sound-only file, made while video couldn't record. Android: absent (video). */
+  kind?: 'video' | 'audio';
+  /** iPhone body-cam: iOS's reason for stopping the camera, when it gave one. For diagnosis only. */
+  interruption?: string | null;
 };
 
 export type SaakshiEvidenceEvents = {
