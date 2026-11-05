@@ -581,12 +581,21 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
       if videoRetryAt.isValid && pts < videoRetryAt { return }
       video = openVideo(sample)
     }
-    guard let file = video, let writer = file.writer, writer.status == .writing, let input = file.videoInput else { return }
+    guard let file = video, let writer = file.writer, let input = file.videoInput else { return }
+    guard writer.status == .writing else {
+      // The writer failed between appends (an encoder error, a media-services reset): end this
+      // file now, so the next frame starts a new one and sound isn't lost meanwhile.
+      if writer.status == .failed || writer.status == .cancelled { writerFailed(file) }
+      return
+    }
     guard input.isReadyForMoreMediaData else {
       file.dropped += 1
       return
     }
-    if input.append(sample) {
+    // Each file's own timeline starts at 0 (Apple's HLS profile writes no edit list to hide the
+    // phone's clock); the file's start in the phone's time is in its record.
+    guard let timed = Self.shifted(sample, by: file.start) else { return }
+    if input.append(timed) {
       file.videoSamples += 1
     } else {
       writerFailed(file)
@@ -745,7 +754,7 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
       let writer = AVAssetWriter(contentType: .mpeg4Movie)
       writer.outputFileTypeProfile = .mpeg4AppleHLS
       writer.preferredOutputSegmentInterval = CMTime(value: Self.segmentSeconds, timescale: 1)
-      writer.initialSegmentStartTime = start
+      writer.initialSegmentStartTime = .zero
       writer.delegate = sink
       let videoInput = AVAssetWriterInput(
         mediaType: .video,
@@ -766,7 +775,7 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
         }
       }
       guard writer.startWriting() else { throw writer.error ?? Failure.cannotWrite("start") }
-      writer.startSession(atSourceTime: start)
+      writer.startSession(atSourceTime: .zero)
       let file = OutputFile(
         kind: .video, url: url, marker: markerURL(for: url), writer: writer, videoInput: videoInput,
         audioInput: audioInput, data: sink.file, clip: clip, index: index, start: start,
@@ -777,8 +786,12 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
         guard let self, let file else { return }
         self.emitCheckpoint(file, snapshot)
       }
-      sink.onError = { [weak self] error in
-        self?.emitError("Writing \(url.lastPathComponent) failed: \(error.localizedDescription)")
+      sink.onError = { [weak self, weak file] error in
+        guard let self else { return }
+        self.emitError("Writing \(url.lastPathComponent) failed: \(error.localizedDescription)")
+        self.queue.async {
+          if let file, !file.failed { self.writerFailed(file) }
+        }
       }
       writeMarker(file)
       videoStarted = true
@@ -849,12 +862,16 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
         return
       }
     } else {
-      guard let input = file.audioInput, !file.soundEnded, file.writer?.status == .writing else { return }
+      guard let input = file.audioInput, !file.soundEnded, let writer = file.writer, chunk.pts >= file.start else { return }
+      guard writer.status == .writing else {
+        if writer.status == .failed || writer.status == .cancelled { writerFailed(file) }
+        return
+      }
       guard input.isReadyForMoreMediaData else {
         file.dropped += 1
         return
       }
-      guard input.append(chunk.sample) else {
+      guard let timed = Self.shifted(chunk.sample, by: file.start), input.append(timed) else {
         writerFailed(file)
         return
       }
@@ -911,7 +928,8 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
       report(file)
       return
     }
-    writer.endSession(atSourceTime: file.end ?? file.start)
+    // No endSession: in segment mode there is no edit list to trim with, and appends already stop
+    // at the file's end.
     finishing.enter()
     videoFinishes += 1
     writer.finishWriting { [weak self] in
@@ -936,6 +954,8 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
   }
 
   private func writerFailed(_ file: OutputFile) {
+    // Once is enough: the file is already being ended as an error.
+    guard !file.failed else { return }
     let message = file.writer?.error?.localizedDescription ?? "the file could not be written"
     emitError("Writing \(file.url.lastPathComponent) failed: \(message)")
     file.failed = true
@@ -1059,14 +1079,27 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     if captureClock == nil { captureClock = capture?.synchronizationClock }
     let host = CMClockGetHostTimeClock()
     guard let clock = captureClock, clock !== host else { return sample }
-    var timing = CMSampleTimingInfo(
-      duration: CMSampleBufferGetDuration(sample),
-      presentationTimeStamp: CMSyncConvertTime(CMSampleBufferGetPresentationTimeStamp(sample), from: clock, to: host),
-      decodeTimeStamp: .invalid
-    )
+    let pts = CMSampleBufferGetPresentationTimeStamp(sample)
+    return Self.shifted(sample, by: pts - CMSyncConvertTime(pts, from: clock, to: host))
+  }
+
+  /// A copy of the sample with every timestamp moved back by `offset`, keeping each sample's
+  /// own duration (an audio buffer holds many samples).
+  private static func shifted(_ sample: CMSampleBuffer, by offset: CMTime) -> CMSampleBuffer? {
+    var count: CMItemCount = 0
+    guard CMSampleBufferGetSampleTimingInfoArray(sample, entryCount: 0, arrayToFill: nil, entriesNeededOut: &count) == noErr,
+      count > 0
+    else { return nil }
+    var timing = [CMSampleTimingInfo](repeating: CMSampleTimingInfo(), count: count)
+    guard CMSampleBufferGetSampleTimingInfoArray(sample, entryCount: count, arrayToFill: &timing, entriesNeededOut: &count) == noErr
+    else { return nil }
+    for i in timing.indices {
+      timing[i].presentationTimeStamp = timing[i].presentationTimeStamp - offset
+      if timing[i].decodeTimeStamp.isValid { timing[i].decodeTimeStamp = timing[i].decodeTimeStamp - offset }
+    }
     var copy: CMSampleBuffer?
     guard CMSampleBufferCreateCopyWithNewTiming(
-      allocator: kCFAllocatorDefault, sampleBuffer: sample, sampleTimingEntryCount: 1, sampleTimingArray: &timing,
+      allocator: kCFAllocatorDefault, sampleBuffer: sample, sampleTimingEntryCount: count, sampleTimingArray: &timing,
       sampleBufferOut: &copy
     ) == noErr else { return nil }
     return copy

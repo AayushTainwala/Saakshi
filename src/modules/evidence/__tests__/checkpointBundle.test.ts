@@ -50,7 +50,7 @@ function checkpoint(recording: string, index: number, bytes: Uint8Array, upTo: n
  * A body-cam session as the app makes it: a video file with three checkpoints and a sound-only file
  * with one, interleaved in the chain, then each file's own record when it closes.
  */
-async function makeSession(options: { videoLength?: number } = {}) {
+async function makeSession(options: { videoLength?: number; failCheckpoint?: number } = {}) {
   const video = growing(30_080, 7);
   const sound = growing(9_000, 13);
   const videoOnDisk = options.videoLength ? video.subarray(0, options.videoLength) : video;
@@ -77,7 +77,11 @@ async function makeSession(options: { videoLength?: number } = {}) {
     newId,
     hash: async (uri) => digestsOf(media.get(uri)!),
     seal: createSealer(sealer),
-    sealCheckpoint: createCheckpointSealer(sealer),
+    sealCheckpoint: async (input) => {
+      // As if signing failed for one checkpoint (the key was briefly unavailable).
+      if (input.checkpoint.recording === 'rec-a' && input.checkpoint.index === options.failCheckpoint) throw new Error('no key');
+      return createCheckpointSealer(sealer)(input);
+    },
   });
   const closed = (uri: string, kind: ClosedFile['kind'], recording: string, clip: number): ClosedFile => ({
     uri,
@@ -229,6 +233,18 @@ describe('checkpoints in the chain (format 0.5)', () => {
     expect(manifest.checkpoints[0]).toMatchObject({ record: 'records/0000.json', recording: 'rec-a', checkpoint: 0, size: 7_520 });
   });
 
+  it('still verifies when one checkpoint could not be signed: the next one covers its bytes', async () => {
+    const { dir, state } = await bundleFolder({ failCheckpoint: 1 });
+    expect(state.checkpoints!.map((c) => [c.sequence, c.recording, c.index])).toEqual([
+      [0, 'rec-a', 0],
+      [1, 'rec-b', 0],
+      [2, 'rec-a', 2],
+    ]);
+    const { code, out } = runVerifier(dir);
+    expect(out).toContain('OK: signatures, files, checkpoints and chain check out.');
+    expect(code).toBe(0);
+  });
+
   it('catches a byte changed inside a checkpointed stretch', async () => {
     const { dir } = await bundleFolder({}, (files) => {
       const name = 'media/0004-clip0-seg0.mp4';
@@ -257,8 +273,9 @@ describe('checkpoints in the chain (format 0.5)', () => {
     });
     const { code, out } = runVerifier(dir);
     expect(code).toBe(1);
+    // The chain shows the gap; the checkpoints themselves still rise.
     expect(out).toContain('a record is missing or out of order');
-    expect(out).toContain('checkpoint 2, expected 1');
+    expect(out).not.toContain('comes after checkpoint');
   });
 
   it("catches checkpoints whose file's record is missing", async () => {

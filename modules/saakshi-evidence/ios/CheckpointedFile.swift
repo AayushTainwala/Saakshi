@@ -4,9 +4,24 @@ import Foundation
 
 /// A recording file the app writes itself, append-only, with a running SHA-256 over every byte as
 /// it is written (fix round 1, group 2a). A checkpoint gives the length so far and the SHA-256 of
-/// those bytes from the running state, so the file is never re-read; the bytes are flushed to
-/// storage first, so a checkpoint never names bytes a power cut could still lose.
+/// those bytes from the running state, so the file is never re-read; the bytes are flushed through
+/// to storage first (`F_FULLFSYNC`, which also empties the drive's own cache).
+///
+/// If a write fails part-way (for example, the phone is full), the file is cut back to the last
+/// whole write and takes no more, so the file on disk and its fingerprint always agree.
 final class CheckpointedFile {
+  enum WriteError: LocalizedError {
+    case closed
+    case broken
+
+    var errorDescription: String? {
+      switch self {
+      case .closed: return "Data arrived after the file was closed"
+      case .broken: return "An earlier write to the file failed"
+      }
+    }
+  }
+
   struct Snapshot {
     let bytes: Int64
     let sha256: String
@@ -20,6 +35,7 @@ final class CheckpointedFile {
   private var bytes: Int64 = 0
   private var checkpoints = 0
   private var closed = false
+  private var broken = false
   private let lock = NSLock()
 
   init(url: URL) throws {
@@ -39,8 +55,17 @@ final class CheckpointedFile {
   func append(_ data: Data) throws {
     lock.lock()
     defer { lock.unlock() }
-    guard !closed, !data.isEmpty else { return }
-    try handle.write(contentsOf: data)
+    guard !data.isEmpty else { return }
+    if closed { throw WriteError.closed }
+    if broken { throw WriteError.broken }
+    do {
+      try handle.write(contentsOf: data)
+    } catch {
+      // Part of `data` may be on disk: cut it off, so the file is exactly what was fingerprinted.
+      broken = true
+      try? handle.truncate(atOffset: UInt64(bytes))
+      throw error
+    }
     hasher.update(data: data)
     bytes += Int64(data.count)
   }
@@ -50,7 +75,7 @@ final class CheckpointedFile {
     lock.lock()
     defer { lock.unlock() }
     guard !closed, bytes > 0 else { return nil }
-    try? handle.synchronize()
+    flush()
     var copy = hasher
     let snapshot = Snapshot(bytes: bytes, sha256: Self.hex(copy.finalize()), index: checkpoints)
     checkpoints += 1
@@ -63,11 +88,16 @@ final class CheckpointedFile {
     defer { lock.unlock() }
     if !closed {
       closed = true
-      try? handle.synchronize()
+      flush()
       try? handle.close()
     }
     var copy = hasher
     return Snapshot(bytes: bytes, sha256: Self.hex(copy.finalize()), index: checkpoints)
+  }
+
+  /// Through to storage: `F_FULLFSYNC`, or `fsync` where a file system refuses it.
+  private func flush() {
+    if fcntl(handle.fileDescriptor, F_FULLFSYNC) == -1 { try? handle.synchronize() }
   }
 
   static func hex(_ digest: SHA256.Digest) -> String {
@@ -120,13 +150,17 @@ final class AdtsWriter {
   private static let rates: [Double] = [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350]
 
   init(url: URL, input: AVAudioFormat, checkpointSeconds: Double) throws {
-    guard let index = Self.rates.firstIndex(of: input.sampleRate), (1...2).contains(input.channelCount) else {
-      throw NSError(domain: "SaakshiEvidence", code: 2, userInfo: [NSLocalizedDescriptionKey: "No AAC for \(input.sampleRate) Hz, \(input.channelCount) channels"])
+    // ADTS knows only these sample rates and, here, mono or stereo: anything else is resampled
+    // (to 48 kHz) or mixed down (to stereo) by the converter.
+    let rate = Self.rates.contains(input.sampleRate) ? input.sampleRate : 48_000
+    let outputChannels = min(max(input.channelCount, 1), 2)
+    guard let index = Self.rates.firstIndex(of: rate) else {
+      throw NSError(domain: "SaakshiEvidence", code: 2, userInfo: [NSLocalizedDescriptionKey: "No AAC for \(rate) Hz"])
     }
     var description = AudioStreamBasicDescription(
       // mFormatFlags 2: MPEG-4 audio object type 2, AAC LC (kMPEG4Object_AAC_LC).
-      mSampleRate: input.sampleRate, mFormatID: kAudioFormatMPEG4AAC, mFormatFlags: 2,
-      mBytesPerPacket: 0, mFramesPerPacket: 1024, mBytesPerFrame: 0, mChannelsPerFrame: input.channelCount,
+      mSampleRate: rate, mFormatID: kAudioFormatMPEG4AAC, mFormatFlags: 2,
+      mBytesPerPacket: 0, mFramesPerPacket: 1024, mBytesPerFrame: 0, mChannelsPerFrame: outputChannels,
       mBitsPerChannel: 0, mReserved: 0
     )
     guard let output = AVAudioFormat(streamDescription: &description),
@@ -134,12 +168,13 @@ final class AdtsWriter {
     else {
       throw NSError(domain: "SaakshiEvidence", code: 3, userInfo: [NSLocalizedDescriptionKey: "The AAC encoder could not be set up"])
     }
+    if input.channelCount > outputChannels { converter.downmix = true }
     if converter.applicableEncodeBitRates?.contains(NSNumber(value: 128_000)) ?? false { converter.bitRate = 128_000 }
     self.output = output
     self.converter = converter
     frequencyIndex = UInt8(index)
-    channels = UInt8(input.channelCount)
-    checkpointFrames = Int64(input.sampleRate * checkpointSeconds)
+    channels = UInt8(outputChannels)
+    checkpointFrames = Int64(rate * checkpointSeconds)
     file = try CheckpointedFile(url: url)
   }
 

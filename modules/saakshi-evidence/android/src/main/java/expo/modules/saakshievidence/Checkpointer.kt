@@ -21,6 +21,9 @@ class Checkpointer(private val file: File) {
   private val buffer = ByteArray(1 shl 16)
   private var offset = 0L
   private var finished = false
+  /** How many checkpoints have been taken. */
+  @Volatile var checkpointsTaken = 0
+    private set
 
   /**
    * Reads what has been added since the last checkpoint, up to the last whole packet. Null when
@@ -29,14 +32,14 @@ class Checkpointer(private val file: File) {
   @Synchronized
   fun checkpoint(): Snapshot? {
     if (finished) return null
-    // Flush what the writer has handed the kernel to storage first, so a checkpoint never names
-    // bytes a power cut could still lose. (fsync works on the file, whichever descriptor wrote it.)
+    // Measure first, then flush to storage, so every byte the checkpoint names has been flushed.
+    // (fsync works on the file, whichever descriptor wrote it.)
+    val length = file.length()
     try {
       RandomAccessFile(file, "r").use { it.fd.sync() }
     } catch (e: Exception) {
       // Some file systems refuse; the bytes are still in the page cache.
     }
-    val length = file.length()
     val target = length - length % TS_PACKET
     if (target <= offset) return null
     read(target)
@@ -45,6 +48,7 @@ class Checkpointer(private val file: File) {
     } catch (e: CloneNotSupportedException) {
       return null
     }
+    checkpointsTaken++
     return Snapshot(offset, hex(copy.digest()))
   }
 
@@ -52,7 +56,10 @@ class Checkpointer(private val file: File) {
   @Synchronized
   fun finish(): Snapshot {
     finished = true
-    read(file.length())
+    val length = file.length()
+    // A file that is gone, or shorter than what was already read, is not the file we fingerprinted.
+    if (!file.isFile || length < offset) throw IllegalStateException("${file.name} is missing or shorter than its checkpoints")
+    read(length)
     return Snapshot(offset, hex(digest.digest()))
   }
 

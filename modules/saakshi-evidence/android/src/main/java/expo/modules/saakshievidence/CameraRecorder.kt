@@ -39,6 +39,8 @@ import org.json.JSONObject
  */
 object CameraRecorder {
   private val PIECE_TOKEN = Any()
+  /** A file whose stop failed is kept if it has checkpoints or at least this much (about 1 s of video). */
+  private const val KEEP_AFTER_FAILED_STOP_BYTES = 256L * 1024
 
   /** RFC 3339 in UTC with milliseconds, as the records use. (java.time needs Android 8.) */
   fun iso(millis: Long): String =
@@ -409,24 +411,30 @@ object CameraRecorder {
     val tick = object : Runnable {
       override fun run() {
         try {
-          val snapshot = tracker.checkpoint()
-          if (snapshot != null) {
-            emit("onCheckpoint", mapOf(
-              "recording" to recording,
-              "uri" to "file://${file.absolutePath}",
-              "kind" to "video",
-              "clip" to clip,
-              "index" to index,
-              "checkpoint" to count,
-              "bytes" to snapshot.bytes.toDouble(),
-              "sha256" to snapshot.sha256,
-              "at" to iso(System.currentTimeMillis()),
-              "startedAt" to iso(startedAt),
-            ))
-            count++
+          // Taken and sent under the tracker's lock, which finish() also takes: a checkpoint is
+          // always sent before the file's close event, so it chains before the file's record.
+          synchronized(tracker) {
+            val snapshot = tracker.checkpoint()
+            if (snapshot != null) {
+              emit("onCheckpoint", mapOf(
+                "recording" to recording,
+                "uri" to "file://${file.absolutePath}",
+                "kind" to "video",
+                "clip" to clip,
+                "index" to index,
+                "checkpoint" to count,
+                "bytes" to snapshot.bytes.toDouble(),
+                "sha256" to snapshot.sha256,
+                "at" to iso(System.currentTimeMillis()),
+                "startedAt" to iso(startedAt),
+              ))
+              count++
+            }
           }
         } catch (e: Exception) {
+          // Say so once, and stop checkpointing this file; recording carries on.
           emit("onRecorderError", mapOf("message" to "Checkpoint failed: ${e.message ?: e}"))
+          return
         }
         if (checkpointer === tracker) h.postDelayed(this, every)
       }
@@ -435,10 +443,21 @@ object CameraRecorder {
   }
 
   /** Stops checkpoints and fingerprints the whole, closed file. Null when there were no checkpoints. */
-  private fun finishCheckpoints(): Checkpointer.Snapshot? {
+  private fun finishCheckpoints(file: File?): Checkpointer.Snapshot? {
     val tracker = checkpointer ?: return null
     checkpointer = null
     checkpointHandler?.removeCallbacksAndMessages(null)
+    // The TS writer flushes its last packets when it is destroyed, which can be just after
+    // MediaRecorder.release() returns: wait until the file stops growing (at most about a second).
+    if (file != null) {
+      var last = -1L
+      for (i in 0 until 20) {
+        val now = file.length()
+        if (now == last) break
+        last = now
+        Thread.sleep(50)
+      }
+    }
     return try {
       tracker.finish()
     } catch (e: Exception) {
@@ -452,36 +471,39 @@ object CameraRecorder {
     val file = currentFile
     val startedAt = currentStartedAt
     val recording = currentRecording
+    val hadCheckpoints = checkpointer?.let { it.checkpointsTaken > 0 } ?: false
     recorder = null
     var ok = true
     try {
       r.stop()
     } catch (e: RuntimeException) {
-      // Thrown when no data was recorded (stop right after start). The file is unusable.
+      // Thrown when no data was recorded (stop right after start), and also when the media server
+      // died mid-recording (for example, the phone ran out of space). Then what is on disk stays.
       ok = false
     } finally {
       r.release()
     }
     // The writer has closed the file (and flushed its last packets): fingerprint all of it.
-    val fingerprint = finishCheckpoints()
-    val whole = if (ok) fingerprint else null
+    val whole = finishCheckpoints(file)
+    val keep = ok || hadCheckpoints || (file?.length() ?: 0L) >= KEEP_AFTER_FAILED_STOP_BYTES
+    val endReason = if (ok) reason else "error"
     val endedAt = System.currentTimeMillis()
     lastEndedAt = endedAt
     val cfg = config
     if (file != null && startedAt != null && cfg != null) {
-      if (!ok) {
+      if (!keep) {
         file.delete()
         File(cfg.pendingDir, "${file.name}.json").delete()
         return
       }
-      writeMarker(cfg, file, startedAt, endedAt, reason, null)
+      writeMarker(cfg, file, startedAt, endedAt, endReason, null)
       emit("onRecordingClosed", mapOf(
         "uri" to "file://${file.absolutePath}",
         "startedAt" to iso(startedAt),
         "endedAt" to iso(endedAt),
         "clip" to cfg.clip,
         "index" to pieceIndex,
-        "endReason" to reason,
+        "endReason" to endReason,
         "gapBeforeMs" to currentGap,
         "cutoffSafe" to cutoffSafe,
         "rotationDegrees" to currentRotation,

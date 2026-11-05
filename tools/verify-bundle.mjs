@@ -257,9 +257,13 @@ export async function verifyBundle(path) {
           if (read.sha256 !== record.file.sha256) {
             fail(`${media}: SHA-256 ${read.sha256} differs from its record (${record.file.sha256})`);
           }
+          // Numbers rise; a gap is allowed (a checkpoint that could not be signed is left out, and the
+          // next one vouches for its bytes too).
           let lastSize = 0;
-          for (const [n, { label: at, record: checkpoint }] of checkpoints.entries()) {
-            if (checkpoint.checkpoint !== n) fail(`${at}: checkpoint ${checkpoint.checkpoint}, expected ${n} (one is missing or out of order)`);
+          let lastNumber = -1;
+          for (const { label: at, record: checkpoint } of checkpoints) {
+            if (!(checkpoint.checkpoint > lastNumber)) fail(`${at}: checkpoint ${checkpoint.checkpoint} comes after checkpoint ${lastNumber}`);
+            lastNumber = checkpoint.checkpoint;
             if (!(checkpoint.file?.size > lastSize)) fail(`${at}: covers ${checkpoint.file?.size} bytes, not more than the checkpoint before it`);
             lastSize = checkpoint.file?.size;
             const prefix = read.prefixes.get(checkpoint.file?.size);

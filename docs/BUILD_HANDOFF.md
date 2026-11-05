@@ -101,6 +101,14 @@ All three checks came out feasible, so nothing falls back to pieces.
 - **Upload parts, for E7.** Byte ranges of the file, each ending on a checkpoint, about `uploadPartSeconds` long. That is a stored setting, 60 seconds for now, to be decided with E7. E7 gets them through `setBodyCamPartListener` from `@/modules/evidence`. Nothing is uploaded yet.
 - **The checker.** `tools/verify-bundle.mjs` checks every checkpoint against its file in one pass: the file's first bytes must have the SHA-256 the checkpoint signed. Tests build real signed bundles and catch a changed byte, a file shorter than its checkpoints, a missing checkpoint, and checkpoints without their file.
 - **Not done:** the witness message could carry the latest checkpoint (the brief says "can"); group 7 redesigns that message, so I left it there. Bug mode is unchanged, as the brief says.
+- **An independent review** of the new phone code found eleven problems, all fixed before the pull request was merged:
+  - an iPhone video file whose writer failed mid-recording would have dropped everything until Stop; it now ends at once and a new file starts;
+  - on Android, a failed stop (for example, the phone full) would have deleted a recording that had checkpoints; it is now kept and marked as an error;
+  - each iPhone `.mp4` now starts its own timeline at 0, so players show the right length;
+  - a write that fails part-way cuts the file back to the last fingerprinted byte;
+  - a checkpoint can no longer reach the app after its file's close event;
+  - the checker accepts a missing checkpoint number (one that couldn't be signed);
+  - and smaller things: waiting for Android's last packets before the final fingerprint, flushing after measuring, a full flush on iPhone (`F_FULLFSYNC`), and sound-only files from unusual microphones being resampled or mixed down instead of refused.
 
 ### Group 2a: not verified
 
@@ -110,6 +118,8 @@ All three checks came out feasible, so nothing falls back to pieces.
   - that Android's checkpoints keep up with the recorder on several makers' phones;
   - that a recording cut off by a forced restart verifies up to its last checkpoint.
 - `MessageDigest.clone()` (Android's way of snapshotting the running hash) is supported by Android's standard SHA-256. If a phone refused it, that phone would give no checkpoints; recording would carry on.
+- Apple doesn't document that an asset writer hands over its last segment before `finishWriting` reports done. If it didn't, the last few seconds would be missing and the app would show a recording problem.
+- AAC's start-up delay (about 44 ms) isn't marked in the `.mp4` (Apple's HLS profile writes no edit list), so sound may run that much behind the picture.
 
 ## Owner questions
 
