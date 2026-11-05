@@ -8,7 +8,7 @@ Read `CLAUDE.md` first. In particular: never modify an original recording; any c
 
 ## Order of work
 
-One pull request per group below, in this order. Each needs tests for the logic, a green native build, an updated `docs/BUILD_HANDOFF.md`, and **plain test steps for the owner** in the PR description.
+One pull request per group below, in this order (group 2a may be built together with group 1, since both change the body-cam recorder). Each needs tests for the logic, a green native build, an updated `docs/BUILD_HANDOFF.md`, and **plain test steps for the owner** in the PR description.
 
 ### 1. Body-cam: two serious bugs (C2, C6)
 
@@ -25,6 +25,31 @@ One pull request per group below, in this order. Each needs tests for the logic,
 3. **Learning the unlock by doing it.** Replace the "I know how to unlock it" tick with a practice step: the screen says "Press volume-down twice now", and Start becomes available only after the user has done it successfully. Keep a short reminder on the start screen.
 4. **Pressing the side (power) button locks the phone.** Video then stops (an iOS limit) and sound carries on. That's expected; just make sure the record says so in plain words.
 
+### 2a. Body-cam: one continuous file, with checkpoints as the fail-safe (Decided 5 Nov)
+
+The owner's decision: one-minute pieces are not the default. A body-cam recording is saved the way the evidence camera saves video, as **one continuous file from Start to Stop**, with sound. Splitting is only a fail-safe, so that an unexpected interruption never costs the whole recording. Thirty one-minute files for a thirty-minute recording is unmanageable.
+
+What already makes a continuous file safe:
+- **iPhone:** expo-camera's `.mov` is written in 10-second fragments, so a file cut off by a crash, a forced restart or a dead battery plays up to its last fragment.
+- **Android:** our MPEG-TS file plays up to the cut. The exception is the MP4 fallback on Android 7, or on any phone that refuses MPEG-TS.
+
+So corruption alone doesn't justify pieces. What a continuous file can't do by itself is get footage **off the phone during** the recording, before a seizure (E7, R2), or let it be witnessed minute by minute. Build that as checkpoints instead of pieces:
+
+1. **The original is one file per unbroken stretch of recording.** On iPhone, video has to stop while Saakshi is in the background, so leaving and returning starts a new file. That's an iOS limit; keep those files in the same record. The separate sound-only file exists only for the time video couldn't record (group 1).
+2. **Checkpoints every minute while recording.**
+   - Hash the bytes written so far and add a signed checkpoint record to the session's chain: byte length, SHA-256 of the bytes so far, time.
+   - At a clean stop, the file gets its usual final record, which must agree with the last checkpoint.
+   - If the recording is cut off, the checkpoints prove what existed up to the last one, and the file plays up to the cut.
+3. **Upload units for later (E7).** The bytes added between two checkpoints become the part that bug mode and body-cam upload as they go, once E7 exists. Joined in order, the parts must be byte-for-byte the original file (true for MPEG-TS and for fragmented `.mov`; check both). Build the checkpointing and the part boundaries now, and leave the upload to E7. The witness message can carry the latest checkpoint.
+4. **Check before building and report in the handoff:**
+   - that reading a file while the recorder is still writing it is reliable on both platforms;
+   - that a part never splits a fragment in a way that breaks the joined file;
+   - what this costs in battery.
+
+   If any of this isn't feasible, stop and report rather than falling back to pieces.
+5. **Format:** a new bundle-format version for checkpoint records, with `tools/verify-bundle.mjs` updated to check checkpoints against the file.
+6. **Bug mode is unchanged for now.** Its sound pieces stay as they are until the owner decides whether the same approach should apply there; the iPhone's `.m4a` isn't cut-off safe, so that needs its own check.
+
 ### 3. Records list and playback (B1, C6)
 
 1. **Show each record as what it is.** Today it says "1 file". Show:
@@ -34,8 +59,8 @@ One pull request per group below, in this order. Each needs tests for the logic,
 2. **Photos can't be viewed.** Tapping one should open it full screen.
 3. **Sound pieces can't be played.** Add in-app playback for sound files (`.m4a`, `.aac`).
 4. **A body-cam or bug-mode recording is one recording (Decided).**
-   - The record shows a single player that runs the pieces end to end, with sound, plus its total length. The individual pieces stay listed under "Files" as the evidence.
-   - Add a **joined MP4 copy for sharing**, made without re-encoding where possible. Label it in the app as a copy, give it its own signed record listing the SHA-256 of every source piece, and add it to the bundle format (new version).
+   - The record shows a single player that plays its files end to end, with sound, plus its total length. With group 2a, a body-cam record usually has one file, or a few on iPhone if the user left the app; bug mode keeps its pieces for now. The files stay listed under "Files" as the evidence.
+   - Where a record has more than one video file, add a **joined MP4 copy for sharing**, made without re-encoding where possible. Label it in the app as a copy, give it its own signed record listing the SHA-256 of every source file, and add it to the bundle format (new version).
 
 ### 4. Evidence camera (B2)
 
