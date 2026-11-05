@@ -18,7 +18,7 @@ class SaakshiEvidenceModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("SaakshiEvidence")
 
-    Events("onRecorderReady", "onRecordingStarted", "onRecordingClosed", "onRecorderError", "onVolumeUp", "onBodyCamStopped")
+    Events("onRecorderReady", "onRecordingStarted", "onRecordingClosed", "onRecorderError", "onVolumeUp", "onBodyCamStopped", "onCheckpoint")
 
     OnCreate {
       CameraRecorder.listener = { name, body -> sendEvent(name, body) }
@@ -38,7 +38,8 @@ class SaakshiEvidenceModule : Module() {
         action = BodyCamService.ACTION_START
         putExtra(BodyCamService.EXTRA_OUTPUT_DIR, config.outputDir.absolutePath)
         putExtra(BodyCamService.EXTRA_PENDING_DIR, config.pendingDir.absolutePath)
-        putExtra(BodyCamService.EXTRA_PIECE_MILLIS, config.pieceMillis ?: 60_000L)
+        putExtra(BodyCamService.EXTRA_PIECE_MILLIS, config.pieceMillis ?: 0L)
+        putExtra(BodyCamService.EXTRA_CHECKPOINT_MILLIS, config.checkpointMillis ?: 0L)
         putExtra(BodyCamService.EXTRA_QUALITY, config.quality)
         putExtra(BodyCamService.EXTRA_CLIP, config.clip)
         putExtra(BodyCamService.EXTRA_TITLE, options["notificationTitle"] as? String)
@@ -154,6 +155,7 @@ class SaakshiEvidenceModule : Module() {
       quality = (options["quality"] as? Number)?.toInt() ?: 720,
       clip = (options["clip"] as? Number)?.toInt() ?: 0,
       mode = options["mode"] as? String ?: "camera",
+      checkpointMillis = (options["checkpointSeconds"] as? Number)?.let { (it.toDouble() * 1000).toLong() },
     )
   }
 

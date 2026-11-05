@@ -1,5 +1,6 @@
 import AVFoundation
 import UIKit
+import UniformTypeIdentifiers
 
 /// Body-cam mode on iPhone (spec B1–B4; fix round 1, group 1).
 ///
@@ -10,18 +11,24 @@ import UIKit
 ///   `audio` background mode it keeps running while the app is in the background or the phone is
 ///   locked.
 ///
-/// While video frames arrive, the sound goes into the same `.mov` as the video (H.264 and AAC,
-/// written by `AVAssetWriter` with a movie fragment every 10 seconds, so a cut-off file plays up to
-/// its last fragment). iOS stops the camera when the app leaves the screen, and an asset writer
-/// can't keep writing in the background (Apple's AVAssetWriter.h: a writer that is still writing
-/// when the app goes into the background fails), so the video file is closed the moment the app
-/// enters the background, inside a background task. From then on the same sound goes into a
-/// sound-only `.m4a`, written by `AVAudioFile`, which keeps working in the background. The
-/// sound-only file starts half a second before the video's sound ended (or, if the video file
-/// failed to close properly, up to 11 seconds before, to cover the fragment that may be lost) and
-/// ends half a second after video comes back, so the sound has no gap. Video and sound-only files
-/// are cut into pieces of `pieceSeconds`, with no gap between pieces.
+/// One continuous file per unbroken stretch (owner's decision of 5 Nov 2026; fix round 1, group 2a):
+/// - While video frames arrive, the sound goes into the same file as the video: H.264 and AAC as
+///   fragmented MPEG-4 (`.mp4`). The asset writer hands each segment (`moof` and `mdat`, about every
+///   10 seconds) to `SegmentSink`, and the app appends it to the file itself, fingerprinting every
+///   byte as it goes. Each segment is a checkpoint, and a file cut off plays up to its last segment.
+/// - iOS stops the camera when the app leaves the screen, and an asset writer can't keep writing in
+///   the background (Apple's AVAssetWriter.h: a writer still writing when the app goes into the
+///   background fails), so the video file is closed the moment the app enters the background,
+///   inside a background task. From then on the same sound goes into a sound-only file, ADTS AAC
+///   (`.aac`) encoded and written by the app (`AdtsWriter`), which works in the background, is cut-off
+///   safe and gets a checkpoint about every 10 seconds. It starts half a second before the video's
+///   sound ended (or, if the video file failed to close properly, up to 11 seconds before, to cover
+///   the segment that may be lost) and ends half a second after video comes back, so the sound has
+///   no gap.
+/// - A new file starts only when it must: the app came back on screen, the microphone came back
+///   after an interruption, or a file could not be written. Pieces of `pieceSeconds` only if asked.
 ///
+/// Each file has a random `recording` id, which its checkpoints (`onCheckpoint`) and its record carry.
 /// Each file gets a crash-recovery marker in `pendingDir` (format shared with
 /// src/modules/evidence/locker/pending.ts), and `onRecordingClosed` when it closes.
 final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
@@ -30,7 +37,10 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
   struct Config {
     let outputDir: URL
     let pendingDir: URL
+    /// Pieces of this length; 0 for one continuous file per stretch.
     let pieceSeconds: Double
+    /// About this often, a sound-only file gets a checkpoint (video files: every segment).
+    let checkpointSeconds: Double
     let quality: Int
     let firstClip: Int
     let mode: String
@@ -79,6 +89,8 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
   private static let retrySeconds = 5.0
   /// While the microphone is off, try to start it again this often.
   private static let audioRetrySeconds = 10.0
+  /// Video segments, each a checkpoint: Apple's usual fragment length, as before.
+  private static let segmentSeconds: Int64 = 10
 
   private let sessionQueue = DispatchQueue(label: "in.aayushtainwala.saakshi.bodycam.session")
   /// Every piece of recording state below is touched only on this queue.
@@ -97,9 +109,8 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
   private var engine: AVAudioEngine?
   /// Sound from an engine of an older generation (before a restart or a loss) is ignored.
   private var engineGeneration = 0
-  /// AAC settings for the video files' sound, and for the sound-only files.
+  /// AAC settings for the video files' sound.
   private var audioSettings: [String: Any]?
-  private var soundFileSettings: [String: Any]?
   private var observers: [NSObjectProtocol] = []
   private var timer: DispatchSourceTimer?
   private let finishing = DispatchGroup()
@@ -371,7 +382,6 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
       queue.sync {
         self.engine = engine
         self.audioSettings = Self.audioSettings(for: format)
-        self.soundFileSettings = Self.soundFileSettings(for: format)
       }
       do {
         try engine.start()
@@ -562,7 +572,7 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     }
     lastFrame = pts
 
-    if let file = video, (pts - file.start).seconds >= config.pieceSeconds {
+    if let file = video, config.pieceSeconds > 0, (pts - file.start).seconds >= config.pieceSeconds {
       video = nil
       continueVideo = (file.clip, file.index + 1)
       close(file, at: pts, reason: "piece-complete", waitForAudio: true)
@@ -600,7 +610,7 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
         sound = nil
         soundStopAt = nil
         close(file, at: stopAt, reason: "video-resumed", waitForAudio: false)
-      } else if soundStopAt == nil, (chunk.pts - file.start).seconds >= config.pieceSeconds {
+      } else if soundStopAt == nil, config.pieceSeconds > 0, (chunk.pts - file.start).seconds >= config.pieceSeconds {
         close(file, at: chunk.pts, reason: "piece-complete", waitForAudio: false)
         sound = openSound(with: [chunk], continuing: file)
       } else {
@@ -728,10 +738,15 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     let clip = continuing?.clip ?? takeClip()
     let index = continuing?.index ?? 0
     let gap = lastVideoEnd.map { Self.milliseconds(start - $0) }
-    let url = config.outputDir.appendingPathComponent(Self.fileName(clip: clip, index: index, ext: "mov"))
+    let url = config.outputDir.appendingPathComponent(Self.fileName(clip: clip, index: index, ext: "mp4"))
     do {
-      let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
-      writer.movieFragmentInterval = CMTime(seconds: 10, preferredTimescale: 600)
+      // Fragmented MPEG-4, handed to us segment by segment (WWDC 2020, session 10011).
+      let sink = SegmentSink(file: try CheckpointedFile(url: url))
+      let writer = AVAssetWriter(contentType: .mpeg4Movie)
+      writer.outputFileTypeProfile = .mpeg4AppleHLS
+      writer.preferredOutputSegmentInterval = CMTime(value: Self.segmentSeconds, timescale: 1)
+      writer.initialSegmentStartTime = start
+      writer.delegate = sink
       let videoInput = AVAssetWriterInput(
         mediaType: .video,
         outputSettings: Self.videoSettings(width: Int(dimensions.width), height: Int(dimensions.height)),
@@ -754,9 +769,17 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
       writer.startSession(atSourceTime: start)
       let file = OutputFile(
         kind: .video, url: url, marker: markerURL(for: url), writer: writer, videoInput: videoInput,
-        audioInput: audioInput, audioFile: nil, clip: clip, index: index, start: start,
+        audioInput: audioInput, data: sink.file, clip: clip, index: index, start: start,
         startedAt: Self.date(for: start), gapBeforeMs: gap
       )
+      file.sink = sink
+      sink.onCheckpoint = { [weak self, weak file] snapshot in
+        guard let self, let file else { return }
+        self.emitCheckpoint(file, snapshot)
+      }
+      sink.onError = { [weak self] error in
+        self?.emitError("Writing \(url.lastPathComponent) failed: \(error.localizedDescription)")
+      }
       writeMarker(file)
       videoStarted = true
       if audioInput != nil {
@@ -773,6 +796,7 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
       return file
     } catch {
       // Sound carries on in a sound-only file until a video file can be started again.
+      try? FileManager.default.removeItem(at: url)
       videoRetryAt = start + Self.seconds(Self.retrySeconds)
       emitError("A video file could not be started: \(error.localizedDescription)")
       return nil
@@ -780,22 +804,24 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
   }
 
   private func openSound(with chunks: [AudioChunk], continuing previous: OutputFile?) -> OutputFile? {
-    guard let config, let settings = soundFileSettings, let first = chunks.first else { return nil }
+    guard let config, let first = chunks.first else { return nil }
     let start = first.pts
     let clip = previous?.clip ?? takeClip()
     let index = previous.map { $0.index + 1 } ?? 0
     // A next piece counts from the piece before it; a new stretch from the last file with sound.
     let gap: Int? = (previous?.end ?? lastSoundEnd).map { Self.milliseconds(start - $0) }
-    let url = config.outputDir.appendingPathComponent(Self.fileName(clip: clip, index: index, ext: "m4a"))
+    let url = config.outputDir.appendingPathComponent(Self.fileName(clip: clip, index: index, ext: "aac"))
     do {
-      let audioFile = try AVAudioFile(
-        forWriting: url, settings: settings, commonFormat: first.pcm.format.commonFormat,
-        interleaved: first.pcm.format.isInterleaved
-      )
+      let adts = try AdtsWriter(url: url, input: first.pcm.format, checkpointSeconds: config.checkpointSeconds)
       let file = OutputFile(
         kind: .audio, url: url, marker: markerURL(for: url), writer: nil, videoInput: nil, audioInput: nil,
-        audioFile: audioFile, clip: clip, index: index, start: start, startedAt: Self.date(for: start), gapBeforeMs: gap
+        data: adts.file, clip: clip, index: index, start: start, startedAt: Self.date(for: start), gapBeforeMs: gap
       )
+      file.adts = adts
+      adts.onCheckpoint = { [weak self, weak file] snapshot in
+        guard let self, let file else { return }
+        self.emitCheckpoint(file, snapshot)
+      }
       writeMarker(file)
       for chunk in chunks { append(chunk, to: file) }
       if file.finished {
@@ -804,6 +830,7 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
       }
       return file
     } catch {
+      try? FileManager.default.removeItem(at: url)
       soundRetryAt = Self.hostNow() + Self.seconds(Self.retrySeconds)
       emitError("A sound file could not be started: \(error.localizedDescription)")
       return nil
@@ -814,9 +841,9 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     guard !file.finished, chunk.end > file.start, chunk.pts > file.lastAudioPts else { return }
     if let end = file.end, chunk.pts >= end { return }
     if file === sound, let stopAt = soundStopAt, chunk.pts >= stopAt { return }
-    if let audioFile = file.audioFile {
+    if let adts = file.adts {
       do {
-        try audioFile.write(from: chunk.pcm)
+        try adts.write(chunk.pcm)
       } catch {
         writerFailed(file)
         return
@@ -859,11 +886,10 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     if let soundEnd = file.soundEnd, lastSoundEnd.map({ soundEnd > $0 }) ?? true { lastSoundEnd = soundEnd }
 
     if file.kind == .audio {
-      if #available(iOS 18.0, *) { file.audioFile?.close() }
-      // Before iOS 18 the file is closed (its header written) when released, which is here, before
-      // it is reported and hashed.
-      file.audioFile = nil
-      if file.audioSamples == 0 {
+      // Encodes the last of the sound and closes the file before it is reported and hashed.
+      file.whole = file.adts?.finish()
+      file.adts = nil
+      if file.audioSamples == 0 || (file.whole?.bytes ?? 0) == 0 {
         discard(file)
         return
       }
@@ -875,11 +901,13 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     guard let writer = file.writer else { return }
     if file.videoSamples == 0 {
       if writer.status == .writing { writer.cancelWriting() }
+      _ = file.data.finish()
       discard(file)
       if handOver?.file === file { decideHandOver(file, closedProperly: false) }
       return
     }
     guard writer.status == .writing else {
+      file.whole = file.data.finish()
       report(file)
       return
     }
@@ -889,6 +917,8 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     writer.finishWriting { [weak self] in
       guard let self else { return }
       self.queue.async {
+        // The writer has handed over its last segment: close the file and fingerprint all of it.
+        file.whole = file.data.finish()
         self.report(file)
         self.videoFinishes -= 1
         if self.videoFinishes == 0, self.inBackground {
@@ -930,6 +960,11 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
   private func report(_ file: OutputFile) {
     let failed = file.failed || (file.writer.map { $0.status != .completed } ?? false)
     if file.kind == .video { decideHandOver(file, closedProperly: !failed) }
+    if (file.whole?.bytes ?? 0) == 0 {
+      // Nothing reached the file (the writer failed before its first segment).
+      discard(file)
+      return
+    }
     let reason = failed ? "error" : file.endReason
     let endedAt = file.endedAt ?? Date()
     writeMarker(file, closedAt: endedAt, endReason: reason)
@@ -942,10 +977,13 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
       "endedAt": iso.string(from: endedAt),
       "endReason": reason,
       "gapBeforeMs": file.gapBeforeMs.map { $0 as Any } ?? NSNull(),
-      "cutoffSafe": file.kind == .video,
+      "cutoffSafe": true,
       "rotationDegrees": NSNull(),
       "interruption": file.interruption.map { $0 as Any } ?? NSNull(),
       "droppedSamples": file.dropped,
+      "recording": file.recording,
+      "finalSize": file.whole.map { Double($0.bytes) as Any } ?? NSNull(),
+      "finalSha256": file.whole.map { $0.sha256 as Any } ?? NSNull(),
     ]
     emit?("onRecordingClosed", event)
     if stopping { closedWhileStopping.append(event) }
@@ -959,8 +997,9 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
       "startedAt": iso.string(from: file.startedAt),
       "mode": config?.mode ?? "body-cam",
       "gapBeforeMs": file.gapBeforeMs.map { $0 as Any } ?? NSNull(),
-      "cutoffSafe": file.kind == .video,
+      "cutoffSafe": true,
       "rotationDegrees": NSNull(),
+      "recording": file.recording,
     ]
     if let closedAt, let endReason {
       json["closedAt"] = iso.string(from: closedAt)
@@ -972,6 +1011,25 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     } catch {
       emitError("The recovery marker for \(file.url.lastPathComponent) could not be written: \(error.localizedDescription)")
     }
+  }
+
+  /// A checkpoint of a file being written: its length so far and the SHA-256 of those bytes. Called
+  /// from the writer's own thread (video) or the queue (sound); it touches only the file's fixed facts.
+  private func emitCheckpoint(_ file: OutputFile, _ snapshot: CheckpointedFile.Snapshot) {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    emit?("onCheckpoint", [
+      "recording": file.recording,
+      "uri": file.url.absoluteString,
+      "kind": file.kind.rawValue,
+      "clip": file.clip,
+      "index": file.index,
+      "checkpoint": snapshot.index,
+      "bytes": Double(snapshot.bytes),
+      "sha256": snapshot.sha256,
+      "at": formatter.string(from: Date()),
+      "startedAt": formatter.string(from: file.startedAt),
+    ])
   }
 
   private func markerURL(for url: URL) -> URL {
@@ -1025,17 +1083,6 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
       AVNumberOfChannelsKey: channels,
       AVEncoderBitRateKey: 128_000,
       AVChannelLayoutKey: Data(bytes: &layout, count: MemoryLayout<AudioChannelLayout>.size),
-    ]
-  }
-
-  /// The same AAC for sound-only files. `AVAudioFile` takes the microphone's buffers as they are,
-  /// so the file has the microphone's sample rate and channel count.
-  private static func soundFileSettings(for format: AVAudioFormat) -> [String: Any] {
-    [
-      AVFormatIDKey: kAudioFormatMPEG4AAC,
-      AVSampleRateKey: format.sampleRate,
-      AVNumberOfChannelsKey: Int(format.channelCount),
-      AVEncoderBitRateKey: 128_000,
     ]
   }
 
@@ -1133,8 +1180,8 @@ private struct AudioChunk {
   }
 }
 
-/// One file being written: a video piece (`AVAssetWriter`, with sound when the microphone is on)
-/// or a sound-only piece (`AVAudioFile`).
+/// One file being written: video (`AVAssetWriter` segments, with sound when the microphone is on)
+/// or sound only (`AdtsWriter`). Both append to a `CheckpointedFile`.
 private final class OutputFile {
   enum Kind: String {
     case video
@@ -1147,7 +1194,14 @@ private final class OutputFile {
   let writer: AVAssetWriter?
   let videoInput: AVAssetWriterInput?
   let audioInput: AVAssetWriterInput?
-  var audioFile: AVAudioFile?
+  /// The file on disk, fingerprinted as it is written.
+  let data: CheckpointedFile
+  /// The asset writer's delegate (the writer holds it weakly).
+  var sink: SegmentSink?
+  var adts: AdtsWriter?
+  /// The whole file's length and SHA-256, once closed.
+  var whole: CheckpointedFile.Snapshot?
+  let recording = UUID().uuidString.lowercased()
   let clip: Int
   let index: Int
   let start: CMTime
@@ -1177,7 +1231,7 @@ private final class OutputFile {
 
   init(
     kind: Kind, url: URL, marker: URL, writer: AVAssetWriter?, videoInput: AVAssetWriterInput?,
-    audioInput: AVAssetWriterInput?, audioFile: AVAudioFile?, clip: Int, index: Int, start: CMTime, startedAt: Date,
+    audioInput: AVAssetWriterInput?, data: CheckpointedFile, clip: Int, index: Int, start: CMTime, startedAt: Date,
     gapBeforeMs: Int?
   ) {
     self.kind = kind
@@ -1186,7 +1240,7 @@ private final class OutputFile {
     self.writer = writer
     self.videoInput = videoInput
     self.audioInput = audioInput
-    self.audioFile = audioFile
+    self.data = data
     self.clip = clip
     self.index = index
     self.start = start

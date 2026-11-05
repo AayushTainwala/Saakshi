@@ -1,9 +1,11 @@
-import SaakshiEvidence, { type RecordingClosedEvent } from '@native/saakshi-evidence';
+import SaakshiEvidence, { type CheckpointEvent, type RecordingClosedEvent } from '@native/saakshi-evidence';
 
 import type { CaptureSession } from '../capture/pipeline';
+import { extensionOf, mediaTypeFor } from '../locker/media';
 import type { LockerStore } from '../locker/store';
-import type { ClosedFile, EndReason, LocationSnapshot } from '../types';
-import { BODYCAM_PIECE_SECONDS } from './constants';
+import type { CheckpointInput, ClosedFile, EndReason, LocationSnapshot } from '../types';
+import { BODYCAM_CHECKPOINT_SECONDS, DEFAULT_UPLOAD_PART_SECONDS } from './constants';
+import { PartPlanner } from './parts';
 
 export type BodyCamEngine = {
   start: () => Promise<void>;
@@ -15,6 +17,8 @@ type Common = {
   store: LockerStore;
   location: () => LocationSnapshot;
   quality: 720 | 1080;
+  /** About how long an upload part is (BodyCamSettings.uploadPartSeconds). */
+  partSeconds?: number;
 };
 
 type NativeBodyCam = Pick<NonNullable<typeof SaakshiEvidence>, 'addListener' | 'bodyCamStart' | 'bodyCamStop'>;
@@ -45,6 +49,46 @@ export function closedFileFromEvent(
     gapBeforeMs: event.gapBeforeMs,
     rotationDegrees: event.rotationDegrees,
     pendingMarker: `${event.uri.split('/').pop()}.json`,
+    recording: event.recording ?? null,
+    written:
+      event.finalSha256 && typeof event.finalSize === 'number' ? { size: event.finalSize, sha256: event.finalSha256 } : null,
+  };
+}
+
+/** A checkpoint event from the recorder, ready to be sealed into the session's chain. */
+export function checkpointFromEvent(event: CheckpointEvent, location: LocationSnapshot): CheckpointInput {
+  return {
+    recording: event.recording,
+    index: event.checkpoint,
+    kind: event.kind,
+    segment: { clip: event.clip, index: event.index },
+    mediaType: mediaTypeFor(extensionOf(event.uri), event.kind),
+    bytes: event.bytes,
+    sha256: event.sha256,
+    at: new Date(event.at),
+    startedAt: new Date(event.startedAt),
+    location,
+    mode: 'body-cam',
+  };
+}
+
+/**
+ * Both platforms: each checkpoint is sealed into the session's chain as it arrives and handed to
+ * the upload planner; each closed file ends its parts.
+ */
+function checkpoints(native: NativeBodyCam, common: Common) {
+  const parts = new PartPlanner(() => common.partSeconds ?? DEFAULT_UPLOAD_PART_SECONDS);
+  const subscription = native.addListener('onCheckpoint', (event: CheckpointEvent) => {
+    void common.session.addCheckpoint(checkpointFromEvent(event, common.location()));
+    parts.checkpoint({ ...event, at: new Date(event.at), startedAt: new Date(event.startedAt) });
+  });
+  return {
+    closed(event: RecordingClosedEvent) {
+      if (event.recording && event.finalSha256 && typeof event.finalSize === 'number') {
+        parts.closed({ recording: event.recording, uri: event.uri, size: event.finalSize, sha256: event.finalSha256 });
+      }
+    },
+    remove: () => subscription.remove(),
   };
 }
 
@@ -56,9 +100,10 @@ function folders(common: Common): { outputDir: string; pendingDir: string } {
 
 /**
  * Android: the app's recorder runs in a foreground service (camera and microphone types), so
- * video and sound carry on with the screen off, during calls and in other apps. Pieces arrive as
- * events and are sealed here. If the JavaScript side is not running when a piece closes, its
- * marker stays and the piece is sealed when the app next opens.
+ * video and sound carry on with the screen off, during calls and in other apps. It records one
+ * continuous MPEG-TS file from Start to Stop and sends a checkpoint about every 10 seconds; the file
+ * arrives as an event when it closes and is sealed here. If the JavaScript side is not running when
+ * it closes, its marker stays and it is sealed when the app next opens.
  */
 export function androidBodyCam(
   common: Common & { notificationTitle: string; notificationText: string; notificationStop: string },
@@ -68,8 +113,10 @@ export function androidBodyCam(
   let stopReason: EndReason | null = null;
   let onFinal: (() => void) | null = null;
   let finished = false;
+  const marks = checkpoints(native, common);
   const subscription = native.addListener('onRecordingClosed', (event: RecordingClosedEvent) => {
     void common.session.add(closedFileFromEvent(event, common.location(), stopReason));
+    marks.closed(event);
     if (event.endReason !== 'piece-complete') {
       finished = true;
       onFinal?.();
@@ -80,7 +127,8 @@ export function androidBodyCam(
     async start() {
       await native.bodyCamStart({
         ...folders(common),
-        pieceSeconds: BODYCAM_PIECE_SECONDS,
+        pieceSeconds: 0,
+        checkpointSeconds: BODYCAM_CHECKPOINT_SECONDS,
         quality: common.quality,
         clip: common.session.nextClip(),
         mode: 'body-cam',
@@ -94,6 +142,7 @@ export function androidBodyCam(
       // Already over, for example stopped from the notification.
       if (finished) {
         subscription.remove();
+        marks.remove();
         return;
       }
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -106,14 +155,16 @@ export function androidBodyCam(
       await closed;
       clearTimeout(timer);
       subscription.remove();
+      marks.remove();
     },
   };
 }
 
 /**
  * iPhone: the app's own recorder (modules/saakshi-evidence/ios/BodyCamRecorder.swift). While
- * Saakshi is on screen, each video piece has its sound in the same file. iOS stops the camera
- * when the app leaves the screen or the phone locks; sound then carries on in sound-only pieces,
+ * Saakshi is on screen, video and its sound go into one file (fragmented MP4), with a checkpoint at
+ * every 10-second segment. iOS stops the camera when the app leaves the screen or the phone locks;
+ * sound then carries on in a sound-only file (ADTS AAC), also checkpointed,
  * which overlap the video on both sides so the sound has no gap, and video with sound starts again
  * when the user comes back. Files arrive as events, the same as on Android; `bodyCamStop` also
  * returns the files it closed, so none is missed if its event comes late.
@@ -125,10 +176,12 @@ export function iosBodyCam(
   const native = requireNative(nativeModule);
   let stopReason: EndReason | null = null;
   const added = new Set<string>();
+  const marks = checkpoints(native, common);
   const add = (event: RecordingClosedEvent) => {
     if (added.has(event.uri)) return;
     added.add(event.uri);
     void common.session.add(closedFileFromEvent(event, common.location(), stopReason));
+    marks.closed(event);
   };
   const closedSubscription = native.addListener('onRecordingClosed', add);
   const errorSubscription = native.addListener('onRecorderError', (event: { message: string }) =>
@@ -137,6 +190,7 @@ export function iosBodyCam(
   const unsubscribe = () => {
     closedSubscription.remove();
     errorSubscription.remove();
+    marks.remove();
   };
 
   return {
@@ -144,7 +198,8 @@ export function iosBodyCam(
       try {
         await native.bodyCamStart({
           ...folders(common),
-          pieceSeconds: BODYCAM_PIECE_SECONDS,
+          pieceSeconds: 0,
+          checkpointSeconds: BODYCAM_CHECKPOINT_SECONDS,
           quality: common.quality,
           clip: common.session.nextClip(),
           mode: 'body-cam',

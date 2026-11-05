@@ -8,7 +8,7 @@ public class SaakshiEvidenceModule: Module {
     // already writes movie fragments every 10 seconds, so its files survive a cut-off.
     Function("recorderSupported") { false }
 
-    Events("onVolumeUp", "onRecordingClosed", "onRecorderError")
+    Events("onVolumeUp", "onRecordingClosed", "onRecorderError", "onCheckpoint")
 
     OnCreate {
       VolumeButtons.shared.onVolumeUp = { [weak self] in self?.sendEvent("onVolumeUp", [:]) }
@@ -53,7 +53,8 @@ public class SaakshiEvidenceModule: Module {
       let config = BodyCamRecorder.Config(
         outputDir: outputDir,
         pendingDir: pendingDir,
-        pieceSeconds: max(options.pieceSeconds, 10),
+        pieceSeconds: options.pieceSeconds > 0 ? max(options.pieceSeconds, 10) : 0,
+        checkpointSeconds: max(options.checkpointSeconds, 2),
         quality: options.quality,
         firstClip: options.clip,
         mode: options.mode
@@ -122,7 +123,9 @@ public class SaakshiEvidenceModule: Module {
 struct BodyCamStartOptions: Record {
   @Field var outputDir: String = ""
   @Field var pendingDir: String = ""
-  @Field var pieceSeconds: Double = 60
+  /// 0: one continuous file per stretch (body-cam's default since fix round 1, group 2a).
+  @Field var pieceSeconds: Double = 0
+  @Field var checkpointSeconds: Double = 10
   @Field var quality: Int = 720
   @Field var clip: Int = 0
   @Field var mode: String = "body-cam"

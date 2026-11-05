@@ -32,6 +32,13 @@ const dark = palettes.dark;
 
 type Phase = 'setup' | 'starting' | 'running' | 'stopping';
 
+/** The phone's local time of day, hh:mm:ss. */
+function formatClock(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 function formatElapsed(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(total / 3600);
@@ -195,7 +202,7 @@ export function BodyCamScreen() {
     stopPractice();
     await practiceReleased.current;
     await checkNotifications().catch(() => undefined);
-    const common = { session, store: fileLocker, location, quality: settings.quality };
+    const common = { session, store: fileLocker, location, quality: settings.quality, partSeconds: settings.uploadPartSeconds };
     try {
       const next =
         Platform.OS === 'android'
@@ -220,7 +227,7 @@ export function BodyCamScreen() {
     setNow(at);
     setPhase('running');
     lock();
-  }, [checkNotifications, location, lock, session, settings.quality, stopPractice, t]);
+  }, [checkNotifications, location, lock, session, settings.quality, settings.uploadPartSeconds, stopPractice, t]);
 
   const stop = useCallback(
     async (reason: EndReason = 'stopped') => {
@@ -377,7 +384,9 @@ export function BodyCamScreen() {
     );
   }
 
-  const pieces = session.items.length;
+  // Checkpoints signed so far (fix round 1, group 2a): the recording is proven up to the last one.
+  const signed = session.checkpoints.filter((c) => c.status === 'sealed');
+  const lastSigned = signed.length ? signed[signed.length - 1] : null;
 
   return (
     <View style={styles.black}>
@@ -408,7 +417,11 @@ export function BodyCamScreen() {
                 ? t('bodycam.starting')
                 : t('bodycam.saving')}
           </AppText>
-          <AppText style={{ color: dark.textMuted }}>{t('bodycam.pieces', { count: pieces })}</AppText>
+          <AppText style={{ color: dark.textMuted }}>
+            {lastSigned
+              ? t('bodycam.checkpoints', { count: signed.length, time: formatClock(lastSigned.at) })
+              : t('bodycam.noCheckpointYet')}
+          </AppText>
           {stopFirst ? <AppText style={{ color: dark.warning }}>{t('bodycam.stopFirst')}</AppText> : null}
           {problem ? <AppText style={{ color: dark.warning }}>{t('bodycam.recorderProblem')}</AppText> : null}
           {batteryNote ? <AppText style={{ color: dark.warning }}>{batteryNote}</AppText> : null}

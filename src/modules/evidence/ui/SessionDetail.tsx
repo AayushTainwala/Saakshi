@@ -6,6 +6,7 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { AppText, Button, Card, Screen } from '@/components';
 import { spacing } from '@/theme';
 
+import { lastLink } from '../capture/pipeline';
 import { shareBundle } from '../export/bundle';
 import { runCheck } from '../locker/actions';
 import { deleteSession, SessionBusyError } from '../locker/delete';
@@ -17,8 +18,7 @@ import type { EvidenceItem, SessionState } from '../types';
 import { formatBytes, formatIST } from './format';
 
 export function chainHeadOf(session: SessionState): string | null {
-  const sealed = session.items.filter((item) => item.status === 'sealed');
-  return sealed.length ? (sealed[sealed.length - 1].recordSha256 ?? null) : null;
+  return lastLink(session)?.recordSha256 ?? null;
 }
 
 function StatusRow({ done, label, detail }: { done: boolean; label: string; detail?: string }) {

@@ -16,9 +16,9 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 
 | Group | State |
 |---|---|
-| 1. Body-cam: back swipe, and sound in the video (C2, C6) | Built: https://github.com/AayushTainwala/Saakshi/pull/16 (branch `claude/determined-goodall-wl89xn`), with test steps for the owner. Not yet run on a phone. |
-| 2. Body-cam: other fixes (C1–C3) | Built: https://github.com/AayushTainwala/Saakshi/pull/17 (branch `claude/fix-round-1-group-2`), stacked on group 1 at the owner's request (5 Nov), with test steps for the owner. Not yet run on a phone. |
-| 2a. Body-cam: one continuous file, with checkpoints | Not started (built separately from group 1) |
+| 1. Body-cam: back swipe, and sound in the video (C2, C6) | Merged: https://github.com/AayushTainwala/Saakshi/pull/16. Not yet run on a phone. |
+| 2. Body-cam: other fixes (C1–C3) | Merged: https://github.com/AayushTainwala/Saakshi/pull/17. Not yet run on a phone. |
+| 2a. Body-cam: one continuous file, with checkpoints | Built on branch `claude/fix-round-1-group-2a`, from `main` after #16 and #17; pull request open. Not yet run on a phone. |
 | 3–9 | Not started |
 
 ### Group 1: what was fixed
@@ -70,6 +70,47 @@ What Apple does not document is whether a capture session with a microphone inpu
 - Nothing has run on a phone. Most important: that Camera Control, the Action button (set to Camera) and AirPods really do nothing while the lock shows; and that volume-up twice unlocks, during the practice and while recording.
 - Whether Notification Center sends Saakshi into the background (then video stops, and the record says `app-left`) or only covers it (then video carries on).
 
+### Group 2a: what was checked before building (brief item 4)
+
+All three checks came out feasible, so nothing falls back to pieces.
+
+1. **Reading a file while the recorder is still writing it.**
+   - *iPhone: nothing has to be read back.* The asset writer can hand its output to the app segment by segment instead of writing a file. Apple: "The asset writer stops normal file writing when you implement this method" ([`assetWriter(_:didOutputSegmentData:segmentType:segmentReport:)`](https://developer.apple.com/documentation/avfoundation/avassetwriterdelegate/assetwriter(_:didoutputsegmentdata:segmenttype:segmentreport:))). With Apple's HLS profile it sends an initialization segment, then a segment every 10 seconds, video and sound together ([WWDC 2020, session 10011](https://developer.apple.com/videos/play/wwdc2020/10011/): "If you encode both audio and video, one AVAssetWriterInput for each media can be added"). The app writes each segment to the file and fingerprints it on the way. So the iPhone body-cam video is now fragmented MP4 (`.mp4`), not `.mov`. For a `.mov` that the asset writer writes itself, Apple doesn't say whether bytes already written stay untouched when it finishes; this way the question doesn't arise.
+   - *iPhone sound-only files:* the app now encodes and writes them itself too, as ADTS AAC (`.aac`). That is append-only, cut-off safe and works in the background.
+   - *Android:* MediaRecorder writes MPEG-TS through Android's `MPEG2TSWriter`. In the Android 15 source (the LineageOS 22.1 copy of AOSP, [`MPEG2TSWriter.cpp`](https://raw.githubusercontent.com/LineageOS/android_frameworks_av/lineage-22.1/media/libstagefright/MPEG2TSWriter.cpp); Google's own source host isn't reachable from here), every write is an `fwrite` of a 188-byte packet to a stream opened with `fdopen(dup(fd), "wb")`, and there is no seek anywhere in the file. `StagefrightRecorder::setupMPEG2TSRecording` creates it ([`StagefrightRecorder.cpp`](https://raw.githubusercontent.com/LineageOS/android_frameworks_av/lineage-22.1/media/libmediaplayerservice/StagefrightRecorder.cpp), line 1601). So the bytes on disk only grow. The app reads only the new bytes, up to the last whole packet, after flushing the file to storage. Phone makers can change this code; it needs testing on a Samsung and a Xiaomi, Oppo or Vivo.
+   - *Android MP4 fallback (Android 7, or a phone that refuses MPEG-TS):* MediaRecorder rewrites an MP4's header when it stops, so these files get no checkpoints.
+2. **That parts never split a file in a way that breaks it.** `modules/saakshi-evidence/verify/checkpoint-parts.sh` makes 40-second MPEG-TS and fragmented MP4 files with ffmpeg (not phones' recorders) and found:
+   - a running SHA-256 snapshotted at each checkpoint equals the SHA-256 of the prefix re-read from disk;
+   - parts ending on checkpoints, joined in order, are the file byte for byte;
+   - every checkpointed prefix plays: 301, 600 and 901 video frames at the MPEG-TS checkpoints; 300, 600, 900 and 1200 at the fMP4 segment ends.
+3. **Battery.** I couldn't measure this on a phone. Estimate:
+   - Body-cam writes about 0.4 MB a second at 720p (0.8 at 1080p).
+   - SHA-256 runs at about 1,400 MB a second on this cloud machine. Current phones have the same kind of SHA instructions in their processors.
+   - So even at a tenth of that speed, the hashing would use well under 1% of one core.
+   - Each checkpoint adds one signature and one flush to storage every 10 seconds; Android also reads each byte once more, from memory.
+
+   I expect this to be small next to the camera, the encoder and the screen. Your last test used about 2% battery in 10.5 minutes; the next test will show whether that changes.
+
+### Group 2a: what was built
+
+- **One continuous file.** Body-cam records one file from Start to Stop, with its sound, on both platforms. On iPhone a new file starts only when it must: you came back to Saakshi, sound came back after a call, or a file couldn't be written. The sound-only file still covers only the time video couldn't record.
+- **Signed checkpoints, about every 10 seconds.** On iPhone they come at each video segment, and about every 10 seconds of sound for sound-only files; on Android, every 10 seconds at a packet boundary.
+  - Each checkpoint is the length so far and the SHA-256 of those bytes, from the running hash. It is signed into the session's chain as it comes (bundle format **0.5**: a new record type, `saakshi.evidence.checkpoint`).
+  - When the file closes, its usual record carries the same `recording` id. The app also compares the file as hashed with what the recorder wrote, and notes any difference.
+  - The body-cam screen shows how many checkpoints are signed and the time of the last one.
+- **Upload parts, for E7.** Byte ranges of the file, each ending on a checkpoint, about `uploadPartSeconds` long. That is a stored setting, 60 seconds for now, to be decided with E7. E7 gets them through `setBodyCamPartListener` from `@/modules/evidence`. Nothing is uploaded yet.
+- **The checker.** `tools/verify-bundle.mjs` checks every checkpoint against its file in one pass: the file's first bytes must have the SHA-256 the checkpoint signed. Tests build real signed bundles and catch a changed byte, a file shorter than its checkpoints, a missing checkpoint, and checkpoints without their file.
+- **Not done:** the witness message could carry the latest checkpoint (the brief says "can"); group 7 redesigns that message, so I left it there. Bug mode is unchanged, as the brief says.
+
+### Group 2a: not verified
+
+- Nothing has run on a phone. Most important:
+  - that the iPhone segments arrive every 10 seconds and the `.mp4` plays in Photos, Files and QuickTime;
+  - that the `.aac` sound-only file encodes in the background;
+  - that Android's checkpoints keep up with the recorder on several makers' phones;
+  - that a recording cut off by a forced restart verifies up to its last checkpoint.
+- `MessageDigest.clone()` (Android's way of snapshotting the running hash) is supported by Android's standard SHA-256. If a phone refused it, that phone would give no checkpoints; recording would carry on.
+
 ## Owner questions
 
 Streams add questions here as `- [ ] (Stream X) question`.
@@ -94,6 +135,7 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [x] (Stream B) **Supabase plan for live location.** `saakshi-live` is in the "AT's Desk" organisation. Supabase pauses inactive projects on its free plan, which would break live links without warning. *Answered (owner's review of R2):* free while testing; the plan must be reviewed before R2 goes public. On the release checklist below.
 - [x] (Stream B, for Stream D) **Apple Team ID.** The widget extension needs `ios.appleTeamId` in `app.json`. *Answered (owner's review of R2):* `5NYAUT5C56` (not secret); set in `app.json`.
 - [x] (Fix round 1) **Camera picture on the iPhone body-cam screen.** *Withdrawn 5 Nov:* the old iPhone body-cam drew the camera's live picture under its controls, but behind an 85%-black layer, so it couldn't really be seen (the owner never noticed it). The new recorder draws no picture, as Android never did. Nothing changes for the user.
+- [ ] (Fix round 1) **Bug mode, continuous too?** The brief left bug mode unchanged until you decide. Group 2a built what it would need: on iPhone, the app's own ADTS AAC writer (cut-off safe, unlike bug mode's `.m4a` pieces), and checkpoints on both platforms. Should bug mode also become one continuous file with checkpoints, its witness texts carrying the latest checkpoint?
 - [ ] (Stream C) **Helpline list updates.** The Help tab fetches `helplines/helplines.json` from raw.githubusercontent.com each time it opens (a plain GET; nothing of the user's is sent, but GitHub sees the phone's IP address). Keep it automatic, or only on a "Check for updates" tap? And should the list be signed, so that a compromised `main` branch can't change numbers on every phone? Today it is only schema-checked.
 - [ ] (Stream C) **Lawyers and medics list.** The schema (`src/modules/helplines/schema.ts`, `helplines/README.md`) shows name, phone, city, state and languages, and records the registration number, consent date and an expiry (`listedUntil`) in the public file. Is publishing the registration number right, or should it be checked and kept off GitHub? Who collects the written consent, and where is it kept?
 - [ ] (Stream C) **"What police may ask of a phone"** (SPEC G5) is left out of the guide: `docs/research/law.md` has nothing on demands to unlock a phone or give a passcode. It needs its own research from statutes and judgments first. Shall I do that next?
@@ -184,7 +226,7 @@ None of it has run on a phone yet.
   - Data still in memory when the phone goes off (typically under a second) is lost; a dead battery normally shuts the phone down cleanly, and step 4's auto-save at 3% avoids that case.
 - **Interrupted files** (both platforms): a marker in the session's `pending/` folder is written when recording starts and removed once the file is in the locker. When the app opens (Record tab), any marker left behind is sealed: hashed as it is, chained after the session's last file, with `interrupted: true` and `endReason: "interrupted"` in the record (spec 0.2, section 3). On iPhone the marker can't name the file in advance (expo-camera reports the path only when it stops), so recovery takes the first `.mov` in expo-camera's cache folder created after the recording started. iOS may empty that cache folder when storage is very low, which would lose the file.
 
-**Body-cam mode (B1–B4): how it works and every platform limit found (21 Oct).** Record tab → "Body-cam mode". The first time, the user must acknowledge how to unlock before Start is enabled. Pieces are 60 seconds (`BODYCAM_PIECE_SECONDS`), 720p by default with 1080p as an option, and are sealed through `createEvidenceSession()`. Nothing is uploaded in R1.
+**Body-cam mode (B1–B4): how it works and every platform limit found (21 Oct).** Record tab → "Body-cam mode". The first time, the user must acknowledge how to unlock before Start is enabled. Since fix round 1, group 2a, one continuous file from Start to Stop with signed checkpoints every 10 seconds (it was 60-second pieces); 720p by default with 1080p as an option, sealed through `createEvidenceSession()`. Nothing is uploaded in R1.
 
 - **Reading the volume buttons:**
   - *Android, screen on:* key events reach the app's window while it is on screen. `VolumeKeys.kt` wraps the window's callback while the lock is showing, takes volume-up presses (volume-down before fix round 1, group 2), and swallows both volume keys so the volume doesn't change.

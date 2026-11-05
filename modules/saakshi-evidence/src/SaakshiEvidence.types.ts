@@ -78,12 +78,36 @@ export type RecordingClosedEvent = RecordingStartedEvent & {
   kind?: 'video' | 'audio';
   /** iPhone body-cam: iOS's reason for stopping the camera, when it gave one. For diagnosis only. */
   interruption?: string | null;
+  /** Body-cam (format 0.5): the recorder's random id for the file, which its checkpoints carry. */
+  recording?: string | null;
+  /** Body-cam: the length and SHA-256 of every byte the recorder wrote, from its running hash. */
+  finalSize?: number | null;
+  finalSha256?: string | null;
+};
+
+/**
+ * Body-cam (fix round 1, group 2a): a checkpoint of a file still being written. Its first `bytes`
+ * bytes have the SHA-256 `sha256`, from the recorder's running hash; about every 10 seconds.
+ */
+export type CheckpointEvent = {
+  recording: string;
+  uri: string;
+  kind: 'video' | 'audio';
+  clip: number;
+  index: number;
+  /** The checkpoint's number in its file, from 0. */
+  checkpoint: number;
+  bytes: number;
+  sha256: string;
+  at: string;
+  startedAt: string;
 };
 
 export type SaakshiEvidenceEvents = {
   onRecorderReady: (event: { width: number; height: number }) => void;
   onRecordingStarted: (event: RecordingStartedEvent) => void;
   onRecordingClosed: (event: RecordingClosedEvent) => void;
+  onCheckpoint: (event: CheckpointEvent) => void;
   onRecorderError: (event: { message: string }) => void;
   /** A volume-up press, while volumeKeysStart() is in effect: two in a row unlock body-cam mode. */
   onVolumeUp: () => void;
@@ -92,7 +116,10 @@ export type SaakshiEvidenceEvents = {
 };
 
 export type BodyCamOptions = RecorderOptions & {
+  /** 0: one continuous file per stretch (body-cam's default since fix round 1, group 2a). */
   pieceSeconds: number;
+  /** About this often, a checkpoint of the file being written. */
+  checkpointSeconds: number;
   /** The text of the notification Android shows while the service runs. */
   notificationTitle: string;
   notificationText: string;

@@ -48,6 +48,45 @@ export type ClosedFile = {
   rotationDegrees?: number | null;
   /** The crash-recovery marker for this file (locker/pending.ts), removed once the file is safe. */
   pendingMarker?: string;
+  /** The recorder's random id for this file, which its checkpoints carry (body-cam, format 0.5). */
+  recording?: string | null;
+  /** The recorder's own fingerprint of every byte it wrote, to compare with the file as hashed. */
+  written?: { size: number; sha256: string } | null;
+};
+
+/**
+ * A checkpoint of a file still being written: its length so far and the SHA-256 of those bytes,
+ * from the recorder's running hash (fix round 1, group 2a). Sealed into the session's chain as it
+ * comes, so it proves what existed at that moment even if the recording is later cut off.
+ */
+export type CheckpointInput = {
+  recording: string;
+  /** The checkpoint's number in its file, from 0. */
+  index: number;
+  kind: MediaKind;
+  segment: SegmentRef | null;
+  mediaType: string;
+  bytes: number;
+  sha256: string;
+  /** When the recorder counted the bytes. */
+  at: Date;
+  /** When the file started. */
+  startedAt: Date;
+  location: LocationSnapshot;
+  mode?: CaptureMode;
+};
+
+export type CheckpointItem = {
+  sequence: number;
+  recording: string;
+  index: number;
+  bytes: number;
+  sha256: string;
+  at: string;
+  status: 'sealed' | 'failed';
+  record?: { file: string; recordId: string };
+  recordSha256?: string;
+  error?: string;
 };
 
 export type FileDigests = {
@@ -78,6 +117,10 @@ export type EvidenceItem = {
   interrupted?: boolean;
   endReason?: EndReason;
   error?: string;
+  /** The recorder's id for the file, which its checkpoints carry (format 0.5). */
+  recording?: string;
+  /** Set when the file as hashed differs from what the recorder wrote (it should never happen). */
+  writtenMismatch?: boolean;
 };
 
 export type WitnessEntry = {
@@ -100,6 +143,8 @@ export type SessionState = {
    * signed record; the originals stay the evidence (owner decision of 22 Oct).
    */
   copies?: Record<string, { file: string; sha256: string; recordSha256: string; madeAt: string }>;
+  /** Signed checkpoints of body-cam files while they were written (format 0.5), in chain order. */
+  checkpoints?: CheckpointItem[];
   /** The last on-phone check of files, records and chain. */
   lastCheck?: { at: string; ok: boolean; problems: { sequence: number; problem: string }[] };
 };

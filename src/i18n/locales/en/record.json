@@ -157,8 +157,8 @@
   "bodycam": {
     "title": "Body-cam mode",
     "open": "Body-cam mode",
-    "openHint": "Wear the phone and keep your hands free. It records video continuously, in one-minute pieces, each fingerprinted and signed as it is saved.",
-    "intro": "Wear the phone on your chest, round your neck or clipped to your clothes. It records video continuously and saves it in one-minute pieces, each fingerprinted and signed as it is saved. The screen goes dark and touch is locked while it records.",
+    "openHint": "Wear the phone and keep your hands free. It records video continuously, as one file, fingerprinted and signed every 10 seconds while it records.",
+    "intro": "Wear the phone on your chest, round your neck or clipped to your clothes. It records video continuously, as one file from Start to Stop, and fingerprints and signs what it has recorded every 10 seconds, so even a recording that is cut off can be proven up to that moment. The screen goes dark and touch is locked while it records.",
     "unlockTitle": "How to unlock the screen",
     "unlockBody": "While body-cam mode records, the screen is dark and doesn't respond to touch. To unlock it, press the volume-up button twice, quickly.",
     "practiseIntro": "Try it now, so you know it works on your phone. Start becomes available once you have done it.",
@@ -187,8 +187,9 @@
     "locked": "Screen locked. Use your unlock buttons.",
     "recordingFor": "Recording {{time}}",
     "saving": "Saving…",
-    "pieces_one": "{{count}} piece saved",
-    "pieces_other": "{{count}} pieces saved",
+    "checkpoints_one": "{{count}} checkpoint signed, the last at {{time}}",
+    "checkpoints_other": "{{count}} checkpoints signed, the last at {{time}}",
+    "noCheckpointYet": "The first checkpoint is signed about 10 seconds after Start.",
     "lock": "Lock screen",
     "stop": "Stop and save",
     "stopFirst": "Body-cam is recording. To leave this screen, press Stop and save first.",
@@ -196,7 +197,7 @@
     "notificationTitle": "Saakshi is recording",
     "notificationText": "Body-cam mode. Open Saakshi to stop.",
     "notificationStop": "Stop",
-    "notificationsOff": "Notifications are off for Saakshi, so the recording notice and its Stop button don't show in the notification shade. Recording carries on. To see it from outside Saakshi, pull down the notification shade and open Active apps at the bottom. Stopping Saakshi there closes the whole app; the piece being recorded is sealed the next time you open it."
+    "notificationsOff": "Notifications are off for Saakshi, so the recording notice and its Stop button don't show in the notification shade. Recording carries on. To see it from outside Saakshi, pull down the notification shade and open Active apps at the bottom. Stopping Saakshi there closes the whole app; the recording up to that moment is sealed the next time you open it."
   },
   "battery": {
     "warn": "Battery {{percent}}%. At 3% the recording will be stopped and saved.",
