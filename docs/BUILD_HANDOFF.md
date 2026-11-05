@@ -31,8 +31,12 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 2. **Body-cam video on iPhone now has its sound in the same file.** The iPhone side of body-cam has its own recorder (`modules/saakshi-evidence/ios/BodyCamRecorder.swift`), in place of expo-camera (muted) plus expo-audio:
    - the camera (no microphone input) and one microphone stream (`AVAudioEngine`, started on screen when you press Start) feed `AVAssetWriter`;
    - while Saakshi is on screen, each one-minute video piece is a `.mov` with H.264 video and AAC sound, with a movie fragment every 10 seconds, so it is cut-off safe like the evidence camera's;
-   - when iOS stops the camera (app left, phone locked), the same sound goes into sound-only `.m4a` pieces, starting half a second before the video stopped; when you come back, video with sound starts again and the sound-only piece ends half a second later. So the sound has no gap, and the picture's gap is in the next video clip's record;
+   - iOS can't write a video file in the background (Apple's `AVAssetWriter.h`: a writer still writing when the app goes into the background fails; see [this Apple forum reply](https://developer.apple.com/forums/thread/672056)). So the video piece is closed the moment the app goes into the background, inside a background task that gives it time to finish;
+   - from then on the same sound goes into sound-only `.m4a` pieces, written by `AVAudioFile`, which works in the background. The first starts half a second before the video's sound ended, or up to 11 seconds before if the video file didn't close properly (such a file keeps only its complete 10-second fragments). When you come back, video with sound starts again and the sound-only piece ends half a second later. So the sound has no gap, and the picture's gap is in the next video clip's record;
+   - a phone call: a sound-only piece ends; a video piece carries on without sound, and ends when sound comes back, so the next piece has sound again;
    - every file has its crash-recovery marker and its signed record in the same session, as before.
+
+   An independent review of the recorder (before your test) found and I fixed: the background-writing failure above; starting body-cam during a call left the whole session without sound (the microphone is now retried until it starts); a stale microphone format after a route change (a fresh engine is made each time); extra tiny files when sound came back; and smaller timing errors in the gaps recorded.
 
    Bundle format **0.3** (`docs/spec/evidence-bundle.md`, section 3, step 8): two new end reasons, `video-resumed` (a sound-only piece ended because video came back) and `sound-resumed` (a video piece recorded without sound, after a phone call for example, ended because sound came back). `tools/verify-bundle.mjs` reads 0.1 to 0.3.
 
@@ -49,7 +53,8 @@ What Apple does not document is whether a capture session with a microphone inpu
 
 - Nothing has run on a phone. The Swift compiles only in the Native build workflow.
 - Sound carrying on in the background: the old build relied on it too (expo-audio), but confirm it with the phone locked for several minutes.
-- After a phone call that ends while Saakshi is in the background, sound may not restart until you return to the app (the mixable rule above). The recorder then tries once as a non-mixable recording; untested.
+- After a phone call that ends while Saakshi is in the background, sound may not restart until you return to the app (the mixable rule above). The recorder then tries as a non-mixable recording, which it stays until Stop, so other apps' sound could then interrupt it; untested.
+- Whether the background task gives the video file enough time to finish when the phone locks. If not, the file's record says `error`, and the sound-only file reaches 11 seconds back to cover it.
 - iOS 26's full-screen back swipe is blocked by the same settings; untested.
 - Audio and video timing in the files (lip sync), and the half-second overlaps, need checking by playing the files.
 

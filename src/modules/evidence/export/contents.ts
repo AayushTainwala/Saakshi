@@ -61,7 +61,7 @@ const END_REASONS: Record<string, string> = {
   'camera-lost': 'the camera was taken by the system or another app',
   'low-battery': 'stopped and saved by the app at 3% battery',
   'audio-interrupted': 'the phone stopped sound recording (for example, for a phone call)',
-  'sound-resumed': 'recorded without sound after an interruption; the next file has sound again (iPhone)',
+  'sound-resumed': 'its sound stopped part-way (an interruption, such as a phone call); the next file has sound again (iPhone)',
   'video-resumed': 'sound-only file ended because video with sound started again (iPhone)',
   interrupted: 'cut off (crash or power-off); sealed when the app next opened',
   error: 'camera error',
