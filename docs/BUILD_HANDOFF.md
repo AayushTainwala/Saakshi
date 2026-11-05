@@ -101,7 +101,7 @@ All three checks came out feasible, so nothing falls back to pieces.
 - **Upload parts, for E7.** Byte ranges of the file, each ending on a checkpoint, about `uploadPartSeconds` long. That is a stored setting, 60 seconds for now, to be decided with E7. E7 gets them through `setBodyCamPartListener` from `@/modules/evidence`. Nothing is uploaded yet.
 - **The checker.** `tools/verify-bundle.mjs` checks every checkpoint against its file in one pass: the file's first bytes must have the SHA-256 the checkpoint signed. Tests build real signed bundles and catch a changed byte, a file shorter than its checkpoints, a missing checkpoint, and checkpoints without their file.
 - **Not done:** the witness message could carry the latest checkpoint (the brief says "can"); group 7 redesigns that message, so I left it there. Bug mode is unchanged, as the brief says.
-- **An independent review** of the new phone code found eleven problems, all fixed before the pull request was merged:
+- **An independent review** of the new phone code found eleven problems, all fixed in this pull request:
   - an iPhone video file whose writer failed mid-recording would have dropped everything until Stop; it now ends at once and a new file starts;
   - on Android, a failed stop (for example, the phone full) would have deleted a recording that had checkpoints; it is now kept and marked as an error;
   - each iPhone `.mp4` now starts its own timeline at 0, so players show the right length;
