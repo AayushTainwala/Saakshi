@@ -18,16 +18,19 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [x] (Stream A) **Segment length.** *Answered 20 Oct:* the evidence camera saves one file from start to stop, with no segments and no joining; the format must survive a sudden cut-off (check its cost on both platforms first and report in this handoff). Segments are for bug mode and body-cam mode only. SPEC E1, E8, body-cam mode.
 - [x] (Stream A) **Certificate language.** *Answered 20 Oct:* English only for now, with the Hindi help text kept. SPEC E4.
 - [x] (Stream A) **App Attest environment.** *Answered 20 Oct:* `production` confirmed.
-- [x] (Stream D) **Play signing key.** *Answered 21 Oct:* (b), upload our EAS keystore as the app signing key. When you first upload to Google Play, the Console asks who holds the app signing key. Two choices:
+- [x] (Stream D) **Play signing key.** When you first upload to Google Play, the Console asks who holds the app signing key. Two choices:
   - **(a) Google makes its own key (the default).** The Play copy and the GitHub APK then have different signatures. Android won't install one over the other, so someone switching must uninstall first, which **deletes the recordings kept in the app**.
   - **(b) Upload our EAS keystore as the app signing key.** Both copies share one signature and the user can switch freely.
 
-  I recommend (b). Decide before the first Play upload: it can't easily be changed afterwards. (b) needs the keystore backup (Stream D, step 4) and Google's key-export steps in the Console, which I couldn't read from here.
-- [x] (Stream D) **Public contact email** *Answered 21 Oct:* tainwala.aayush@gmail.com. For the privacy policy, TestFlight feedback, App Review contact and the Play developer page. Until then, the privacy policy points to GitHub issues.
-- [x] (Stream D) **Play target audience.** I suggest 18 and over. *Answered 21 Oct:* 18 and over.
-- [x] (Stream D) **Mirrors.** *Answered 21 Oct:* yes to both: Codeberg first, and CI may use the Internet Archive's uploader.
+  I recommend (b). Decide before the first Play upload: it can't easily be changed afterwards. (b) needs the keystore backup (Stream D, step 4) and Google's key-export steps in the Console, which I couldn't read from here. *Answered 21 Oct: (b).* At the first Play upload, choose to upload your own app signing key, using the EAS keystore from step 4, rather than letting Google make one. The keystore backup is therefore required before the first Play upload.
+- [x] (Stream D) **Public contact email** for the privacy policy, TestFlight feedback, App Review contact and the Play developer page. *Answered 21 Oct:* `tainwala.aayush@gmail.com`. It is now in the privacy policy (both languages) and the store text.
+- [x] (Stream D) **Play target audience.** I suggest 18 and over. Your call. *Answered 21 Oct:* 18 and over.
+- [x] (Stream D) **Mirrors.**
   - Is Codeberg fine as the first mirror (docs/release/mirrors.md)?
   - The Internet Archive's official uploader is AGPL. May CI use it (it never enters the app), or should a later session use plain `curl` instead?
+
+  *Answered 21 Oct:* yes to both. Codeberg is the first mirror, and CI may use the Internet Archive's uploader. Both mirror jobs in `release.yml` stay off until their settings are added (docs/release/mirrors.md, sections 2 and 3).
+- [x] (Owner, 21 Oct) **The repository is public**, by the owner's decision. GitHub Pages may serve the privacy policy and the live-location viewer page (S3).
 - [x] (Stream B) **Phone backups.** Android backs up an app's files to the user's Google account unless the app turns this off (`android.allowBackup`), and iCloud backs up the documents directory. That would copy trusted contacts (and evidence) off the phone. Turn Android backup off for the whole app, keep it, or exclude only some files? This touches Stream A's evidence too. *Answered 20 Oct:* the user chooses whether anything is backed up and where: local only, or a cloud service of their own (Google Drive, iCloud or another). Nothing ever comes to us. So the app starts local-only, with the phone's automatic backups off for its files, and copies only where the user chooses. SPEC section 2. Work for Streams A and B: see Stream D, "For other streams".
 - [x] (Stream B, for Stream D) **Extra Android permissions.** `npx expo config --type introspect` shows the Expo defaults `SYSTEM_ALERT_WINDOW`, `READ_EXTERNAL_STORAGE` and `WRITE_EXTERNAL_STORAGE` in the manifest. No feature needs them; consider blocking them in `app.json` (`android.blockedPermissions`) so the Play listing and App Review notes stay short. *Done by Stream D:* `app.config.ts` blocks all three in every Android build.
 - [x] (Stream B) **Supabase region for live location (S3).** *Answered 20 Oct:* Mumbai (`ap-south-1`). Project `saakshi-live` created there.
@@ -44,7 +47,12 @@ Streams add questions here as `- [ ] (Stream X) question`.
 Things that must be done or decided before a release goes public. Streams add items as `- [ ] (Stream X, release) item`.
 
 - [ ] (Stream B, R2) **Supabase plan for live location.** `saakshi-live` stays on the free plan while testing (owner's answer). Before R2 goes public, review the plan: free-plan projects can be paused when inactive, which would break every live link without warning.
-- [ ] (Stream B, R2, for Stream D) **Privacy texts for live location.** Update the privacy policy, the Apple privacy label and Play's Data safety answers before an R2 build is published (facts in Stream B, "For Stream D").
+- [x] (Stream B, R2, for Stream D) **Privacy texts for live location.** Update the privacy policy, the Apple privacy label and Play's Data safety answers before an R2 build is published (facts in Stream B, "For Stream D"). *Done by Stream D, 21 Oct, NEEDS OWNER REVIEW.*
+  - The privacy policy, English and Hindi, describes live location's server, bug mode and its witness texts.
+  - Apple's label becomes **Location → Precise Location, App Functionality, not linked to you**.
+  - Play's Data safety declares **Precise location, collected, optional, for App functionality, encrypted in transit, deletable**, plus a foreground-service declaration for camera, microphone and location.
+  - The App Review notes drop "No server".
+  - Still open: Supabase's log retention for IP addresses (see `store/apple/privacy-label.md`).
 - [ ] (Review, beta) **Owner's sign-offs:** the certificate text (then set `FORM_TEXT_REVIEWED`), the rights prompts, and every Hindi string.
 - [ ] (Review, beta) **Design pass:** directions mocked up and chosen by the owner, then applied; a real app icon and launch screen in place of Expo's placeholders.
 - [ ] (Review, beta) **Phone testing:** every feature on at least one iPhone and two different Android phones (one Samsung, one Xiaomi, Oppo or Vivo), with what was found fixed.
@@ -52,6 +60,49 @@ Things that must be done or decided before a release goes public. Streams add it
 - [ ] (Stream D, beta) **Dependency audit:** `npm ci` reports 61 known vulnerabilities in build tools. Triage which, if any, reach the app; don't run `npm audit fix --force`.
 - [ ] (Stream D, beta) **TestFlight public link** (Apple's beta review) and **Play closed test** (12 or more testers for 14 days).
 - [ ] (Review, beta) **Rights and safety guides (G1, G2):** the owner decides whether they join the beta.
+
+---
+
+## How to try a build on your Mac
+
+Every run of the **Native build** workflow makes two test builds you can download and try on your Mac. It runs on each pull request that changes native code, or whenever you start it by hand. The builds are:
+- one for Apple's iPhone Simulator;
+- one for the Android emulator.
+
+They are for trying the app, not for sharing. The Android one is signed with a public test key, so a fake could carry the same key.
+
+**1. Get the files**
+1. Open https://github.com/AayushTainwala/Saakshi/actions and choose **Native build** on the left.
+2. For a fresh build of `main`: **Run workflow** → **Run workflow**. It takes about 30–45 minutes.
+3. Open a finished run (green tick), and scroll down to **Artifacts**. Download:
+   - `Saakshi-<commit>-ios-simulator.zip` for the iPhone;
+   - `Saakshi-<commit>-android-emulator.apk` for Android.
+
+   You must be logged in to GitHub. Each build is kept for 30 days.
+
+**2. iPhone, in the Simulator**
+1. Install **Xcode** from the Mac App Store. It's free and a large download.
+2. Open Xcode once. If it offers to install the iOS platform or a simulator, accept. If none is installed, add one in Xcode → Settings → Components (called Platforms in older versions).
+3. Open the Simulator: in Xcode's menu, **Xcode → Open Developer Tool → Simulator**. An iPhone appears on screen.
+4. Double-click the downloaded `.zip` in Finder. It becomes `Saakshi.app`.
+5. Drag `Saakshi.app` onto the Simulator's iPhone screen. Saakshi appears on its home screen; click it to open.
+
+**3. Android, in the emulator**
+1. Install **Android Studio**, free from https://developer.android.com/studio, and go through its setup with the default choices.
+2. On its welcome screen: **More Actions → Virtual Device Manager → Create device**.
+   1. Pick a phone, such as a Pixel.
+   2. Pick the recommended system image and let it download.
+   3. Click **Finish**.
+3. Start the virtual phone with its ▶ button.
+4. Drag the downloaded `.apk` onto the emulator window. It installs; open Saakshi from the app list.
+
+**What a simulator can't show.** Try these on a real phone, through TestFlight or the GitHub APK:
+- **The iPhone Simulator** has no camera, can't send SMS, and App Attest doesn't work there. The phone's security-chip key may not either.
+- **The Android emulator's camera** shows a made-up test scene.
+- **SMS from the emulator** goes nowhere: there is no real SIM.
+- **Location:** both can pretend to be somewhere. In the Simulator, use Features → Location. In the emulator, use the ⋯ button → Location.
+
+If you put the Android test APK on a real phone, uninstall it before installing a real Saakshi release. The two are signed with different keys, so Android won't install one over the other.
 
 ---
 
@@ -444,6 +495,12 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
   4. **Play bundle:** checked for SMS permissions and kept as a workflow artifact for 30 days, for you to upload in the Play Console.
   5. **iPhone:** `eas submit` to TestFlight. This is skipped, with a warning, until `ascAppId` is in `eas.json`.
   6. **Codeberg mirror:** pushes `main` and the tag, then creates the same release there. It runs only once `CODEBERG_REPO` and `CODEBERG_TOKEN` are set.
+  7. **Internet Archive mirror** (added 21 Oct): uploads the APK, `SHA256SUMS` and `SIGNING-CERTIFICATE.txt` as one archive.org item per release, using the official uploader `internetarchive` 5.12.0 (AGPL-3.0; owner-approved, CI only). It runs only once `IA_IDENTIFIER_PREFIX` and the other settings are in place.
+- **`.github/workflows/native-build.yml`** (21 Oct; Stream A's compile check) now also uploads two test builds on every run, with the JavaScript bundled in so no development server is needed:
+  - an Android release APK signed with the debug key, with the GitHub APK's flags (SMS auto-send on);
+  - a zipped iOS Simulator `Saakshi.app` in the Release configuration, checked to contain `main.jsbundle`.
+
+  The Android job now runs `assembleRelease` instead of `assembleDebug`, and the iOS job builds Release instead of Debug. Both still compile all the native code. The steps for trying them are under "How to try a build on your Mac" above.
 - **`.github/workflows/pages.yml`:** publishes `store/site/` to GitHub Pages:
   - privacy policy at `https://aayushtainwala.github.io/Saakshi/privacy/` (Hindi at `/privacy/hi/`);
   - a short home page.
@@ -491,7 +548,8 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
          - If you already made a key in App Store Connect, choose to give it instead (the `.p8` file path, key ID and issuer ID). EAS uploads it. Then delete the `.p8` from the clone folder, or move it to your password manager. **Never commit it.**
       4. **Exit.**
    4. Re-run step 3 whenever an iPhone capability or app extension is added (for example Stream B's Lock Screen controls or widgets in R2), and if a build says the provisioning profile has expired.
-4. **Back up the Android key** (strongly advised, after the first Release run). Losing it means no update can ever install over existing copies, and the published fingerprint changes.
+   5. **Run step 3 again now, from the latest `main`** (21 Oct). R2 added a widget extension (`in.aayushtainwala.saakshi.widgets`) that needs its own provisioning profile. In a non-interactive (CI) build, EAS CLI 25.2.0 skips registering a new bundle ID with Apple (`SetUpTargetBuildCredentials`: `bestEffortAppStoreAuthenticateAsync` returns early when non-interactive), so the extension must be set up once interactively. First run `git checkout main && git pull`, then run the same `credentials` command, and choose the same menu items. It sets up both the app and the extension.
+4. **Back up the Android key** (after the first Release run; **required before the first Play upload**, because Play will sign with this key, as decided on 21 Oct). Losing it means no update can ever install over existing copies, and the published fingerprint changes.
    1. On the same computer, run `npx eas-cli@latest credentials --platform android`.
    2. Choose profile **apk** → **Keystore: Manage everything needed to build your project** → **Download existing keystore**.
    3. Keep the `.jks` file and the passwords it prints in your password manager. **Never commit them.**
@@ -507,6 +565,7 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
    4. Don't create the release by hand in GitHub's Releases page. The workflow creates it, and would fail if it already exists.
 8. **Optional, when ready:**
    - **Codeberg mirror:** the steps in docs/release/mirrors.md, section 2.
+   - **Internet Archive mirror:** the steps in docs/release/mirrors.md, section 3. It needs two secrets and three variables.
    - **TestFlight public link:** once Apple approves the first external build, set the repository variable `TESTFLIGHT_PUBLIC_LINK` (Settings → Secrets and variables → Actions → Variables), and releases will include it.
 
 **Verified:**

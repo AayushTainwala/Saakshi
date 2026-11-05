@@ -1,8 +1,13 @@
 name: Native build
 
 # Compiles the app with its local Expo modules (Kotlin and Swift) on GitHub's runners, because cloud
-# sessions can't reach Android's or Apple's build tools. Debug builds only, unsigned; releases are
-# Stream D's EAS pipeline.
+# sessions can't reach Android's or Apple's build tools. Every run also uploads two test builds, with
+# the JavaScript bundled in so no development server is needed (docs/BUILD_HANDOFF.md, "How to try a
+# build on your Mac"):
+# - Saakshi-<sha>-android-emulator.apk: release build signed with the public debug key, with the
+#   GitHub APK's flags (SMS auto-send on). For emulators and test phones only; never publish it.
+# - Saakshi-<sha>-ios-simulator.zip: Release build of Saakshi.app for the iOS Simulator, unsigned.
+# Real releases are the EAS pipeline in release.yml.
 
 on:
   workflow_dispatch:
@@ -15,6 +20,10 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/native-build.yml'
+
+env:
+  # On a pull request GITHUB_SHA is GitHub's merge commit; name the builds after the branch's commit.
+  COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
 
 concurrency:
   group: native-build-${{ github.ref }}
@@ -34,9 +43,12 @@ jobs:
       - run: modules/saakshi-evidence/verify/verify-hashing.sh 1024
 
   android:
-    name: Android debug build
+    name: Android emulator build
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
+    env:
+      SAAKSHI_CHANNEL: github
+      SAAKSHI_SMS_AUTOSEND: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -54,12 +66,25 @@ jobs:
         # Compiler errors are also raised as annotations, so they can be read without the log.
         run: |
           set +e
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
           status=${PIPESTATUS[0]}
           grep -E '^e: |error: |What went wrong' -A2 build.log | head -40 | while IFS= read -r line; do
             echo "::error::${line}"
           done
-          exit $status
+          exit "$status"
+      - name: Name the APK
+        id: apk
+        run: |
+          set -euo pipefail
+          apk="Saakshi-${COMMIT::7}-android-emulator.apk"
+          mv android/app/build/outputs/apk/release/app-release.apk "$apk"
+          echo "file=$apk" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          path: ${{ steps.apk.outputs.file }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
 
   ios:
     name: iOS simulator build
@@ -80,10 +105,25 @@ jobs:
         working-directory: ios
         run: |
           set +e
-          xcodebuild -workspace Saakshi.xcworkspace -scheme Saakshi -configuration Debug \
+          xcodebuild -workspace Saakshi.xcworkspace -scheme Saakshi -configuration Release \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO build > build.log 2>&1
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build > build.log 2>&1
           status=$?
           tail -200 build.log
           grep -E 'error: ' build.log | head -40 | while IFS= read -r line; do echo "::error::${line}"; done
-          exit $status
+          exit "$status"
+      - name: Zip the app
+        id: app
+        run: |
+          set -euo pipefail
+          app=ios/build/Build/Products/Release-iphonesimulator/Saakshi.app
+          [ -f "$app/main.jsbundle" ] || { echo "::error::The JavaScript bundle is missing from Saakshi.app."; exit 1; }
+          zip="Saakshi-${COMMIT::7}-ios-simulator.zip"
+          ditto -c -k --keepParent "$app" "$zip"
+          echo "file=$zip" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          path: ${{ steps.app.outputs.file }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
