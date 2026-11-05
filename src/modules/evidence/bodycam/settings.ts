@@ -1,14 +1,17 @@
 import { File, Paths } from 'expo-file-system';
 
 export type BodyCamSettings = {
-  /** The unlock buttons have been shown and acknowledged once. */
-  taught: boolean;
+  /**
+   * The user has unlocked with volume-up twice in the practice step, which Start waits for (fix
+   * round 1, group 2). The old `taught` tick was for volume-down, so it doesn't count.
+   */
+  practised: boolean;
   quality: 720 | 1080;
   /** Android 13+: the notification permission has been asked for once (spec: first start only). */
   notificationsAsked: boolean;
 };
 
-export const defaultBodyCamSettings: BodyCamSettings = { taught: false, quality: 720, notificationsAsked: false };
+export const defaultBodyCamSettings: BodyCamSettings = { practised: false, quality: 720, notificationsAsked: false };
 
 function file(): File {
   return new File(Paths.document, 'evidence', 'bodycam.json');
@@ -20,7 +23,7 @@ export function loadBodyCamSettings(): BodyCamSettings {
     if (!f.exists) return defaultBodyCamSettings;
     const raw = JSON.parse(f.textSync()) as Partial<BodyCamSettings>;
     return {
-      taught: raw.taught === true,
+      practised: raw.practised === true,
       quality: raw.quality === 1080 ? 1080 : 720,
       notificationsAsked: raw.notificationsAsked === true,
     };

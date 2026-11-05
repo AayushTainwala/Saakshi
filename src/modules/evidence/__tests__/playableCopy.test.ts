@@ -86,7 +86,7 @@ describe('playable MP4 copy of an Android .ts video', () => {
     expect(original.capture.rotationDegrees).toBe(90);
     expect(record).toMatchObject({
       type: 'saakshi.evidence.copy',
-      version: '0.3',
+      version: '0.4',
       session: id,
       original: { recordId: original.id, recordSha256: video.recordSha256, fileName: '0000-video.ts', fileSha256: original.file.sha256 },
       method: { name: 'remux-mpegts-to-mp4', reencoded: false, rotationDegrees: 90 },

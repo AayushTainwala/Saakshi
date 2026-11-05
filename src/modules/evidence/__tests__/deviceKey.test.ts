@@ -27,7 +27,7 @@ describe('mergeDeviceKey', () => {
     const file = mergeDeviceKey(androidKey, null, new Date('2026-10-20T08:59:40.511Z'));
     expect(file).toEqual({
       type: 'saakshi.device-key',
-      version: '0.3',
+      version: '0.4',
       keyId: 'k1',
       algorithm: 'ES256',
       publicKeySpki: 'QUJD',

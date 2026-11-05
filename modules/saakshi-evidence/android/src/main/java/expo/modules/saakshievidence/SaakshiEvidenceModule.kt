@@ -18,16 +18,16 @@ class SaakshiEvidenceModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("SaakshiEvidence")
 
-    Events("onRecorderReady", "onRecordingStarted", "onRecordingClosed", "onRecorderError", "onVolumeDown", "onBodyCamStopped")
+    Events("onRecorderReady", "onRecordingStarted", "onRecordingClosed", "onRecorderError", "onVolumeUp", "onBodyCamStopped")
 
     OnCreate {
       CameraRecorder.listener = { name, body -> sendEvent(name, body) }
-      VolumeKeys.onVolumeDown = { sendEvent("onVolumeDown", emptyMap<String, Any>()) }
+      VolumeKeys.onVolumeUp = { sendEvent("onVolumeUp", emptyMap<String, Any>()) }
     }
 
     OnDestroy {
       CameraRecorder.listener = null
-      VolumeKeys.onVolumeDown = null
+      VolumeKeys.onVolumeUp = null
     }
 
     // Body-cam mode: recording in a foreground service, so it carries on with the screen off.
@@ -68,7 +68,7 @@ class SaakshiEvidenceModule : Module() {
       }
     }
 
-    // Volume-down presses while body-cam mode's lock screen shows (the screen is on, dimmed).
+    // Volume-up presses while body-cam mode's lock screen or unlock practice shows (the screen is on).
     AsyncFunction("volumeKeysStart") {
       appContext.currentActivity?.let { VolumeKeys.enable(it) }
     }.runOnQueue(Queues.MAIN)

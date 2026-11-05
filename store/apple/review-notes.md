@@ -43,7 +43,7 @@ Source code: https://github.com/AayushTainwala/Saakshi
 
 ```text
 BODY-CAM MODE AND BACKGROUND AUDIO
-In body-cam mode the user wears the phone on the chest and records with the screen dark and touch locked. While the app is on screen, video and sound are recorded together in one file. If the user leaves the app or locks the phone, iOS stops the video; the app keeps recording sound only (background audio mode, started while the app was on screen) so the sound has no gap, and the orange indicator shows. Video with sound starts again when the user returns. The app warns about this before recording, and logs every gap in the record. Try it: Record tab, Body-cam mode, Start; press volume down twice to unlock.
+In body-cam mode the user wears the phone on the chest and records with the screen dark and touch locked. While the app is on screen, video and sound are recorded together in one file. If the user leaves the app or locks the phone, iOS stops the video; the app keeps recording sound only (background audio mode, started while the app was on screen) so the sound has no gap, and the orange indicator shows. Video with sound starts again when the user returns. The app warns about this before recording, and logs every gap in the record. Try it: Record tab, Body-cam mode, Start; press volume up twice to unlock (the app asks you to practise this once before the first start).
 ```
 
 ## Optional: contacts permission (if the build asks for it)

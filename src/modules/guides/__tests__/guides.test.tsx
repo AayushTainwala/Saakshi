@@ -68,8 +68,8 @@ describe('guide content', () => {
   it('teaches the body-cam unlock buttons in both languages', () => {
     const bodyCam = findGuide('chest-mount')!.sections.find((s) => s.id === 'body-cam')!;
     const all = bodyCam.blocks.flatMap(texts);
-    expect(all.some((t) => t.en.includes('press volume-down twice'))).toBe(true);
-    expect(all.some((t) => t.hi.includes('वॉल्यूम कम करने वाला बटन दो बार दबाएँ'))).toBe(true);
+    expect(all.some((t) => t.en.includes('press volume-up twice'))).toBe(true);
+    expect(all.some((t) => t.hi.includes('वॉल्यूम बढ़ाने वाला बटन दो बार दबाएँ'))).toBe(true);
   });
 
   it('credits EFF in the guide and in THIRD_PARTY_NOTICES.md', () => {

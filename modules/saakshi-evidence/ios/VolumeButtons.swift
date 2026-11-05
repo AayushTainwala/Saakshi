@@ -2,18 +2,24 @@ import AVFoundation
 import AVKit
 import UIKit
 
-/// Reads volume-down presses for body-cam mode's lock screen.
+/// Reads volume-up presses for body-cam mode's lock screen and its unlock practice: volume-up twice
+/// unlocks (owner's decision of 5 Nov 2026).
 ///
-/// - iOS 17.2 and later: `AVCaptureEventInteraction`, Apple's API for camera apps. Volume down is
-///   a "primary" capture event (as are the Action button and Camera Control); volume up is
-///   "secondary" and is swallowed here. Events arrive only while the app is on screen and actively
-///   using the camera. While the interaction is enabled, the buttons don't change the volume.
+/// - iOS 17.2 and later: `AVCaptureEventInteraction`, Apple's API for camera apps. Apple (WWDC 2025,
+///   session 253): "Primary actions are triggered by the volume down button, Action button, and the
+///   Camera Control, while the secondary action is triggered by the volume up button", and from
+///   iOS 26 AirPods stem clicks are primary too. A capture event carries no way to tell those
+///   primary buttons apart, so only the secondary event, volume-up, counts. Primary events are taken
+///   and ignored, so while the lock shows, volume-down, Camera Control, the Action button and AirPods
+///   do nothing. Events arrive only while the app is on screen and actively using the camera, and
+///   the buttons don't change the volume while the interaction is enabled.
 /// - Earlier iOS: no public API reads the buttons. The fallback watches the system output volume
-///   and treats each decrease as a press, so it doesn't fire when the volume is already at zero.
+///   and treats each increase as a press, so it doesn't fire when the volume is already at its
+///   highest, and the presses do change the volume.
 final class VolumeButtons: NSObject {
   static let shared = VolumeButtons()
 
-  var onVolumeDown: (() -> Void)?
+  var onVolumeUp: (() -> Void)?
   private var interaction: UIInteraction?
   private weak var host: UIView?
   private var observation: NSKeyValueObservation?
@@ -23,10 +29,12 @@ final class VolumeButtons: NSObject {
     guard interaction == nil && observation == nil else { return }
     if #available(iOS 17.2, *), let view = Self.keyWindow()?.rootViewController?.view {
       let capture = AVCaptureEventInteraction(
-        primary: { [weak self] event in
-          if event.phase == .ended { self?.onVolumeDown?() }
+        primary: { _ in
+          // Volume-down, Camera Control, the Action button or AirPods: deliberately nothing.
         },
-        secondary: { _ in }
+        secondary: { [weak self] event in
+          if event.phase == .ended { self?.onVolumeUp?() }
+        }
       )
       view.addInteraction(capture)
       interaction = capture
@@ -34,7 +42,7 @@ final class VolumeButtons: NSObject {
     } else {
       observation = AVAudioSession.sharedInstance().observe(\.outputVolume, options: [.old, .new]) {
         [weak self] _, change in
-        if let old = change.oldValue, let new = change.newValue, new < old { self?.onVolumeDown?() }
+        if let old = change.oldValue, let new = change.newValue, new > old { self?.onVolumeUp?() }
       }
     }
   }
@@ -53,6 +61,59 @@ final class VolumeButtons: NSObject {
       .compactMap { $0 as? UIWindowScene }
       .flatMap { $0.windows }
       .first { $0.isKeyWindow }
+  }
+}
+
+/// The unlock practice on the body-cam start screen. iOS sends button presses to an app only while
+/// it actively uses the camera, so on iOS 17.2 and later the practice runs the camera (nothing is
+/// recorded or kept) while it waits for the presses. Earlier iOS reads the volume level, which needs
+/// an active audio session instead.
+enum UnlockPractice {
+  private static let queue = DispatchQueue(label: "in.aayushtainwala.saakshi.unlock-practice")
+  private static var session: AVCaptureSession?
+
+  /// Calls back on the main thread once the buttons can be read.
+  static func start(completion: @escaping () -> Void) {
+    queue.async {
+      if session == nil, !BodyCamRecorder.shared.isRunning {
+        if #available(iOS 17.2, *) {
+          let capture = AVCaptureSession()
+          capture.automaticallyConfiguresApplicationAudioSession = false
+          capture.beginConfiguration()
+          if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+            let input = try? AVCaptureDeviceInput(device: device), capture.canAddInput(input)
+          {
+            capture.addInput(input)
+          }
+          // Frames go nowhere: the output only makes the camera run.
+          let output = AVCaptureVideoDataOutput()
+          if capture.canAddOutput(output) { capture.addOutput(output) }
+          capture.commitConfiguration()
+          capture.startRunning()
+          session = capture
+        } else {
+          let audio = AVAudioSession.sharedInstance()
+          try? audio.setCategory(.ambient, options: [.mixWithOthers])
+          try? audio.setActive(true)
+        }
+      }
+      DispatchQueue.main.async {
+        VolumeButtons.shared.start()
+        completion()
+      }
+    }
+  }
+
+  /// Calls back on the main thread once the camera is off again.
+  static func stop(completion: @escaping () -> Void) {
+    DispatchQueue.main.async {
+      VolumeButtons.shared.stop()
+      queue.async {
+        session?.stopRunning()
+        session = nil
+        DispatchQueue.main.async { completion() }
+      }
+    }
   }
 }
 

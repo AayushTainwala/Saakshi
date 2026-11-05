@@ -2,7 +2,7 @@ import { BUNDLE_TYPE, FORMAT_VERSION } from '../constants';
 import type { DeviceKeyFile } from '../integrity/deviceKey';
 import type { EvidenceRecord } from '../integrity/record';
 import { formatIST } from '../ui/format';
-import type { SessionState } from '../types';
+import type { EndReason, SessionState } from '../types';
 
 /** A sealed file as it goes into a bundle. */
 export type BundledRecord = {
@@ -54,10 +54,14 @@ export function buildManifest(
   };
 }
 
-const END_REASONS: Record<string, string> = {
+/** Every end reason in plain words, for the hash report. A new reason without words fails `tsc`. */
+const END_REASONS: Record<EndReason, string> = {
   stopped: 'stopped by the user',
   'piece-complete': 'piece complete; recording continued in the next file',
-  'app-left': 'video stopped because the app left the screen (iPhone)',
+  'app-left':
+    'video stopped because Saakshi left the screen or the phone was locked (iPhone records video only while the app is on screen); sound carried on in the next file',
+  'camera-in-use': 'iPhone stopped the camera because another app took it',
+  'system-pressure': 'iPhone stopped the camera because the phone was under strain, for example too hot',
   'camera-lost': 'the camera was taken by the system or another app',
   'low-battery': 'stopped and saved by the app at 3% battery',
   'audio-interrupted': 'the phone stopped sound recording (for example, for a phone call)',
@@ -66,6 +70,11 @@ const END_REASONS: Record<string, string> = {
   interrupted: 'cut off (crash or power-off); sealed when the app next opened',
   error: 'camera error',
 };
+
+/** A record's end reason in plain words; a reason from a newer format is shown as it is. */
+export function describeEndReason(reason: string): string {
+  return (END_REASONS as Record<string, string>)[reason] ?? reason;
+}
 
 function groupDigits(n: number): string {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -125,7 +134,7 @@ export function hashReport(
       `${String(record.sequence).padStart(4, '0')}  media/${mediaFile}`,
       `      Recorded:        ${formatIST(capture.startedAt, true)} to ${formatIST(capture.endedAt, true)}`,
       ...(capture.endReason
-        ? [`      Ended:           ${END_REASONS[capture.endReason] ?? capture.endReason}${record.interrupted ? ' (end time is the file\'s last write)' : ''}`]
+        ? [`      Ended:           ${describeEndReason(capture.endReason)}${record.interrupted ? ' (end time is the file\'s last write)' : ''}`]
         : []),
       `      Place:           ${formatPlace(record)}`,
       `      Size:            ${groupDigits(file.size)} bytes`,
