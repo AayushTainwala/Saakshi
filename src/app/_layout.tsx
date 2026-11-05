@@ -47,7 +47,13 @@ function ThemedStack() {
   return (
     <ThemeProvider value={navigationTheme}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        {/*
+          Set here, before the screen is pushed, rather than from inside it: body-cam must never be
+          left by a swipe while it records (fix round 1, C2). BodyCamScreen also refuses removal.
+        */}
+        <Stack.Screen name="bodycam" options={{ presentation: 'card', gestureEnabled: false, fullScreenGestureEnabled: false }} />
+      </Stack>
     </ThemeProvider>
   );
 }

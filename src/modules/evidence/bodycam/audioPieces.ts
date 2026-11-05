@@ -8,12 +8,13 @@ import type { CaptureMode, EndReason, LocationSnapshot } from '../types';
 type Piece = { recorder: AudioRecorder; uri: string; startedAt: Date; index: number; marker: string; gapBeforeMs: number | null };
 
 /**
- * iPhone body-cam sound, and bug mode's sound on iPhone (E8): expo-audio records fixed pieces
- * with background recording on, so sound carries on when the user leaves the app or locks the
- * phone (video can't). Each next piece starts
- * before the previous one stops, so there is no silence between them; the overlap shows as a
- * negative `gapBeforeMs`. That takes two recorders, used in turn. If a new piece can't start (iOS may refuse while a call holds the
- * microphone), the current one keeps running and the next attempt comes a piece later.
+ * Bug mode's sound on iPhone (E8): expo-audio records fixed pieces with background recording on,
+ * so sound carries on with the phone locked. Each next piece starts before the previous one
+ * stops, so there is no silence between them; the overlap shows as a negative `gapBeforeMs`. That
+ * takes two recorders, used in turn. If a new piece can't start (iOS may refuse while a call holds
+ * the microphone, or in the background), the current one keeps running and the next attempt comes
+ * a piece later. (Body-cam mode on iPhone no longer uses this: its own recorder,
+ * BodyCamRecorder.swift, puts video and sound in one file.)
  */
 export class AudioPieces {
   private current: Piece | null = null;

@@ -6,6 +6,7 @@ import type {
   KeyAttestation,
   NativeDeviceKey,
   RecorderOptions,
+  RecordingClosedEvent,
   SaakshiEvidenceEvents,
 } from './SaakshiEvidence.types';
 
@@ -28,9 +29,16 @@ declare class SaakshiEvidenceModule extends NativeModule<SaakshiEvidenceEvents> 
   recorderStart(options: RecorderOptions): Promise<void>;
   recorderStop(): Promise<void>;
 
-  /** Android: starts body-cam recording in a foreground service (camera and microphone). */
+  /**
+   * Starts body-cam recording. Android: in a foreground service (camera and microphone). iPhone:
+   * the app's own recorder, with video and sound in one file while the app is on screen.
+   */
   bodyCamStart(options: BodyCamOptions): Promise<void>;
-  bodyCamStop(): Promise<void>;
+  /**
+   * Stops body-cam recording. iPhone: resolves once every file is closed, with the
+   * `onRecordingClosed` events of the files the stop closed. Android: resolves with nothing.
+   */
+  bodyCamStop(): Promise<RecordingClosedEvent[] | null | undefined>;
   bodyCamRunning(): boolean;
   /** Android: MP4 copy of an MPEG-TS file without re-encoding; returns the copy's file:// URI. */
   remuxToMp4(input: string, output: string, rotationDegrees: number | null): Promise<string>;

@@ -2,13 +2,61 @@
 
 The pickup file for build sessions. Each stream keeps its own section current: status, what was done, what's next, questions for the owner. Read [CLAUDE.md](../CLAUDE.md) first.
 
-## Where things stand (21 Oct 2026)
+## Where things stand (21 Oct 2026; fix round 1 from 5 Nov)
 
 - **Merged into `main`:** #1–#9. That is R1 and R2 as planned, apart from E3 and E7, plus the law checks against the Gazette of India (#9). Typecheck, lint, all tests and both native builds pass on `main`.
 - **Pace:** no 24-hour deadline (owner, 21 Oct). The next goal is a beta for about 50 testers on iPhone and Android; see BUILD_PLAN.md, section 1, "Road to the beta".
 - **First Release run (21 Oct, iOS only):** the owner set up iOS credentials and the App Store Connect API key with EAS (role App Manager). The EAS build succeeded; the **Submit to TestFlight step failed**. Its log is visible only to someone signed in to GitHub, so the cause isn't known yet. The owner is submitting that build from his Mac with `eas submit --platform ios --latest`. **Stream D:** find the cause and fix the workflow.
 - **Owner's phone testing:** round 1 on iPhone through TestFlight, with a checklist and his notes on a claude.ai page (https://claude.ai/artifact/BQU34AZ76SbRZpBKE5iyc6). Android follows when his phone arrives (about 23 Oct). The review session turns his notes into fix work for the streams.
 - **Streams:** each opens pull requests into `main`; the owner or a review session merges them.
+
+## Fix round 1 (iPhone test round 1, A–C)
+
+The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05-test-round-1-fixes.md) works through its groups in order, one branch and pull request per group, each from the latest `main`. Questions are in "Owner questions" below, marked "(Fix round 1)".
+
+| Group | State |
+|---|---|
+| 1. Body-cam: back swipe, and sound in the video (C2, C6) | Built: https://github.com/AayushTainwala/Saakshi/pull/16 (branch `claude/determined-goodall-wl89xn`), with test steps for the owner. Not yet run on a phone. |
+| 2. Body-cam: other fixes (C1–C3) | Not started |
+| 2a. Body-cam: one continuous file, with checkpoints | Not started (built separately from group 1) |
+| 3–9 | Not started |
+
+### Group 1: what was fixed
+
+1. **Nothing leaves body-cam while it records.** I couldn't pin down from the code alone why the left-edge swipe got through `gestureEnabled: false`. The likeliest cause is that the option was set from inside the screen, after the screen had been pushed. The fix covers every route out, whatever the cause:
+   - the root layout turns the back gesture off for the body-cam screen before it opens (`src/app/_layout.tsx`), including iOS 26's full-screen swipe;
+   - while recording, the screen refuses to be removed (`usePreventRemove` from expo-router, which also tells iOS not to let the native back gesture dismiss it), hides its header and back button, and swallows Android's back button. A swipe or back press shows "Stop and save first" (or the lock message, if locked);
+   - leaving is allowed again only after Stop has saved everything;
+   - if the screen were ever removed anyway, the recording is stopped and the session finished as one record, instead of being left open.
+2. **Body-cam video on iPhone now has its sound in the same file.** The iPhone side of body-cam has its own recorder (`modules/saakshi-evidence/ios/BodyCamRecorder.swift`), in place of expo-camera (muted) plus expo-audio:
+   - the camera (no microphone input) and one microphone stream (`AVAudioEngine`, started on screen when you press Start) feed `AVAssetWriter`;
+   - while Saakshi is on screen, each one-minute video piece is a `.mov` with H.264 video and AAC sound, with a movie fragment every 10 seconds, so it is cut-off safe like the evidence camera's;
+   - iOS can't write a video file in the background (Apple's `AVAssetWriter.h`: a writer still writing when the app goes into the background fails; see [this Apple forum reply](https://developer.apple.com/forums/thread/672056)). So the video piece is closed the moment the app goes into the background, inside a background task that gives it time to finish;
+   - from then on the same sound goes into sound-only `.m4a` pieces, written by `AVAudioFile`, which works in the background. The first starts half a second before the video's sound ended, or up to 11 seconds before if the video file didn't close properly (such a file keeps only its complete 10-second fragments). When you come back, video with sound starts again and the sound-only piece ends half a second later. So the sound has no gap, and the picture's gap is in the next video clip's record;
+   - a phone call: a sound-only piece ends; a video piece carries on without sound, and ends when sound comes back, so the next piece has sound again;
+   - every file has its crash-recovery marker and its signed record in the same session, as before.
+
+   An independent review of the recorder (before your test) found and I fixed: the background-writing failure above; starting body-cam during a call left the whole session without sound (the microphone is now retried until it starts); a stale microphone format after a route change (a fresh engine is made each time); extra tiny files when sound came back; and smaller timing errors in the gaps recorded.
+
+   Bundle format **0.3** (`docs/spec/evidence-bundle.md`, section 3, step 8): two new end reasons, `video-resumed` (a sound-only piece ended because video came back) and `sound-resumed` (a video piece recorded without sound, after a phone call for example, ended because sound came back). `tools/verify-bundle.mjs` reads 0.1 to 0.3.
+
+### Group 1: what I found on sharing the microphone (research)
+
+The brief asked whether iOS lets the camera and the background recorder share the microphone, or whether a hand-over is needed. What Apple documents:
+- The camera can't be used in the background: iOS interrupts it with [`videoDeviceNotAvailableInBackground`](https://developer.apple.com/documentation/avfoundation/avcapturesession/interruptionreason/videodevicenotavailableinbackground).
+- A capture session uses the app's shared audio session by default ([`usesApplicationAudioSession`](https://developer.apple.com/documentation/avfoundation/avcapturesession/usesapplicationaudiosession)) and, by default, reconfigures it for its own recording and does not restore it afterwards ([`automaticallyConfiguresApplicationAudioSession`](https://developer.apple.com/documentation/avfoundation/avcapturesession/automaticallyconfiguresapplicationaudiosession)). expo-camera leaves both at their defaults.
+- Starting a recording from the background can be refused: [`AVAudioSession.ErrorCode.cannotStartRecording`](https://developer.apple.com/documentation/coreaudiotypes/avaudiosession/errorcode/cannotstartrecording) "usually occurs when an app starts a mixable recording from the background". Body-cam's sound is mixable, so that other apps' music doesn't stop it.
+
+What Apple does not document is whether a capture session with a microphone input and a separate recorder in the same app can both record at once; developer-forum reports disagree, and I couldn't test it here. A hand-over would have to start the sound recorder at the moment the app leaves the screen, which is already the background, where iOS may refuse it. So I built neither: the camera has no microphone input, and a single microphone stream, started on screen, is written into the video file or the sound-only file. There is no hand-over of the microphone and no second recorder, and the only gap is in the picture while you are away. Whether all of this behaves as designed needs your next phone test.
+
+### Group 1: not verified
+
+- Nothing has run on a phone. The Swift compiles only in the Native build workflow.
+- Sound carrying on in the background: the old build relied on it too (expo-audio), but confirm it with the phone locked for several minutes.
+- After a phone call that ends while Saakshi is in the background, sound may not restart until you return to the app (the mixable rule above). The recorder then tries as a non-mixable recording, which it stays until Stop, so other apps' sound could then interrupt it; untested.
+- Whether the background task gives the video file enough time to finish when the phone locks. If not, the file's record says `error`, and the sound-only file reaches 11 seconds back to cover it.
+- iOS 26's full-screen back swipe is blocked by the same settings; untested.
+- Audio and video timing in the files (lip sync), and the half-second overlaps, need checking by playing the files.
 
 ## Owner questions
 
@@ -33,6 +81,7 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [x] (Stream B) **Supabase region for live location (S3).** *Answered 20 Oct:* Mumbai (`ap-south-1`). Project `saakshi-live` created there.
 - [x] (Stream B) **Supabase plan for live location.** `saakshi-live` is in the "AT's Desk" organisation. Supabase pauses inactive projects on its free plan, which would break live links without warning. *Answered (owner's review of R2):* free while testing; the plan must be reviewed before R2 goes public. On the release checklist below.
 - [x] (Stream B, for Stream D) **Apple Team ID.** The widget extension needs `ios.appleTeamId` in `app.json`. *Answered (owner's review of R2):* `5NYAUT5C56` (not secret); set in `app.json`.
+- [x] (Fix round 1) **Camera picture on the iPhone body-cam screen.** *Withdrawn 5 Nov:* the old iPhone body-cam drew the camera's live picture under its controls, but behind an 85%-black layer, so it couldn't really be seen (the owner never noticed it). The new recorder draws no picture, as Android never did. Nothing changes for the user.
 - [ ] (Stream C) **Helpline list updates.** The Help tab fetches `helplines/helplines.json` from raw.githubusercontent.com each time it opens (a plain GET; nothing of the user's is sent, but GitHub sees the phone's IP address). Keep it automatic, or only on a "Check for updates" tap? And should the list be signed, so that a compromised `main` branch can't change numbers on every phone? Today it is only schema-checked.
 - [ ] (Stream C) **Lawyers and medics list.** The schema (`src/modules/helplines/schema.ts`, `helplines/README.md`) shows name, phone, city, state and languages, and records the registration number, consent date and an expiry (`listedUntil`) in the public file. Is publishing the registration number right, or should it be checked and kept off GitHub? Who collects the written consent, and where is it kept?
 - [ ] (Stream C) **"What police may ask of a phone"** (SPEC G5) is left out of the guide: `docs/research/law.md` has nothing on demands to unlock a phone or give a passcode. It needs its own research from statutes and judgments first. Shall I do that next?
@@ -137,16 +186,14 @@ None of it has run on a phone yet.
   - Some makers' battery managers (Xiaomi, Oppo, Vivo and others) may stop background services. Test.
   - During a phone call Android may give the microphone to the call and silence other apps' recording; video continues. Not yet tested.
   - Google Play requires a declaration for camera and microphone foreground services (Stream D).
-- **iPhone:**
+- **iPhone** (rebuilt in fix round 1, group 1: see "Fix round 1" above; the old expo-camera and expo-audio design is gone from body-cam):
   - Apple allows video only while the app is on screen, as the spec says. Video pieces stop with `endReason: "app-left"` when the app leaves the screen, and a new clip starts on return; `gapBeforeMs` in the first piece's record gives the gap.
   - The screen warns about this before Start, and again whenever it is unlocked. iOS gives no notice before the user leaves an app, so a warning at the moment of leaving isn't possible.
-  - Sound is recorded separately (expo-audio, background recording, `.m4a` pieces). Each piece starts before the last stops, so there is no silence, and records show a small negative `gapBeforeMs` for the overlap.
-  - A phone call interrupts sound recording. That piece ends `audio-interrupted`, and a new piece starts at the next minute if iOS allows it, which needs testing.
-  - Video and sound are separate files in the same session, matched by their times.
+  - While the app is on screen, each video piece has its sound in the same file. Sound-only `.m4a` pieces are written only while video can't record.
   - There is no way to open the Low Power Mode setting directly, so the app explains where it is. On Android the button opens Battery Saver settings.
 - **Gaps between pieces:**
   - Android: about the time to stop one `MediaRecorder` and start the next.
-  - iPhone video: the time between one `recordAsync` ending and the next starting.
+  - iPhone: none between pieces (one writer ends on the frame where the next begins); the gap in the picture while the app is away is in the next video clip's `gapBeforeMs`.
   - Both are recorded in `gapBeforeMs` and are untested on phones.
 - **For Stream C:** the chest-mount guide (G4) should teach the unlock (volume down, twice). The lock message deliberately doesn't name the buttons.
 - **Permissions:** `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, `SYSTEM_ALERT_WINDOW` and `VIBRATE` come from Expo's template and no feature uses them. All four are now blocked in every Android build through `ALWAYS_BLOCKED` in `app.config.ts`; Stream D had already blocked the first three, and I added `VIBRATE`, which nothing in the app uses and no library declares. `POST_NOTIFICATIONS` stays, for body-cam's notice.

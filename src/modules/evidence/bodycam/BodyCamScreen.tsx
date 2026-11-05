@@ -1,11 +1,10 @@
 import SaakshiEvidence from '@native/saakshi-evidence';
-import { RecordingPresets, useAudioRecorder } from 'expo-audio';
 import { useLowPowerMode } from 'expo-battery';
-import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { router } from 'expo-router';
+import { router, useNavigation, usePreventRemove } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BackHandler, Linking, PermissionsAndroid, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,7 +24,9 @@ import { androidBodyCam, type BodyCamEngine, iosBodyCam } from './engine';
 import { type BodyCamSettings, loadBodyCamSettings, saveBodyCamSettings } from './settings';
 
 const KEEP_AWAKE_TAG = 'saakshi-bodycam';
-const OWN_RECORDER = Platform.OS === 'android' && !!SaakshiEvidence?.recorderSupported();
+/** Body-cam needs the app's own recorder: Android's CameraRecorder, or iPhone's BodyCamRecorder. */
+const RECORDER_AVAILABLE =
+  Platform.OS === 'android' ? !!SaakshiEvidence?.recorderSupported() : Platform.OS === 'ios' && !!SaakshiEvidence;
 const dark = palettes.dark;
 
 type Phase = 'setup' | 'starting' | 'running' | 'stopping';
@@ -42,13 +43,11 @@ function formatElapsed(ms: number): string {
 /** Body-cam mode (spec B1–B4). */
 export function BodyCamScreen() {
   const { t } = useTranslation('record');
+  const navigation = useNavigation();
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const lowPowerMode = useLowPowerMode();
   const location = useLatestLocation();
-  // iPhone sound pieces: two recorders, used in turn so each piece starts before the last stops.
-  const recorderA = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const recorderB = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   const [settings, setSettingsState] = useState<BodyCamSettings>(loadBodyCamSettings);
   const setSettings = (next: BodyCamSettings) => {
@@ -59,10 +58,12 @@ export function BodyCamScreen() {
   const [phase, setPhase] = useState<Phase>('setup');
   const [locked, setLocked] = useState(false);
   const [message, setMessage] = useState(false);
+  const [stopFirst, setStopFirst] = useState(false);
+  const [problem, setProblem] = useState(false);
+  const [startFailed, setStartFailed] = useState(false);
   const [startedAt, setStartedAt] = useState(0);
   const [notificationsOff, setNotificationsOff] = useState(false);
   const [now, setNow] = useState(0);
-  const camera = useRef<CameraView>(null);
   const engine = useRef<BodyCamEngine | null>(null);
   const session = useMemo(() => createEvidenceSession(), []);
   const [, refresh] = useReducer((n: number) => n + 1, 0);
@@ -73,6 +74,36 @@ export function BodyCamScreen() {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [phase]);
+
+  // ---- Nothing leaves this screen while body-cam records (fix round 1, C2) --------------------
+  //
+  // One body-cam session is one record from Start to Stop. While it records, the back swipe
+  // (iPhone), the back button (Android) and every navigation action are refused; the header with
+  // its back button is hidden. The only way out is Stop.
+  const recording = phase !== 'setup';
+  const disablePrevention = usePreventRemove(recording, () => {
+    if (locked) setMessage(true);
+    else setStopFirst(true);
+  });
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerShown: !recording, gestureEnabled: false, fullScreenGestureEnabled: false });
+  }, [navigation, recording]);
+
+  useEffect(() => {
+    if (!recording) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!locked) setStopFirst(true);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [recording, locked]);
+
+  useEffect(() => {
+    if (!stopFirst) return;
+    const timer = setTimeout(() => setStopFirst(false), LOCK_MESSAGE_MS);
+    return () => clearTimeout(timer);
+  }, [stopFirst]);
 
   // ---- Lock and unlock -------------------------------------------------------------------------
 
@@ -104,26 +135,6 @@ export function BodyCamScreen() {
 
   // ---- Start and stop --------------------------------------------------------------------------
 
-  const begin = useCallback(async () => {
-    const common = { session, store: fileLocker, location, quality: settings.quality };
-    const next = OWN_RECORDER
-      ? androidBodyCam({
-          ...common,
-          notificationTitle: t('bodycam.notificationTitle'),
-          notificationText: t('bodycam.notificationText'),
-          notificationStop: t('bodycam.notificationStop'),
-        })
-      : iosBodyCam(camera, [recorderA, recorderB], common);
-    engine.current = next;
-    await activateKeepAwakeAsync(KEEP_AWAKE_TAG);
-    await next.start();
-    const at = Date.now();
-    setStartedAt(at);
-    setNow(at);
-    setPhase('running');
-    lock();
-  }, [location, lock, recorderA, recorderB, session, settings.quality, t]);
-
   /**
    * Android 13+: the recording notice (with its Stop button) needs the notification permission.
    * Ask the first time body-cam starts; if refused, record anyway and say where the notice is.
@@ -141,12 +152,35 @@ export function BodyCamScreen() {
   }, [settings]);
 
   const start = useCallback(async () => {
+    setStartFailed(false);
+    setPhase('starting');
     await checkNotifications().catch(() => undefined);
-    // iPhone records through expo-camera, which must be on screen and ready first.
-    if (OWN_RECORDER) void begin();
-    else setPhase('starting');
-  }, [begin, checkNotifications]);
-
+    const common = { session, store: fileLocker, location, quality: settings.quality };
+    try {
+      const next =
+        Platform.OS === 'android'
+          ? androidBodyCam({
+              ...common,
+              notificationTitle: t('bodycam.notificationTitle'),
+              notificationText: t('bodycam.notificationText'),
+              notificationStop: t('bodycam.notificationStop'),
+            })
+          : iosBodyCam({ ...common, onProblem: () => setProblem(true) });
+      await activateKeepAwakeAsync(KEEP_AWAKE_TAG);
+      await next.start();
+      engine.current = next;
+    } catch {
+      deactivateKeepAwake(KEEP_AWAKE_TAG);
+      setStartFailed(true);
+      setPhase('setup');
+      return;
+    }
+    const at = Date.now();
+    setStartedAt(at);
+    setNow(at);
+    setPhase('running');
+    lock();
+  }, [checkNotifications, location, lock, session, settings.quality, t]);
 
   const stop = useCallback(
     async (reason: EndReason = 'stopped') => {
@@ -157,16 +191,18 @@ export function BodyCamScreen() {
       await current?.stop(reason);
       await session.finish();
       deactivateKeepAwake(KEEP_AWAKE_TAG);
+      // The recording is over and saved: leaving the screen is allowed again.
+      disablePrevention();
       const id = session.id;
       if (id) router.replace({ pathname: '/record/[session]', params: { session: id } });
       else router.back();
     },
-    [session, unlock],
+    [disablePrevention, session, unlock],
   );
 
   // Android: stopped from the recording notice's Stop button.
   useEffect(() => {
-    if (!OWN_RECORDER || !SaakshiEvidence || phase !== 'running') return;
+    if (Platform.OS !== 'android' || !SaakshiEvidence || phase !== 'running') return;
     const subscription = SaakshiEvidence.addListener('onBodyCamStopped', () => void stop());
     return () => subscription.remove();
   }, [phase, stop]);
@@ -182,22 +218,17 @@ export function BodyCamScreen() {
   );
   useLowBattery(phase === 'running', onBattery);
 
-  // While recording, the back button never leaves the screen: unlock with the volume buttons,
-  // then use Stop.
-  useEffect(() => {
-    if (phase !== 'running' && phase !== 'starting') return;
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
-    return () => subscription.remove();
-  }, [phase]);
-
+  // If the screen goes away anyway, the recording still ends as one complete record.
   useEffect(
     () => () => {
-      if (engine.current) void engine.current.stop('stopped');
+      const current = engine.current;
+      engine.current = null;
+      if (current) void current.stop('stopped').then(() => session.finish());
       void SaakshiEvidence?.setScreenDimmed(false);
       void SaakshiEvidence?.volumeKeysStop();
       deactivateKeepAwake(KEEP_AWAKE_TAG);
     },
-    [],
+    [session],
   );
 
   // ---- Screens ---------------------------------------------------------------------------------
@@ -270,7 +301,14 @@ export function BodyCamScreen() {
           onChange={(value) => setSettings({ ...settings, quality: value === '1080' ? 1080 : 720 })}
         />
 
-        <Button variant="danger" label={t('bodycam.start')} disabled={!settings.taught} onPress={() => void start()} />
+        {startFailed ? <AppText color="danger">{t('bodycam.startFailed')}</AppText> : null}
+        {!RECORDER_AVAILABLE ? <AppText color="danger">{t('bodycam.unavailable')}</AppText> : null}
+        <Button
+          variant="danger"
+          label={t('bodycam.start')}
+          disabled={!settings.taught || !RECORDER_AVAILABLE}
+          onPress={() => void start()}
+        />
         {!settings.taught ? <AppText color="textMuted">{t('bodycam.ackFirst')}</AppText> : null}
       </Screen>
     );
@@ -281,18 +319,6 @@ export function BodyCamScreen() {
   return (
     <View style={styles.black}>
       <StatusBar hidden={locked} style="light" />
-      {Platform.OS === 'ios' && !OWN_RECORDER ? (
-        <CameraView
-          ref={camera}
-          style={StyleSheet.absoluteFill}
-          mode="video"
-          mute
-          videoQuality={settings.quality === 1080 ? '1080p' : '720p'}
-          onCameraReady={() => {
-            if (phase === 'starting') void begin();
-          }}
-        />
-      ) : null}
 
       {locked ? (
         <Pressable
@@ -313,9 +339,15 @@ export function BodyCamScreen() {
       ) : (
         <SafeAreaView style={styles.controls}>
           <AppText variant="title" style={{ color: dark.text }}>
-            {phase === 'stopping' ? t('bodycam.saving') : t('bodycam.recordingFor', { time: formatElapsed(now - startedAt) })}
+            {phase === 'running'
+              ? t('bodycam.recordingFor', { time: formatElapsed(now - startedAt) })
+              : phase === 'starting'
+                ? t('bodycam.starting')
+                : t('bodycam.saving')}
           </AppText>
           <AppText style={{ color: dark.textMuted }}>{t('bodycam.pieces', { count: pieces })}</AppText>
+          {stopFirst ? <AppText style={{ color: dark.warning }}>{t('bodycam.stopFirst')}</AppText> : null}
+          {problem ? <AppText style={{ color: dark.warning }}>{t('bodycam.recorderProblem')}</AppText> : null}
           {batteryNote ? <AppText style={{ color: dark.warning }}>{batteryNote}</AppText> : null}
           {notificationsOff ? <AppText style={{ color: dark.textMuted }}>{t('bodycam.notificationsOff')}</AppText> : null}
           {Platform.OS === 'ios' ? <AppText style={{ color: dark.warning }}>{t('bodycam.iosWarning')}</AppText> : null}

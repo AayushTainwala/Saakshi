@@ -62,8 +62,8 @@ export const chestMount: Guide = {
               hi: 'Android: स्क्रीन बंद होने पर भी, और कॉल लेते समय या दूसरे ऐप चलाते समय भी, रिकॉर्डिंग चलती रहती है।',
             },
             {
-              en: 'iPhone: video records only while Saakshi is on the screen. If you leave the app, or a call comes in, sound keeps recording and video starts again when you come back. Every gap is noted in the record.',
-              hi: 'iPhone: वीडियो तभी रिकॉर्ड होता है जब साक्षी स्क्रीन पर खुला हो। अगर आप ऐप से बाहर जाएँ या कॉल आए, तो आवाज़ रिकॉर्ड होती रहती है, और लौटने पर वीडियो फिर शुरू हो जाता है। हर रुकावट रिकॉर्ड में दर्ज होती है।',
+              en: 'iPhone: video records only while Saakshi is on the screen, with its sound in the same file. If you leave the app or lock the phone, sound keeps recording on its own, and video starts again, with sound, when you come back. A phone call pauses the sound. Every gap is noted in the record.',
+              hi: 'iPhone: वीडियो तभी रिकॉर्ड होता है जब साक्षी स्क्रीन पर खुला हो, और उसकी आवाज़ उसी फ़ाइल में रहती है। अगर आप ऐप से बाहर जाएँ या फ़ोन लॉक करें, तो आवाज़ अलग से रिकॉर्ड होती रहती है, और लौटने पर वीडियो आवाज़ के साथ फिर शुरू हो जाता है। फ़ोन कॉल के दौरान आवाज़ की रिकॉर्डिंग रुक जाती है। हर रुकावट रिकॉर्ड में दर्ज होती है।',
             },
             {
               en: 'Recording for a long time uses a lot of battery and storage. Carry a power bank and a short cable, free up space before you go, and keep the phone out of strong sun where you can, because a hot phone may stop recording.',

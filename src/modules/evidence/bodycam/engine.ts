@@ -1,14 +1,8 @@
 import SaakshiEvidence, { type RecordingClosedEvent } from '@native/saakshi-evidence';
-import type { AudioRecorder } from 'expo-audio';
-import type { CameraView } from 'expo-camera';
-import type { RefObject } from 'react';
-import { AppState, type NativeEventSubscription } from 'react-native';
 
 import type { CaptureSession } from '../capture/pipeline';
-import { iosVideoController } from '../capture/video';
 import type { LockerStore } from '../locker/store';
-import type { EndReason, LocationSnapshot } from '../types';
-import { AudioPieces } from './audioPieces';
+import type { ClosedFile, EndReason, LocationSnapshot } from '../types';
 import { BODYCAM_PIECE_SECONDS } from './constants';
 
 export type BodyCamEngine = {
@@ -23,6 +17,43 @@ type Common = {
   quality: 720 | 1080;
 };
 
+type NativeBodyCam = Pick<NonNullable<typeof SaakshiEvidence>, 'addListener' | 'bodyCamStart' | 'bodyCamStop'>;
+
+function requireNative(native: NativeBodyCam | null | undefined): NativeBodyCam {
+  if (!native) throw new Error('The SaakshiEvidence native module is not available in this build.');
+  return native;
+}
+
+/**
+ * The file a body-cam `onRecordingClosed` event describes, ready to be sealed. A file the recorder
+ * closed because the user (or the app) stopped takes the stop's reason, such as `low-battery`.
+ */
+export function closedFileFromEvent(
+  event: RecordingClosedEvent,
+  location: LocationSnapshot,
+  stopReason: EndReason | null,
+): ClosedFile {
+  return {
+    uri: event.uri,
+    kind: event.kind ?? 'video',
+    segment: { clip: event.clip, index: event.index },
+    startedAt: new Date(event.startedAt),
+    endedAt: new Date(event.endedAt),
+    location,
+    mode: 'body-cam',
+    endReason: event.endReason === 'stopped' && stopReason ? stopReason : event.endReason,
+    gapBeforeMs: event.gapBeforeMs,
+    rotationDegrees: event.rotationDegrees,
+    pendingMarker: `${event.uri.split('/').pop()}.json`,
+  };
+}
+
+function folders(common: Common): { outputDir: string; pendingDir: string } {
+  const id = common.session.ensureSession().id;
+  const base = common.store.sessionDirUri(id).replace(/\/$/, '');
+  return { outputDir: `${base}/incoming`, pendingDir: `${base}/pending` };
+}
+
 /**
  * Android: the app's recorder runs in a foreground service (camera and microphone types), so
  * video and sound carry on with the screen off, during calls and in other apps. Pieces arrive as
@@ -31,27 +62,14 @@ type Common = {
  */
 export function androidBodyCam(
   common: Common & { notificationTitle: string; notificationText: string; notificationStop: string },
+  nativeModule: NativeBodyCam | null = SaakshiEvidence,
 ): BodyCamEngine {
-  const native = SaakshiEvidence;
-  if (!native) throw new Error('The SaakshiEvidence native module is not available in this build.');
+  const native = requireNative(nativeModule);
   let stopReason: EndReason | null = null;
   let onFinal: (() => void) | null = null;
   let finished = false;
   const subscription = native.addListener('onRecordingClosed', (event: RecordingClosedEvent) => {
-    const reason: EndReason = event.endReason === 'stopped' && stopReason ? stopReason : event.endReason;
-    void common.session.add({
-      uri: event.uri,
-      kind: 'video',
-      segment: { clip: event.clip, index: event.index },
-      startedAt: new Date(event.startedAt),
-      endedAt: new Date(event.endedAt),
-      location: common.location(),
-      mode: 'body-cam',
-      endReason: reason,
-      gapBeforeMs: event.gapBeforeMs,
-      rotationDegrees: event.rotationDegrees,
-      pendingMarker: `${event.uri.split('/').pop()}.json`,
-    });
+    void common.session.add(closedFileFromEvent(event, common.location(), stopReason));
     if (event.endReason !== 'piece-complete') {
       finished = true;
       onFinal?.();
@@ -60,11 +78,8 @@ export function androidBodyCam(
 
   return {
     async start() {
-      const id = common.session.ensureSession().id;
-      const base = common.store.sessionDirUri(id).replace(/\/$/, '');
       await native.bodyCamStart({
-        outputDir: `${base}/incoming`,
-        pendingDir: `${base}/pending`,
+        ...folders(common),
         pieceSeconds: BODYCAM_PIECE_SECONDS,
         quality: common.quality,
         clip: common.session.nextClip(),
@@ -81,93 +96,75 @@ export function androidBodyCam(
         subscription.remove();
         return;
       }
+      let timer: ReturnType<typeof setTimeout> | undefined;
       const closed = new Promise<void>((resolve) => {
         onFinal = resolve;
-        setTimeout(resolve, 5000);
+        // If the recorder had nothing to close, don't wait forever.
+        timer = setTimeout(resolve, 5000);
       });
       await native.bodyCamStop();
       await closed;
+      clearTimeout(timer);
       subscription.remove();
     },
   };
 }
 
 /**
- * iPhone: Apple allows video only while the app is on screen. Video is recorded by expo-camera in
- * pieces (muted); sound is recorded separately in pieces with background recording, so it carries
- * on when the user leaves the app or a call comes in. When the app leaves the screen the video
- * piece ends with `app-left`; when it returns, video restarts as a new clip, and the gap is in the
- * first piece's record.
+ * iPhone: the app's own recorder (modules/saakshi-evidence/ios/BodyCamRecorder.swift). While
+ * Saakshi is on screen, each video piece has its sound in the same file. iOS stops the camera
+ * when the app leaves the screen or the phone locks; sound then carries on in sound-only pieces,
+ * which overlap the video on both sides so the sound has no gap, and video with sound starts again
+ * when the user comes back. Files arrive as events, the same as on Android; `bodyCamStop` also
+ * returns the files it closed, so none is missed if its event comes late.
  */
 export function iosBodyCam(
-  camera: RefObject<CameraView | null>,
-  recorders: readonly [AudioRecorder, AudioRecorder],
-  common: Common,
+  common: Common & { onProblem?: (message: string) => void },
+  nativeModule: NativeBodyCam | null = SaakshiEvidence,
 ): BodyCamEngine {
-  const audio = new AudioPieces(recorders, common.session, common.store, common.location, BODYCAM_PIECE_SECONDS);
-  let running = false;
-  let videoOn = false;
-  let current: ReturnType<typeof iosVideoController> | null = null;
-  let lastVideoEnd: number | null = null;
-  let loop: Promise<void> = Promise.resolve();
-  let appState: NativeEventSubscription | null = null;
-
-  const videoLoop = async () => {
-    const clip = common.session.nextClip();
-    for (let index = 0; videoOn && running; index++) {
-      const gapBeforeMs = lastVideoEnd === null ? null : Date.now() - lastVideoEnd;
-      current = iosVideoController(camera, {
-        session: common.session,
-        store: common.store,
-        location: common.location,
-        mode: 'body-cam',
-        clip,
-        segment: { index },
-        maxDuration: BODYCAM_PIECE_SECONDS,
-        gapBeforeMs,
-      });
-      try {
-        await current.start();
-      } catch {
-        break;
-      }
-      const result = await current.done;
-      lastVideoEnd = Date.now();
-      current = null;
-      if (!result || result.endReason !== 'piece-complete') break;
-    }
+  const native = requireNative(nativeModule);
+  let stopReason: EndReason | null = null;
+  const added = new Set<string>();
+  const add = (event: RecordingClosedEvent) => {
+    if (added.has(event.uri)) return;
+    added.add(event.uri);
+    void common.session.add(closedFileFromEvent(event, common.location(), stopReason));
   };
-
-  const startVideo = () => {
-    if (videoOn) return;
-    videoOn = true;
-    loop = videoLoop().finally(() => {
-      videoOn = false;
-    });
-  };
-
-  const stopVideo = async (reason: EndReason) => {
-    videoOn = false;
-    await current?.stop(reason);
-    await loop;
+  const closedSubscription = native.addListener('onRecordingClosed', add);
+  const errorSubscription = native.addListener('onRecorderError', (event: { message: string }) =>
+    common.onProblem?.(event.message),
+  );
+  const unsubscribe = () => {
+    closedSubscription.remove();
+    errorSubscription.remove();
   };
 
   return {
     async start() {
-      running = true;
-      await audio.start();
-      startVideo();
-      appState = AppState.addEventListener('change', (state) => {
-        if (!running) return;
-        if (state === 'background') void stopVideo('app-left');
-        if (state === 'active') startVideo();
-      });
+      try {
+        await native.bodyCamStart({
+          ...folders(common),
+          pieceSeconds: BODYCAM_PIECE_SECONDS,
+          quality: common.quality,
+          clip: common.session.nextClip(),
+          mode: 'body-cam',
+          notificationTitle: '',
+          notificationText: '',
+          notificationStop: '',
+        });
+      } catch (error) {
+        unsubscribe();
+        throw error;
+      }
     },
     async stop(reason = 'stopped') {
-      running = false;
-      appState?.remove();
-      await stopVideo(reason);
-      await audio.stop(reason);
+      stopReason = reason;
+      try {
+        const closed = await native.bodyCamStop();
+        for (const event of closed ?? []) add(event);
+      } finally {
+        unsubscribe();
+      }
     },
   };
 }
