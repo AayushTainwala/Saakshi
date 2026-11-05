@@ -36,11 +36,14 @@ What already makes a continuous file safe:
 So corruption alone doesn't justify pieces. What a continuous file can't do by itself is get footage **off the phone during** the recording, before a seizure (E7, R2), or let it be witnessed minute by minute. Build that as checkpoints instead of pieces:
 
 1. **The original is one file per unbroken stretch of recording.** On iPhone, video has to stop while Saakshi is in the background, so leaving and returning starts a new file. That's an iOS limit; keep those files in the same record. The separate sound-only file exists only for the time video couldn't record (group 1).
-2. **Checkpoints every minute while recording.**
-   - Hash the bytes written so far and add a signed checkpoint record to the session's chain: byte length, SHA-256 of the bytes so far, time.
+2. **Checkpoints about every 10 seconds while recording**, in step with the file's own fragments: Apple's 10-second movie fragments on iPhone, and the same interval for Android's MPEG-TS.
+   - Keep a running SHA-256 over the bytes as they're written. At each checkpoint, add a signed checkpoint record to the session's chain: byte length, SHA-256 of all bytes so far (taken from the running state, so the file isn't re-read), and time. Don't re-hash the whole file each time.
    - At a clean stop, the file gets its usual final record, which must agree with the last checkpoint.
-   - If the recording is cut off, the checkpoints prove what existed up to the last one, and the file plays up to the cut.
-3. **Upload units for later (E7).** The bytes added between two checkpoints become the part that bug mode and body-cam upload as they go, once E7 exists. Joined in order, the parts must be byte-for-byte the original file (true for MPEG-TS and for fragmented `.mov`; check both). Build the checkpointing and the part boundaries now, and leave the upload to E7. The witness message can carry the latest checkpoint.
+   - If the recording is cut off, the checkpoints prove what existed up to the last one, at most about 10 seconds before the cut, and the file plays up to the cut. The rest is sealed when the app next opens, marked interrupted.
+3. **Upload parts for later (E7).** Parts exist only to get footage off the phone during recording. Their size is decided with E7 (a minute or two, depending on file size and connection); make it a setting, not a constant. Parts start and end on checkpoint boundaries.
+   - Joined in order, the parts must be byte-for-byte the original file (true for MPEG-TS and for fragmented `.mov`; check both).
+   - The joined bytes up to any part must match that checkpoint's signed SHA-256. That's how a copy rebuilt from the cloud proves it's identical to what the phone recorded.
+   - Build the checkpointing and the part boundaries now, and leave the upload to E7. The witness message can carry the latest checkpoint.
 4. **Check before building and report in the handoff:**
    - that reading a file while the recorder is still writing it is reliable on both platforms;
    - that a part never splits a fragment in a way that breaks the joined file;
