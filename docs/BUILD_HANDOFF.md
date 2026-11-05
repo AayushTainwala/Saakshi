@@ -18,7 +18,7 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 |---|---|
 | 1. Body-cam: back swipe, and sound in the video (C2, C6) | Merged: https://github.com/AayushTainwala/Saakshi/pull/16. Not yet run on a phone. |
 | 2. Body-cam: other fixes (C1–C3) | Merged: https://github.com/AayushTainwala/Saakshi/pull/17. Not yet run on a phone. |
-| 2a. Body-cam: one continuous file, with checkpoints | Built on branch `claude/fix-round-1-group-2a`, from `main` after #16 and #17; pull request open. Not yet run on a phone. |
+| 2a. Body-cam: one continuous file, with checkpoints | Built: https://github.com/AayushTainwala/Saakshi/pull/18 (branch `claude/fix-round-1-group-2a`, from `main` after #16 and #17), with test steps for the owner. Not yet run on a phone. |
 | 3–9 | Not started |
 
 ### Group 1: what was fixed
