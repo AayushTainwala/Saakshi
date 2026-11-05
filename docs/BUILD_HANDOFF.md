@@ -4,7 +4,7 @@ The pickup file for build sessions. Each stream keeps its own section current: s
 
 ## Where things stand (21 Oct 2026; fix round 1 from 5 Nov)
 
-- **Merged into `main`:** #1–#9. That is R1 and R2 as planned, apart from E3 and E7, plus the law checks against the Gazette of India (#9). Typecheck, lint, all tests and both native builds pass on `main`.
+- **Merged into `main`:** #1–#9. That is R1 and R2 as planned, apart from E3 and E7, plus the law checks against the Gazette of India (#9). Since then: the owner's docs and briefs (#10–#15), and fix round 1, groups 1, 2 and 2a (#16–#18; see "Fix round 1" below). Typecheck, lint, all tests and both native builds pass on `main`.
 - **Pace:** no 24-hour deadline (owner, 21 Oct). The next goal is a beta for about 50 testers on iPhone and Android; see BUILD_PLAN.md, section 1, "Road to the beta".
 - **First Release run (21 Oct, iOS only):** the owner set up iOS credentials and the App Store Connect API key with EAS (role App Manager). The EAS build succeeded; the **Submit to TestFlight step failed**. Its log is visible only to someone signed in to GitHub, so the cause isn't known yet. The owner is submitting that build from his Mac with `eas submit --platform ios --latest`. **Stream D:** find the cause and fix the workflow.
 - **Owner's phone testing:** round 1 on iPhone through TestFlight, with a checklist and his notes on a claude.ai page (https://claude.ai/artifact/BQU34AZ76SbRZpBKE5iyc6). Android follows when his phone arrives (about 23 Oct). The review session turns his notes into fix work for the streams.
@@ -18,8 +18,34 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 |---|---|
 | 1. Body-cam: back swipe, and sound in the video (C2, C6) | Merged: https://github.com/AayushTainwala/Saakshi/pull/16. Not yet run on a phone. |
 | 2. Body-cam: other fixes (C1–C3) | Merged: https://github.com/AayushTainwala/Saakshi/pull/17. Not yet run on a phone. |
-| 2a. Body-cam: one continuous file, with checkpoints | Built: https://github.com/AayushTainwala/Saakshi/pull/18 (branch `claude/fix-round-1-group-2a`, from `main` after #16 and #17), with test steps for the owner. Not yet run on a phone. |
-| 3–9 | Not started |
+| 2a. Body-cam: one continuous file, with checkpoints | Merged: https://github.com/AayushTainwala/Saakshi/pull/18. Not yet run on a phone. |
+| 3. Records list and playback (B1, C6) | **Next.** Not started. |
+| 4–9 | Not started |
+
+### Where fix round 1 stands, and what's next (6 Nov 2026)
+
+For the session that takes over. Read the brief, then this section, then CLAUDE.md as usual.
+
+- **Finished:** groups 1, 2 and 2a are merged into `main` (#16, #17, #18). Each pull request has plain test steps for the owner. Typecheck, lint and all 307 tests pass, and both native builds pass on every one.
+- **Not yet tested:** nothing from fix round 1 has run on a phone. The owner's next TestFlight round should follow the test steps in #16, #17 and #18. Step C of #18, a forced restart while recording, is the genuine cut-off test that round 1 couldn't do.
+- **Next: group 3** (records list and playback), on a new branch from the latest `main` (for example `claude/fix-round-1-group-3`), then groups 4 to 9 in the brief's order, one pull request each. The owner merges each pull request; when asked, stack the next group on the previous branch instead, as group 2 was.
+- **What group 3 starts from:**
+  - **Body-cam files now:** one file per clip. iPhone video is fragmented MP4 (`.mp4`), and each file's timeline starts at 0. iPhone sound-only files are ADTS (`.aac`). Android is MPEG-TS (`.ts`), with its existing MP4 copy (`Remuxer.kt`).
+  - **Bug mode is unchanged:** pieces, `.m4a` on iPhone and `.aac` on Android.
+  - **Group 3's joined MP4 copy:** it needs a multi-file record, which now happens only when an iPhone user left the app. Its "copy" record can follow `export/playableCopy.ts` and spec section 11.
+  - **Sessions now hold `checkpoints`** beside `items`. Any list of a session's records must count both; `lastLink()` in `capture/pipeline.ts` gives the chain head.
+- **Bundle format:** 0.5 now. Groups 3 and 9 each need a new version (0.6, …). Update `FORMAT_VERSION`, the record-version strings in `seal.test.ts`, `playableCopy.test.ts` and `deviceKey.test.ts`, `SUPPORTED_VERSIONS` in `tools/verify-bundle.mjs`, and spec section 12.
+- **Left on purpose for later groups:**
+  - putting the latest checkpoint in the witness message (group 7);
+  - telling "phone locked" from "left Saakshi", and showing end reasons in plain words on the record screen (group 5);
+  - in-app playback of sound files (group 3).
+- **Owner's decisions so far (all in SPEC.md, body-cam mode):** one record from Start to Stop; video and sound in the same file; unlock with volume-up twice, after a practice step; video stops only when iOS stops the camera; one continuous file with signed checkpoints; upload parts for E7, whose size is a setting.
+- **Open owner question:** bug mode continuous too? See "Owner questions", "(Fix round 1)".
+- **How this was built, for the next builder:**
+  - Swift and Kotlin compile only in the "Native build" workflow, which runs on pull requests that touch `modules/**`. Its status can be read without signing in from `https://api.github.com/repos/AayushTainwala/Saakshi/actions/runs?branch=<branch>`.
+  - `ffmpeg` is installed in the cloud container. `modules/saakshi-evidence/verify/checkpoint-parts.sh` and `cutoff-formats.sh` check the containers with it.
+  - Apple's documentation reads well as JSON (`https://developer.apple.com/tutorials/data/documentation/<path>.json`). Android source wasn't reachable from Google's hosts, but the LineageOS copy on raw.githubusercontent.com was.
+  - Twice, an independent review of the new native code, by a separate agent before merging, found real bugs that the compiler couldn't. Worth repeating for native changes.
 
 ### Group 1: what was fixed
 
