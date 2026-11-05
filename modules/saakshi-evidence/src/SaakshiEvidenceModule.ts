@@ -42,9 +42,16 @@ declare class SaakshiEvidenceModule extends NativeModule<SaakshiEvidenceEvents> 
   bodyCamRunning(): boolean;
   /** Android: MP4 copy of an MPEG-TS file without re-encoding; returns the copy's file:// URI. */
   remuxToMp4(input: string, output: string, rotationDegrees: number | null): Promise<string>;
-  /** Starts delivering `onVolumeDown` events and stops the volume buttons changing the volume. */
+  /** Starts delivering `onVolumeUp` events and stops the volume buttons changing the volume. */
   volumeKeysStart(): Promise<void>;
   volumeKeysStop(): Promise<void>;
+  /**
+   * iPhone only: `volumeKeysStart` for the unlock practice, with the camera running (not recording),
+   * because iOS sends button presses only to an app that is using the camera. On Android, use
+   * `volumeKeysStart` and `volumeKeysStop`.
+   */
+  unlockPracticeStart(): Promise<void>;
+  unlockPracticeStop(): Promise<void>;
   /** Dims the screen to its minimum, or puts it back. */
   setScreenDimmed(dimmed: boolean): Promise<void>;
 }

@@ -21,6 +21,7 @@ import type { EndReason } from '../types';
 import { LOCK_MESSAGE_MS } from './constants';
 import { doublePress } from './doublePress';
 import { androidBodyCam, type BodyCamEngine, iosBodyCam } from './engine';
+import { startUnlockPractice, type UnlockPractice } from './practice';
 import { type BodyCamSettings, loadBodyCamSettings, saveBodyCamSettings } from './settings';
 
 const KEEP_AWAKE_TAG = 'saakshi-bodycam';
@@ -50,10 +51,13 @@ export function BodyCamScreen() {
   const location = useLatestLocation();
 
   const [settings, setSettingsState] = useState<BodyCamSettings>(loadBodyCamSettings);
-  const setSettings = (next: BodyCamSettings) => {
-    setSettingsState(next);
-    saveBodyCamSettings(next);
-  };
+  const updateSettings = useCallback((patch: Partial<BodyCamSettings>) => {
+    setSettingsState((previous) => {
+      const next = { ...previous, ...patch };
+      saveBodyCamSettings(next);
+      return next;
+    });
+  }, []);
 
   const [phase, setPhase] = useState<Phase>('setup');
   const [locked, setLocked] = useState(false);
@@ -123,7 +127,7 @@ export function BodyCamScreen() {
   useEffect(() => {
     if (!locked || !SaakshiEvidence) return;
     const press = doublePress(unlock);
-    const subscription = SaakshiEvidence.addListener('onVolumeDown', () => press());
+    const subscription = SaakshiEvidence.addListener('onVolumeUp', () => press());
     return () => subscription.remove();
   }, [locked, unlock]);
 
@@ -132,6 +136,39 @@ export function BodyCamScreen() {
     const timer = setTimeout(() => setMessage(false), LOCK_MESSAGE_MS);
     return () => clearTimeout(timer);
   }, [message]);
+
+  // ---- Practising the unlock (fix round 1, group 2) ---------------------------------------------
+  //
+  // Start is offered only once the user has unlocked with volume-up twice here, read the same way
+  // the lock reads it.
+
+  const [practice, setPractice] = useState<'idle' | 'listening' | 'done'>('idle');
+  const practiceRef = useRef<UnlockPractice | null>(null);
+  const practiceReleased = useRef<Promise<void>>(Promise.resolve());
+
+  const stopPractice = useCallback(() => {
+    const current = practiceRef.current;
+    practiceRef.current = null;
+    if (current) practiceReleased.current = current.stop();
+  }, []);
+
+  const beginPractice = useCallback(() => {
+    if (!SaakshiEvidence) return;
+    stopPractice();
+    setPractice('listening');
+    practiceRef.current = startUnlockPractice(SaakshiEvidence, Platform.OS, () => {
+      stopPractice();
+      setPractice('done');
+      updateSettings({ practised: true });
+    });
+  }, [stopPractice, updateSettings]);
+
+  const cancelPractice = useCallback(() => {
+    stopPractice();
+    setPractice('idle');
+  }, [stopPractice]);
+
+  useEffect(() => stopPractice, [stopPractice]);
 
   // ---- Start and stop --------------------------------------------------------------------------
 
@@ -144,16 +181,19 @@ export function BodyCamScreen() {
     const permission = PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS;
     if (await PermissionsAndroid.check(permission)) return setNotificationsOff(false);
     if (!settings.notificationsAsked) {
-      setSettings({ ...settings, notificationsAsked: true });
+      updateSettings({ notificationsAsked: true });
       const result = await PermissionsAndroid.request(permission);
       if (result === PermissionsAndroid.RESULTS.GRANTED) return setNotificationsOff(false);
     }
     setNotificationsOff(true);
-  }, [settings]);
+  }, [settings.notificationsAsked, updateSettings]);
 
   const start = useCallback(async () => {
     setStartFailed(false);
     setPhase('starting');
+    // The practice's camera must be off before the recorder takes it.
+    stopPractice();
+    await practiceReleased.current;
     await checkNotifications().catch(() => undefined);
     const common = { session, store: fileLocker, location, quality: settings.quality };
     try {
@@ -180,7 +220,7 @@ export function BodyCamScreen() {
     setNow(at);
     setPhase('running');
     lock();
-  }, [checkNotifications, location, lock, session, settings.quality, t]);
+  }, [checkNotifications, location, lock, session, settings.quality, stopPractice, t]);
 
   const stop = useCallback(
     async (reason: EndReason = 'stopped') => {
@@ -258,9 +298,31 @@ export function BodyCamScreen() {
         <Card>
           <AppText variant="label">{t('bodycam.unlockTitle')}</AppText>
           <AppText>{t('bodycam.unlockBody')}</AppText>
-          {!settings.taught ? (
-            <Button variant="secondary" label={t('bodycam.unlockAck')} onPress={() => setSettings({ ...settings, taught: true })} />
-          ) : null}
+          {practice === 'listening' ? (
+            <>
+              <AppText variant="heading" accessibilityLiveRegion="polite">
+                {t('bodycam.practiseNow')}
+              </AppText>
+              {Platform.OS === 'ios' ? <AppText color="textMuted">{t('bodycam.practiseCameraNote')}</AppText> : null}
+              <Button variant="secondary" label={t('bodycam.practiseCancel')} onPress={cancelPractice} />
+            </>
+          ) : (
+            <>
+              {practice === 'done' ? (
+                <AppText color="success" variant="label" accessibilityLiveRegion="polite">
+                  {t('bodycam.practiseDone')}
+                </AppText>
+              ) : !settings.practised ? (
+                <AppText>{t('bodycam.practiseIntro')}</AppText>
+              ) : null}
+              <Button
+                variant={settings.practised ? 'secondary' : 'primary'}
+                label={settings.practised ? t('bodycam.practiseAgain') : t('bodycam.practiseButton')}
+                disabled={!SaakshiEvidence}
+                onPress={beginPractice}
+              />
+            </>
+          )}
         </Card>
 
         {Platform.OS === 'ios' ? (
@@ -298,18 +360,19 @@ export function BodyCamScreen() {
             { value: '1080', label: t('bodycam.q1080') },
           ]}
           value={String(settings.quality) as '720' | '1080'}
-          onChange={(value) => setSettings({ ...settings, quality: value === '1080' ? 1080 : 720 })}
+          onChange={(value) => updateSettings({ quality: value === '1080' ? 1080 : 720 })}
         />
 
         {startFailed ? <AppText color="danger">{t('bodycam.startFailed')}</AppText> : null}
         {!RECORDER_AVAILABLE ? <AppText color="danger">{t('bodycam.unavailable')}</AppText> : null}
+        {settings.practised ? <AppText color="textMuted">{t('bodycam.unlockReminder')}</AppText> : null}
         <Button
           variant="danger"
           label={t('bodycam.start')}
-          disabled={!settings.taught || !RECORDER_AVAILABLE}
+          disabled={!settings.practised || practice === 'listening' || !RECORDER_AVAILABLE}
           onPress={() => void start()}
         />
-        {!settings.taught ? <AppText color="textMuted">{t('bodycam.ackFirst')}</AppText> : null}
+        {!settings.practised ? <AppText color="textMuted">{t('bodycam.practiseFirst')}</AppText> : null}
       </Screen>
     );
   }

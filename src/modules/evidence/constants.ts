@@ -1,5 +1,5 @@
 /** Evidence bundle format version this code writes (docs/spec/evidence-bundle.md). */
-export const FORMAT_VERSION = '0.3';
+export const FORMAT_VERSION = '0.4';
 
 
 export const RECORD_TYPE = 'saakshi.evidence.record';

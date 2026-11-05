@@ -8,10 +8,10 @@ public class SaakshiEvidenceModule: Module {
     // already writes movie fragments every 10 seconds, so its files survive a cut-off.
     Function("recorderSupported") { false }
 
-    Events("onVolumeDown", "onRecordingClosed", "onRecorderError")
+    Events("onVolumeUp", "onRecordingClosed", "onRecorderError")
 
     OnCreate {
-      VolumeButtons.shared.onVolumeDown = { [weak self] in self?.sendEvent("onVolumeDown", [:]) }
+      VolumeButtons.shared.onVolumeUp = { [weak self] in self?.sendEvent("onVolumeUp", [:]) }
       BodyCamRecorder.shared.emit = { [weak self] name, body in
         self?.sendEvent(name, body.mapValues { $0 as Any? })
       }
@@ -24,6 +24,16 @@ public class SaakshiEvidenceModule: Module {
     AsyncFunction("volumeKeysStop") {
       VolumeButtons.shared.stop()
     }.runOnQueue(.main)
+
+    // The unlock practice on the body-cam start screen: runs the camera, without recording, so that
+    // iOS sends the button presses (see UnlockPractice in VolumeButtons.swift).
+    AsyncFunction("unlockPracticeStart") { (promise: Promise) in
+      UnlockPractice.start { promise.resolve() }
+    }
+
+    AsyncFunction("unlockPracticeStop") { (promise: Promise) in
+      UnlockPractice.stop { promise.resolve() }
+    }
 
     AsyncFunction("setScreenDimmed") { (dimmed: Bool) in
       ScreenDimmer.set(dimmed: dimmed)

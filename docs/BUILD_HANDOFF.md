@@ -17,7 +17,7 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 | Group | State |
 |---|---|
 | 1. Body-cam: back swipe, and sound in the video (C2, C6) | Built: https://github.com/AayushTainwala/Saakshi/pull/16 (branch `claude/determined-goodall-wl89xn`), with test steps for the owner. Not yet run on a phone. |
-| 2. Body-cam: other fixes (C1–C3) | Not started |
+| 2. Body-cam: other fixes (C1–C3) | Built on branch `claude/fix-round-1-group-2`, stacked on group 1 at the owner's request (5 Nov); pull request open. Not yet run on a phone. |
 | 2a. Body-cam: one continuous file, with checkpoints | Not started (built separately from group 1) |
 | 3–9 | Not started |
 
@@ -57,6 +57,18 @@ What Apple does not document is whether a capture session with a microphone inpu
 - Whether the background task gives the video file enough time to finish when the phone locks. If not, the file's record says `error`, and the sound-only file reaches 11 seconds back to cover it.
 - iOS 26's full-screen back swipe is blocked by the same settings; untested.
 - Audio and video timing in the files (lip sync), and the half-second overlaps, need checking by playing the files.
+
+### Group 2: what was fixed, and what was found
+
+1. **Notification Center stopping video.** The new recorder from group 1 never stops video because the app is covered or inactive: under Control Center or Notification Center it keeps recording unless iOS actually stops the camera or sends the app into the background. Each video piece's record now gives iOS's reason (bundle format **0.4**): `app-left` (the app left the screen or the phone locked), `camera-in-use` (another app took the camera), `system-pressure` (Apple's example is heat), or `camera-lost` for anything else. The raw iOS reason is also written to the phone's log. If Notification Center still stops video in your next test, its record will say `app-left`, which means iOS itself treated pulling it down as leaving the app; the app can't prevent that.
+2. **Unlock with one button only.** Apple's button API ([`AVCaptureEventInteraction`](https://developer.apple.com/documentation/avkit/avcaptureeventinteraction)) tells an app only whether a press was "primary" or "secondary"; a [capture event](https://developer.apple.com/documentation/avkit/avcaptureevent) carries nothing else. Apple's WWDC 2025 session 253 ([transcript](https://developer.apple.com/videos/play/wwdc2025/253/)): "Primary actions are triggered by the volume down button, Action button, and the Camera Control, while the secondary action is triggered by the volume up button", and from iOS 26 AirPods stem clicks are primary too. So volume-down can't be told apart from the others. **You decided (5 Nov): unlock with volume-up twice, on both platforms.** Volume-down, Camera Control, the Action button and AirPods now do nothing while the lock shows. On iOS 16.4–17.1, which lack that API, the app watches the volume level instead, so there the unlock doesn't work when the volume is already at its highest.
+3. **Practice step.** The "I know how to unlock it" tick is gone. The start screen says "Press volume-up twice now", and Start becomes available only once you have done it; afterwards a one-line reminder stays above Start, with "Practise again". On iPhone the camera turns on during the practice (nothing is recorded), because iOS passes button presses only to an app that is using the camera; the screen says so. The old tick doesn't count, since it was for volume-down, so everyone practises once.
+4. **The side button.** Locking the phone stops video (an iOS limit) and sound carries on. The hash report in the bundle now says so in words: "video stopped because Saakshi left the screen or the phone was locked (iPhone records video only while the app is on screen); sound carried on in the next file". The app itself can't yet tell locking apart from leaving the app; showing the reason on the record's screen, and telling those two apart if possible, is group 5.
+
+### Group 2: not verified
+
+- Nothing has run on a phone. Most important: that Camera Control, the Action button (set to Camera) and AirPods really do nothing while the lock shows; and that volume-up twice unlocks, during the practice and while recording.
+- Whether Notification Center sends Saakshi into the background (then video stops, and the record says `app-left`) or only covers it (then video carries on).
 
 ## Owner questions
 
@@ -175,9 +187,9 @@ None of it has run on a phone yet.
 **Body-cam mode (B1–B4): how it works and every platform limit found (21 Oct).** Record tab → "Body-cam mode". The first time, the user must acknowledge how to unlock before Start is enabled. Pieces are 60 seconds (`BODYCAM_PIECE_SECONDS`), 720p by default with 1080p as an option, and are sealed through `createEvidenceSession()`. Nothing is uploaded in R1.
 
 - **Reading the volume buttons:**
-  - *Android, screen on:* key events reach the app's window while it is on screen. `VolumeKeys.kt` wraps the window's callback while the lock is showing, takes volume-down presses, and swallows both volume keys so the volume doesn't change.
+  - *Android, screen on:* key events reach the app's window while it is on screen. `VolumeKeys.kt` wraps the window's callback while the lock is showing, takes volume-up presses (volume-down before fix round 1, group 2), and swallows both volume keys so the volume doesn't change.
   - *Android, screen off:* apps get no key events. Volume keys go to the system, or to an active media session that takes remote volume handling ([`MediaSession.setPlaybackToRemote`](https://developer.android.com/reference/android/media/session/MediaSession): "This must be called to receive volume button events"). That would mean presenting a fake playing media session, so it isn't used. Unlocking needs the dark screen (which is on, at minimum brightness). If the user turns the screen off, recording carries on and they unlock the phone as usual.
-  - *iPhone, iOS 17.2+:* [`AVCaptureEventInteraction`](https://developer.apple.com/documentation/avkit/avcaptureeventinteraction): "The system sends capture events only to apps that actively use the camera. Backgrounded capture apps … don't receive events." Volume down is a "primary" event (WWDC 2025 session 253), and so are the **Action button and Camera Control**: pressing either twice also unlocks.
+  - *iPhone, iOS 17.2+:* [`AVCaptureEventInteraction`](https://developer.apple.com/documentation/avkit/avcaptureeventinteraction): "The system sends capture events only to apps that actively use the camera. Backgrounded capture apps … don't receive events." Volume down is a "primary" event (WWDC 2025 session 253), and so are the **Action button and Camera Control** (and AirPods clicks from iOS 26). Since fix round 1, group 2, only volume-up (the "secondary" event) unlocks, and the primary buttons do nothing while the lock shows.
   - *iPhone, iOS 16.4–17.1:* no public API reads the buttons. The fallback watches the system output volume and counts each decrease as a press, so it **does not work when the volume is already at zero**, and the presses do change the volume.
 - **Dark screen:** Android dims only Saakshi's window (no `WRITE_SETTINGS` permission; I removed expo-brightness, whose plugin would add it). iPhone sets the system brightness and restores the previous level on unlock; iOS also restores it when the phone locks. The screen stays on (keep-awake) so that it can be unlocked, which costs battery.
 - **Android foreground service** (`BodyCamService.kt`, types camera and microphone, partial wake lock):
@@ -195,7 +207,7 @@ None of it has run on a phone yet.
   - Android: about the time to stop one `MediaRecorder` and start the next.
   - iPhone: none between pieces (one writer ends on the frame where the next begins); the gap in the picture while the app is away is in the next video clip's `gapBeforeMs`.
   - Both are recorded in `gapBeforeMs` and are untested on phones.
-- **For Stream C:** the chest-mount guide (G4) should teach the unlock (volume down, twice). The lock message deliberately doesn't name the buttons.
+- **For Stream C:** the chest-mount guide (G4) should teach the unlock (volume up, twice, since fix round 1, group 2). The lock message deliberately doesn't name the buttons.
 - **Permissions:** `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, `SYSTEM_ALERT_WINDOW` and `VIBRATE` come from Expo's template and no feature uses them. All four are now blocked in every Android build through `ALWAYS_BLOCKED` in `app.config.ts`; Stream D had already blocked the first three, and I added `VIBRATE`, which nothing in the app uses and no library declares. `POST_NOTIFICATIONS` stays, for body-cam's notice.
 
 **Android videos: the original and its MP4 copy (owner decision of 22 Oct).** The `.ts` from the camera stays the original: the chain, the export bundle and the certificate use only it.
@@ -220,7 +232,7 @@ None of it has run on a phone yet.
 - the same on iPhone, with a recording longer than 10 seconds;
 - body-cam with the screen off on Android, through a phone call;
 - body-cam on iPhone leaving and returning to the app;
-- volume-down unlock on each platform, including iOS 16 and 17.0–17.1;
+- volume-up unlock on each platform, including iOS 16 and 17.0–17.1;
 - the 10%, 5% and 3% battery points.
 
 Kotlin and Swift compile only on GitHub's runners (Native build workflow).

@@ -45,8 +45,8 @@ export const chestMount: Guide = {
               hi: 'जब ऐप कहे, तो बैटरी सेवर (Android) या लो पावर मोड (iPhone) चालू करें।',
             },
             {
-              en: 'To unlock the screen, press volume-down twice. The locked screen does not say which buttons to press, so that someone who picks up your phone is not shown how. Remember it, and practise it once at home.',
-              hi: 'स्क्रीन खोलने के लिए वॉल्यूम कम करने वाला बटन दो बार दबाएँ। लॉक स्क्रीन पर यह नहीं लिखा होता कि कौन-से बटन दबाने हैं, ताकि आपका फ़ोन उठाने वाले को पता न चले। इसे याद रखें, और घर पर एक बार आज़मा लें।',
+              en: 'To unlock the screen, press volume-up twice. The locked screen does not say which buttons to press, so that someone who picks up your phone is not shown how. Saakshi asks you to practise it before you first start, and you can practise again at any time.',
+              hi: 'स्क्रीन खोलने के लिए वॉल्यूम बढ़ाने वाला बटन दो बार दबाएँ। लॉक स्क्रीन पर यह नहीं लिखा होता कि कौन-से बटन दबाने हैं, ताकि आपका फ़ोन उठाने वाले को पता न चले। पहली बार शुरू करने से पहले साक्षी आपसे इसका अभ्यास करवाता है, और आप कभी भी फिर से अभ्यास कर सकते हैं।',
             },
             {
               en: 'Video is saved in short pieces as it records, and each piece is fingerprinted and signed as it is saved. In this version, the pieces stay on your phone. You find them in the Record tab.',

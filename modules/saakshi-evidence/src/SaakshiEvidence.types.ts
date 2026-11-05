@@ -64,6 +64,8 @@ export type RecorderEndReason =
   | 'error'
   // iPhone body-cam only:
   | 'app-left'
+  | 'camera-in-use'
+  | 'system-pressure'
   | 'audio-interrupted'
   | 'sound-resumed'
   | 'video-resumed';
@@ -83,8 +85,8 @@ export type SaakshiEvidenceEvents = {
   onRecordingStarted: (event: RecordingStartedEvent) => void;
   onRecordingClosed: (event: RecordingClosedEvent) => void;
   onRecorderError: (event: { message: string }) => void;
-  /** A volume-down press, while volumeKeysStart() is in effect. */
-  onVolumeDown: () => void;
+  /** A volume-up press, while volumeKeysStart() is in effect: two in a row unlock body-cam mode. */
+  onVolumeUp: () => void;
   /** Android: body-cam was stopped from its notification's Stop button. */
   onBodyCamStopped: () => void;
 };

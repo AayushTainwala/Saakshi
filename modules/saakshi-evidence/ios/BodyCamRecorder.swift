@@ -520,19 +520,36 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
 
   // MARK: - Events from the camera and the microphone (on the queue)
 
-  /// iOS interrupted the camera. Raw reasons are AVCaptureSession.InterruptionReason values.
+  /// iOS interrupted the camera. Video stops only here (or when frames stop coming), never because
+  /// the app is merely covered or inactive, such as under Control Center. iOS's reason becomes the
+  /// file's end reason (fix round 1, group 2); the raw reason is also logged and sent with the event.
   private func cameraInterrupted(_ raw: Int?) {
     let reason = raw.flatMap { AVCaptureSession.InterruptionReason(rawValue: $0) }
     let name: String
+    let endReason: String
     switch reason {
-    case .videoDeviceNotAvailableInBackground: name = "videoDeviceNotAvailableInBackground"
-    case .audioDeviceInUseByAnotherClient: name = "audioDeviceInUseByAnotherClient"
-    case .videoDeviceInUseByAnotherClient: name = "videoDeviceInUseByAnotherClient"
-    case .videoDeviceNotAvailableWithMultipleForegroundApps: name = "videoDeviceNotAvailableWithMultipleForegroundApps"
-    case .videoDeviceNotAvailableDueToSystemPressure: name = "videoDeviceNotAvailableDueToSystemPressure"
-    default: name = "reason \(raw.map { String($0) } ?? "unknown")"
+    case .videoDeviceNotAvailableInBackground:
+      // The app left the screen, or the phone was locked.
+      name = "videoDeviceNotAvailableInBackground"
+      endReason = "app-left"
+    case .videoDeviceInUseByAnotherClient:
+      name = "videoDeviceInUseByAnotherClient"
+      endReason = "camera-in-use"
+    case .videoDeviceNotAvailableDueToSystemPressure:
+      // Apple: "system pressure, such as thermal duress".
+      name = "videoDeviceNotAvailableDueToSystemPressure"
+      endReason = "system-pressure"
+    case .videoDeviceNotAvailableWithMultipleForegroundApps:
+      name = "videoDeviceNotAvailableWithMultipleForegroundApps"
+      endReason = "camera-lost"
+    case .audioDeviceInUseByAnotherClient:
+      name = "audioDeviceInUseByAnotherClient"
+      endReason = "camera-lost"
+    default:
+      name = "reason \(raw.map { String($0) } ?? "unknown")"
+      endReason = "camera-lost"
     }
-    let endReason = reason == .videoDeviceNotAvailableInBackground ? "app-left" : "camera-lost"
+    NSLog("[Saakshi body-cam] camera interrupted: %@", name)
     endVideoStretch(reason: endReason, interruption: name)
   }
 

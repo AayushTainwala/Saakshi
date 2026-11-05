@@ -5,23 +5,25 @@ import android.view.KeyEvent
 import android.view.Window
 
 /**
- * Reads the volume-down button while body-cam mode's lock screen is showing. The app's window
- * receives key events only while it is on screen with the screen on; with the screen off, Android
- * sends volume keys to the system (or to an active media session), not to the app. While enabled,
- * volume keys are consumed so the volume doesn't change.
+ * Reads the volume-up button while body-cam mode's lock screen (or its unlock practice) is showing:
+ * volume-up twice unlocks (owner's decision of 5 Nov 2026; on iPhone only volume-up can be told
+ * apart from the other camera buttons). The app's window receives key events only while it is on
+ * screen with the screen on; with the screen off, Android sends volume keys to the system (or to an
+ * active media session), not to the app. While enabled, both volume keys are consumed so the volume
+ * doesn't change.
  */
 object VolumeKeys {
-  var onVolumeDown: (() -> Unit)? = null
+  var onVolumeUp: (() -> Unit)? = null
   private var installed: Pair<Window, Window.Callback>? = null
 
   private class Interceptor(private val wrapped: Window.Callback) : Window.Callback by wrapped {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
       return when (event.keyCode) {
-        KeyEvent.KEYCODE_VOLUME_DOWN -> {
-          if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) onVolumeDown?.invoke()
+        KeyEvent.KEYCODE_VOLUME_UP -> {
+          if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) onVolumeUp?.invoke()
           true
         }
-        KeyEvent.KEYCODE_VOLUME_UP -> true
+        KeyEvent.KEYCODE_VOLUME_DOWN -> true
         else -> wrapped.dispatchKeyEvent(event)
       }
     }
