@@ -16,10 +16,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, Button } from '@/components';
+import { type BatteryAction, useLowBattery } from '@/platform/battery';
 import { palettes, radius, spacing, touchTarget } from '@/theme';
 
-import type { BatteryAction } from '../battery/monitor';
-import { useLowBattery } from '../battery/useLowBattery';
 import { fileLocker } from '../locker/store';
 import { RightsOverlay } from '../rights/RightsOverlay';
 import type { EndReason, MediaKind } from '../types';

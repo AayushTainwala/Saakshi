@@ -4,8 +4,10 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { useSyncExternalStore } from 'react';
 
+import { readBatteryPercent } from '@/platform/battery';
+
 import { createLiveApi, type LivePoint } from './api';
-import { type LiveShare, LiveShareController, type Tracker } from './share';
+import { type LiveShare, LiveShareController, type Tracker, withBattery } from './share';
 
 const TASK = 'saakshi-live-location';
 const FILE_NAME = 'live-share.json';
@@ -80,7 +82,7 @@ export function registerLiveLocationTask(): void {
   if (TaskManager.isTaskDefined(TASK)) return;
   TaskManager.defineTask<{ locations: Location.LocationObject[] }>(TASK, async ({ data, error }) => {
     if (error || !data?.locations?.length) return;
-    await liveShare.receive(data.locations.map(toPoint));
+    await liveShare.receive(withBattery(data.locations.map(toPoint), await readBatteryPercent()));
   });
   void liveShare.retryStops();
 }

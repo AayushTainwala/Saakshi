@@ -28,6 +28,19 @@ type Saved = {
   unstopped: { shareId: string; writeSecret: string }[];
 };
 
+/**
+ * The battery level goes with the newest position of each delivery: it is the level now, so the
+ * older ones in the same delivery (iPhone can hold a few back) are left without one.
+ */
+export function withBattery(points: LivePoint[], battery: number | null): LivePoint[] {
+  if (battery === null || points.length === 0) return points;
+  let newest = 0;
+  points.forEach((point, i) => {
+    if (Date.parse(point.at) >= Date.parse(points[newest].at)) newest = i;
+  });
+  return points.map((point, i) => (i === newest ? { ...point, bat: battery } : point));
+}
+
 /** Positions kept on the phone while there's no signal; the oldest are dropped first. */
 export const MAX_PENDING = 120;
 /** The server takes at most this many positions per call. */

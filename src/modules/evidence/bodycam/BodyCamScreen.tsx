@@ -11,10 +11,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, Button, Card, OptionGroup, Screen } from '@/components';
 import { requireSecretCode } from '@/modules/secretcode';
+import { type BatteryAction, useLowBattery } from '@/platform/battery';
 import { palettes, spacing } from '@/theme';
 
-import type { BatteryAction } from '../battery/monitor';
-import { useLowBattery } from '../battery/useLowBattery';
 import { createEvidenceSession } from '../capture/deps';
 import { useLatestLocation } from '../capture/useLocation';
 import { fileLocker } from '../locker/store';
