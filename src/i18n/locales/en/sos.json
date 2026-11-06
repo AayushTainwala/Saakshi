@@ -69,6 +69,11 @@
       "sos": "SOS alerts",
       "live": "Live location",
       "witness": "Witness messages"
+    },
+    "methodHeading": "How they're reached",
+    "methodLabel": "How {{name}} is reached",
+    "methods": {
+      "sms": "Text message (SMS)"
     }
   },
   "direct": {
@@ -90,7 +95,6 @@
   "live": {
     "heading": "Live location",
     "body": "Your trusted contacts get a link that shows where you are in any browser, until you stop. Your location goes to Saakshi's server only while sharing is on, and is deleted when it stops.",
-    "duration": "Share for",
     "hours_one": "{{count}} hour",
     "hours_other": "{{count}} hours",
     "start": "Share my live location",
@@ -105,7 +109,8 @@
     "failed": "Live location could not start: {{detail}}",
     "denied": "Saakshi needs location permission to share where you are.",
     "noticeTitle": "Sharing your location",
-    "noticeBody": "Your trusted contacts can see where you are until you stop."
+    "noticeBody": "Your trusted contacts can see where you are until you stop.",
+    "length": "For {{hours}} (change this in Settings)."
   },
   "bug": {
     "title": "Bug mode",

@@ -63,6 +63,19 @@
       ],
       "expo-sharing",
       [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Saakshi uses Face ID only when you reset a forgotten secret code, to check that it is you.",
+          "configureAndroidBackup": false
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Saakshi uses Face ID only when you reset a forgotten secret code, to check that it is you."
+        }
+      ],
+      [
         "expo-audio",
         {
           "microphonePermission": "Saakshi records sound with your videos and in bug mode, for your own records.",

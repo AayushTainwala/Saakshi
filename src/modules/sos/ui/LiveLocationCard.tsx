@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AppText, Button, Card, OptionGroup } from '@/components';
-import { LIVE_HOURS_CHOICES, LocationDeniedError, useLiveShare } from '@/modules/location';
+import { AppText, Button, Card } from '@/components';
+import { LocationDeniedError, useLiveLength, useLiveShare } from '@/modules/location';
 
 import { liveInvite, startLiveLocation, stopLiveLocation } from '../alert/live';
 import { textTrustedContacts } from '../alert/text';
@@ -12,7 +12,8 @@ import { formatTimeIST } from '../alert/time';
 export function LiveLocationCard({ hasContacts }: { hasContacts: boolean }) {
   const { t } = useTranslation('sos');
   const share = useLiveShare();
-  const [hours, setHours] = useState('4');
+  // Settings → Live-location length (SPEC 5.8), 4 hours by default.
+  const hours = useLiveLength();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +21,7 @@ export function LiveLocationCard({ hasContacts }: { hasContacts: boolean }) {
     setBusy(true);
     setError(null);
     try {
-      await startLiveLocation(Number(hours));
+      await startLiveLocation(hours);
     } catch (e) {
       setError(
         e instanceof LocationDeniedError
@@ -58,12 +59,7 @@ export function LiveLocationCard({ hasContacts }: { hasContacts: boolean }) {
       ) : (
         <>
           <AppText>{t('live.body')}</AppText>
-          <OptionGroup
-            label={t('live.duration')}
-            options={LIVE_HOURS_CHOICES.map((h) => ({ value: String(h), label: t('live.hours', { count: h }) }))}
-            value={hours}
-            onChange={setHours}
-          />
+          <AppText color="textMuted">{t('live.length', { hours: t('live.hours', { count: hours }) })}</AppText>
           <Button label={busy ? t('live.starting') : t('live.start')} busy={busy} disabled={!hasContacts} onPress={() => void start()} />
         </>
       )}
