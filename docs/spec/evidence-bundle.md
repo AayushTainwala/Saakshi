@@ -1,6 +1,6 @@
 # Saakshi evidence bundle format
 
-**Version 0.8** (draft, 6 November 2026; 0.5, 0.6 and 0.7 were also 6 November 2026, 0.3 and 0.4 were 5 November 2026, 0.2 was 21 October 2026, 0.1 was 20 October 2026). Status: in use by the app from its first release; may change before 1.0, always with a new version number.
+**Version 0.9** (draft, 6 November 2026, specified for round 2; **the app still writes 0.8 until the round 2 Part 1 pull request bumps it**; 0.8 and the versions before it: 0.5, 0.6 and 0.7 were also 6 November 2026, 0.3 and 0.4 were 5 November 2026, 0.2 was 21 October 2026, 0.1 was 20 October 2026). Status: in use by the app from its first release; may change before 1.0, always with a new version number.
 
 This document defines how Saakshi records the integrity of photos and videos, and the bundle it exports. It is written so that anyone (a lawyer, a court-appointed expert, another app) can check a bundle with standard tools and without Saakshi. Other apps and forks may produce and read this format. The key words MUST, SHOULD and MAY are used as in RFC 2119.
 
@@ -58,7 +58,7 @@ What this format does and does not show:
    - When the file closes, its own record (section 4) carries the same `recording` id as its checkpoints, and its first bytes must agree with every one of them.
    - If the recording is cut off, the checkpoints already signed prove what existed up to the last one, at most about 10 seconds before the cut. The file itself plays up to the cut and is sealed as interrupted when the app next opens (step 6).
    - The Android MP4 fallback (step 2) gets no checkpoints: MediaRecorder rewrites an MP4's header when it stops.
-   - **Upload parts** (for E7, not yet uploaded): byte ranges of the file, each ending on a checkpoint and about a minute or two long (a setting). Joined in order they are the file byte for byte, and the bytes up to the end of any part have the SHA-256 its checkpoint signed. Parts are not separate files and are not in the bundle.
+   - **Upload parts** (for E7): byte ranges of the file, each starting and ending on a checkpoint. Their lengths follow the schedule in section 4b (from 0.9; before it, a minute or two, a setting). Joined in order they are the file byte for byte, and the bytes up to the end of any part have the SHA-256 its checkpoint signed. Parts are not separate files and are not in the bundle.
 
 ## 4. Record
 
@@ -67,7 +67,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 ```json
 {
   "type": "saakshi.evidence.record",
-  "version": "0.8",
+  "version": "0.9",
   "id": "3f0a1c9e-5d0b-4a8e-9a3c-2f1b7c6d5e4f",
   "session": "8c2d4b6a-1e3f-4a5b-9c7d-0e1f2a3b4c5d",
   "sequence": 3,
@@ -122,7 +122,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 
 | Member | Meaning |
 |---|---|
-| `type`, `version` | Always `"saakshi.evidence.record"` and `"0.8"` for this version. |
+| `type`, `version` | Always `"saakshi.evidence.record"` and `"0.9"` for this version. |
 | `id` | UUID (version 4) of this record. |
 | `session` | UUID of the capture session. |
 | `sequence` | Position in the session's chain, from 0, counting every record in the order it was made: each file's record when the file closed, and from 0.5 each checkpoint (section 4a). |
@@ -131,10 +131,12 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 | `previous` | Null for `sequence` 0. Otherwise the previous record in the session: its `id`, the SHA-256 of its record file (section 5) and the SHA-256 of its media file. |
 | `interrupted` | True when the recording was cut off and this record was made when the app next opened (section 3, step 6). |
 | `file` | The media file: the app's name for it (up to 0.7 also its name inside the bundle's `media/` folder; from 0.8 the bundle gives it a name a person can read, section 7), IANA media type, size in bytes, and fingerprints. |
-| `capture.mode` | `"camera"` (the evidence camera), `"body-cam"` or `"bug"`. |
+| `capture.mode` | `"camera"` (the evidence camera), `"body-cam"` or `"bug"`. The app calls `"bug"` **Pocket recording** from 0.9 (the owner renamed bug mode on 6 November 2026); the stored value does not change, so old and new records read alike. |
+| `capture.startedFrom` | From 0.9, optional, for `"bug"` only: `"pocket"` (started as Pocket recording) or `"phone-taken"` (started by "My phone is being taken"). Absent in older records. |
+| `capture.batteryPercent` | From 0.9, optional: the battery level, 0–100, when the file closed (in a file's record) or when the checkpoint was made (in a checkpoint). Absent when the phone did not say. Like the location, it is the phone's report and not proof. |
 | `capture.startedAt`, `endedAt` | When the camera started and stopped writing this file, by the phone's clock. Equal for a photo. |
 | `capture.endedAtSource` | `"recorder"`: the recorder reported the end. `"file-modified"`: the file's last-write time, for an interrupted file. |
-| `capture.endReason` | `"stopped"` (by the user), `"piece-complete"`, `"app-left"` (iPhone video stopped because the app left the screen or the phone was locked), `"camera-in-use"` (from 0.4, iPhone body-cam: iOS stopped the camera because another app took it), `"system-pressure"` (from 0.4, iPhone body-cam: iOS stopped the camera because the phone was under strain, such as from heat), `"camera-lost"` (the system or another app took the camera, for any other reason), `"low-battery"` (the app stopped and saved the recording at 3% battery), `"audio-interrupted"` (the system stopped sound recording, for example for a phone call on iPhone), `"sound-resumed"` (from 0.3, iPhone body-cam: a video piece whose sound stopped part-way, or which had none, ended because sound recording came back; the next piece has sound), `"video-resumed"` (from 0.3, iPhone body-cam: a sound-only piece ended because video with sound started again), `"interrupted"` or `"error"`. For a piece, a negative `gapBeforeMs` means it started before the previous piece stopped (iPhone sound pieces overlap so there is no silence; section 3, step 8). |
+| `capture.endReason` | `"stopped"` (by the user), `"piece-complete"`, `"app-left"` (iPhone video stopped because the app left the screen or the phone was locked), `"camera-in-use"` (from 0.4, iPhone body-cam: iOS stopped the camera because another app took it), `"system-pressure"` (from 0.4, iPhone body-cam: iOS stopped the camera because the phone was under strain, such as from heat), `"camera-lost"` (the system or another app took the camera, for any other reason), `"low-battery"` (up to 0.8: the app stopped and saved the recording at 3% battery. From 0.9: the file was closed cleanly at 5% battery in body-cam or Pocket recording, and a new file of the same clip follows, `segment.index` + 1, at lower quality in body-cam (480p, 15 frames a second). Nothing ends with `"low-battery"` in the evidence camera from 0.9: it never stops by itself), `"audio-interrupted"` (the system stopped sound recording, for example for a phone call on iPhone), `"sound-resumed"` (from 0.3, iPhone body-cam: a video piece whose sound stopped part-way, or which had none, ended because sound recording came back; the next piece has sound), `"video-resumed"` (from 0.3, iPhone body-cam: a sound-only piece ended because video with sound started again), `"interrupted"` or `"error"`. For a piece, a negative `gapBeforeMs` means it started before the previous piece stopped (iPhone sound pieces overlap so there is no silence; section 3, step 8). |
 | `capture.rotationDegrees` | Degrees clockwise to turn the picture to show it upright, as the recorder set it when the file started. Given only for MPEG-TS files, whose container has no field for it, so a player may show them on their side; null otherwise (QuickTime and MP4 carry their own rotation, and photos and audio have none). |
 | `capture.gapBeforeMs` | For a piece: milliseconds between the end of the previous piece of the same recording and the start of this one. Otherwise null. |
 | `capture.hashedAt` | When hashing finished. |
@@ -154,7 +156,7 @@ A checkpoint is signed while a body-cam file (from 0.5) or a bug-mode file (from
 ```json
 {
   "type": "saakshi.evidence.checkpoint",
-  "version": "0.8",
+  "version": "0.9",
   "id": "5d1e…",
   "session": "8c2d4b6a-1e3f-4a5b-9c7d-0e1f2a3b4c5d",
   "sequence": 7,
@@ -187,7 +189,18 @@ A checkpoint is signed while a body-cam file (from 0.5) or a bug-mode file (from
 | `segment` | As in the file's record. |
 | `file` | The file's media type, and `size` and `sha256`: the length written so far, and the SHA-256 of exactly those first bytes. There is no `name`: the file's name in the bundle is in its own record. |
 | `capture.startedAt`, `checkpointAt` | When the file started, and when the recorder counted these bytes, by the phone's clock. |
+| `capture.batteryPercent` | From 0.9, optional, as in section 4. |
 | `location`, `locationStatus`, `device`, `app`, `key` | As in section 4. |
+
+## 4b. Upload parts (from 0.9)
+
+Upload parts get a body-cam or Pocket-recording file off the phone while it is still being written (E7). They are not files of the bundle and have no records of their own; they are byte ranges, fixed by the file's checkpoints (section 4a).
+
+- **A part** is the bytes of one file from one checkpoint's `file.size` (or 0 for the first part) to a later checkpoint's `file.size`. Parts of a file are consecutive and do not overlap. The last part runs to the end of the file when the file closes, and is checked against the file's own record.
+- **Lengths (the owner's design, 6 November 2026).** Parts are cut at the first checkpoint at or after the target length: **about 10 seconds** while the recording is in its first minute, **about 30 seconds** for the next five minutes, and **about one minute** after that. Checkpoints come about every 10 seconds, so the first parts are one checkpoint each. The lengths are settings, not constants. A new file of the same clip (for example after the low-battery handover) restarts the count only if the clip does not continue: the schedule runs from the start of the recording, not of the file.
+- **Joining.** The parts in order are the file byte for byte. The first `n` bytes of the joined parts have the SHA-256 that the checkpoint ending part `n` signed. A reader who has the parts and the signed checkpoint records can therefore prove a rebuilt file is the one the phone recorded, up to the last part. Whether such a copy counts as primary or secondary evidence is an open question in `docs/research/law.md` (item 8); the format makes no claim.
+- **No live streaming.** A part is uploaded only once it ends on a checkpoint. The phone does not send audio or video as it is captured.
+- **Upload state** (which parts have gone, to which provider, the name each part has there) is kept by the app and is not signed. The E7 builder adds it to the manifest as `uploads` and records the change in section 12.
 
 ## 5. Record file, signature and chain
 
@@ -220,7 +233,7 @@ Apple's attestation object (CBOR, with a certificate chain to Apple's App Attest
 ```json
 {
   "type": "saakshi.device-key",
-  "version": "0.8",
+  "version": "0.9",
   "keyId": "…",
   "algorithm": "ES256",
   "publicKeySpki": "<Base64 of DER SubjectPublicKeyInfo>",
@@ -243,7 +256,7 @@ Apple's attestation object (CBOR, with a certificate chain to Apple's App Attest
 
 ## 7. Bundle
 
-A ZIP file named `Saakshi <record name>.zip`, for example `Saakshi 2026-11-05 10-40 IST Body-cam.zip`: when the record's first file started (IST) and what recorded it (`Body-cam`, `Bug mode`, `Photo`, `Photos`, `Video`, `Videos` or `Camera`), as the app and the witness message (section 9) name it. Entries are stored without compression (method 0). ZIP64 is used when an entry or the archive passes 4 GiB. From 0.8 a reader may also rely on the ZIP being plain: each name once, and a plain path; each local header the same as its central-directory entry; no data descriptors, no symbolic links, and no extra fields but ZIP64's; the entries one after another from the start, with the central directory right after the last; then, only if needed, the ZIP64 end record and locator; and the end record in the last 22 bytes, with no comment, agreeing with the ZIP64 record.
+A ZIP file named `Saakshi <record name>.zip`, for example `Saakshi 2026-11-05 10-40 IST Body-cam.zip`: when the record's first file started (IST) and what recorded it (`Body-cam`, `Pocket recording` (`Bug mode` up to 0.8), `Photo`, `Photos`, `Video`, `Videos` or `Camera`), as the app and the witness message (section 9) name it. Entries are stored without compression (method 0). ZIP64 is used when an entry or the archive passes 4 GiB. From 0.8 a reader may also rely on the ZIP being plain: each name once, and a plain path; each local header the same as its central-directory entry; no data descriptors, no symbolic links, and no extra fields but ZIP64's; the entries one after another from the start, with the central directory right after the last; then, only if needed, the ZIP64 end record and locator; and the end record in the last 22 bytes, with no comment, agreeing with the ZIP64 record.
 
 From 0.8 the folders and files have names a person can read (fix round 1, group 9), and every part of each name comes from a signed record, so a reader can work it out and check it:
 - **an original:** `Original files/<capture.startedAt in IST, YYYY-MM-DD HH-MM-SS> IST <label><extension of file.name>`;
@@ -276,7 +289,7 @@ Up to 0.7 the layout was `manifest.json`, `device-key.json`, `media/<file.name>`
 ```json
 {
   "type": "saakshi.evidence.bundle",
-  "version": "0.8",
+  "version": "0.9",
   "session": "8c2d4b6a-…",
   "name": "2026-11-05 10-40 IST Body-cam",
   "createdAt": "2026-11-05T06:15:00.000Z",
@@ -341,7 +354,7 @@ ID: 8c2d4b6a-1e3f-4a5b-9c7d-0e1f2a3b4c5d
 
 | Line | Value |
 |---|---|
-| Record | The record's name: when it started (date and time, IST) and what it is (`Body-cam`, `Bug mode`, `Photo`, `Photos`, `Video`, `Videos`, `Camera`). |
+| Record | The record's name: when it started (date and time, IST) and what it is (`Body-cam`, `Pocket recording` (`Bug mode` up to 0.8), `Photo`, `Photos`, `Video`, `Videos`, `Camera`). |
 | Started, Ended | When the first file started and the last one ended (each record's `capture.startedAt` and `capture.endedAt`), as `DD/MM/YYYY HH:MM:SS IST`. These are the times the app shows as "Started" and the bundle's file name uses. |
 | Length | From Started to Ended, as `H:MM:SS`. |
 | Place | Where the recording started: the first file with a position, as latitude and longitude to five decimals and its accuracy; or that it was not recorded. |
@@ -353,7 +366,7 @@ ID: 8c2d4b6a-1e3f-4a5b-9c7d-0e1f2a3b4c5d
 | ID (optional) | The session's id (the records' `session`, the manifest's `session`). |
 
 - **Length limit.** A message is kept to at most 6 SMS parts (160 characters, or 70 outside GSM's basic character set such as Hindi, per part; 153 and 67 when joined). If it would be longer, it leaves out, in turn: the lines for each file (the chain head still covers them), the map link, and the ID. Line 1, the record's name, the times, the place, the count, the chain head and the app are always kept. In English, the message uses only GSM characters, so that it stays in the cheaper encoding.
-- **Bug mode's witness texts** (section 3, step 9) are shorter, and sent while it records: `Saakshi bug mode: recording since 10:40 IST, signed up to 10:50 IST. SHA-256: <chain head>`.
+- **Pocket recording's witness texts** (bug mode's up to 0.8) (section 3, step 9) are shorter, and sent while it records: `Saakshi pocket recording: recording since 10:40 IST, signed up to 10:50 IST. SHA-256: <chain head>`.
 
 ## 10. How to verify a bundle
 
@@ -435,8 +448,9 @@ To check a joined copy: verify its record's signature as in section 10, step 3; 
 - **0.6** (6 November 2026): bug mode records one continuous file per unbroken stretch instead of 2-minute pieces, with checkpoint records (section 4a) as for body-cam, and its files are ADTS AAC (`.aac`) on iPhone too (section 3, steps 2, 7 and 9). No record member was added or removed.
 - **0.7** (6 November 2026): joined copies of a record's files for sharing, with their own signed records (section 11a). No member of the records in a bundle was added or removed.
 - **0.8** (6 November 2026): the bundle, its folders and its files have names a person can read (section 7): `Saakshi <record name>.zip`, `Original files/`, `Signed records/`, `Hash report.txt`, `Certificate Part A.pdf`; the manifest gains `name` and, for each record, `recordId` and `fileName`, and is how a reader finds a record's original; README.txt is in English and Hindi. No record member was added or removed.
+- **0.9** (6 November 2026, specified for round 2): the low-battery handover at 5% instead of the 3% stop (`capture.endReason: "low-battery"`, section 4); optional `capture.batteryPercent` in file and checkpoint records; optional `capture.startedFrom` (`"pocket"` or `"phone-taken"`); upload parts and their lengthening schedule (section 4b); bug mode is called Pocket recording in names and in the witness text, with `capture.mode` still `"bug"`. No required member was added or removed. When the Part 1 pull request bumps `FORMAT_VERSION`, it also updates the record-version strings in `seal.test.ts`, `playableCopy.test.ts`, `deviceKey.test.ts`, `joinedCopy.test.ts` and `checkpointBundle.test.ts`, and `SUPPORTED_VERSIONS` in `tools/verify-bundle.mjs`.
 - **Witness message v1** (6 November 2026): section 9. The message's format is versioned on its own; the bundle format is unchanged by it.
-- **Later (planned, R2):** OpenTimestamps proofs for each chain head and record, in `timestamps/<recordSha256>.ots`, listed in the manifest's `timestamps`; upload state for copies in the user's cloud drive.
+- **Later (planned):** OpenTimestamps proofs for each chain head and record, in `timestamps/<recordSha256>.ots`, listed in the manifest's `timestamps`; upload state for copies in the user's cloud drive (`uploads`, section 4b, built with E7).
 - **1.1 of the app** (planned): C2PA Content Credentials and sensor readings.
 
 A reader MUST reject a record whose `version` it does not know, and SHOULD tell the user which version it found.
