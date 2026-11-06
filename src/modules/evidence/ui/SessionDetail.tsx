@@ -8,17 +8,19 @@ import { getTrustedContacts } from '@/modules/sos';
 import { spacing } from '@/theme';
 
 import { lastLink } from '../capture/pipeline';
-import { shareBundle } from '../export/bundle';
+import { BundleBusyError, shareBundle } from '../export/bundle';
+import { type ExportFolder, ExportFolderError, exportToFolder, pickExportFolder, readExportFolder, saveExportFolder } from '../export/folder';
+import { JoinError } from '../export/joinedCopy';
+import { shareKind, shareTarget } from '../export/shareTarget';
+import { needsCopy, playVideo, shareFile, shareJoinedCopy } from '../export/videoActions';
 import { runCheck } from '../locker/actions';
 import { deleteSession, SessionBusyError } from '../locker/delete';
 import { fileLocker } from '../locker/store';
-import { JoinError, needsJoinedCopy } from '../export/joinedCopy';
-import { needsCopy, playVideo, shareJoinedCopy, shareVideo } from '../export/videoActions';
 import { recordModeOf } from '../locker/records';
 import { summarize } from '../locker/summary';
 import { useSession } from '../locker/useSessions';
 import { sendWitnessMessage, SmsUnavailableError } from '../witness/send';
-import type { EvidenceItem, SessionState } from '../types';
+import type { EvidenceItem, MediaKind, SessionState } from '../types';
 import { formatBytes, formatIST } from './format';
 import { endReasonLabel } from './endReasons';
 import { kindLabel, lengthLabel } from './labels';
@@ -28,6 +30,10 @@ import { Thumbnail } from './RecordRow';
 export function chainHeadOf(session: SessionState): string | null {
   return lastLink(session)?.recordSha256 ?? null;
 }
+
+const SHARE_WORD = { video: 'share.video', photo: 'share.photo', audio: 'share.sound' } as const satisfies Record<MediaKind, string>;
+
+const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 function StatusRow({ done, label, detail }: { done: boolean; label: string; detail?: string }) {
   return (
@@ -53,29 +59,30 @@ function ItemCard({ item, session }: { item: EvidenceItem; session: SessionState
   const ended = item.kind === 'photo' ? null : endReasonLabel(t, item);
   const openPhoto = () => router.push({ pathname: '/photo', params: { session: session.id, sequence: String(item.sequence) } });
 
-  const run = async (action: () => Promise<void>) => {
-    setBusy(true);
+  const [sharing, setSharing] = useState(false);
+  const run = async (action: () => Promise<void>, setRunning: (running: boolean) => void = setBusy) => {
+    setRunning(true);
     try {
       await action();
     } catch (error) {
-      Alert.alert(t('locker.errorTitle'), error instanceof Error ? error.message : String(error));
+      Alert.alert(t('locker.errorTitle'), message(error));
     } finally {
-      setBusy(false);
+      setRunning(false);
     }
   };
 
-  const share = () => {
-    if (!needsCopy(item)) {
-      void run(() => shareVideo(session.id, item, 'original', t('video.share')));
-      return;
-    }
-    // Android .ts: the original is the evidence; offer the MP4 copy for playing elsewhere.
-    Alert.alert(t('video.shareTitle'), t('video.shareBody'), [
-      { text: t('video.shareCopy'), onPress: () => void run(() => shareVideo(session.id, item, 'copy', t('video.share'))) },
-      { text: t('video.shareOriginal'), onPress: () => void run(() => shareVideo(session.id, item, 'original', t('video.share'))) },
-      { text: t('video.cancel'), style: 'cancel' },
-    ]);
-  };
+  // A playable file through the share sheet: the original, or an Android video's MP4 copy (group 9).
+  const shareWord = t(SHARE_WORD[item.kind]);
+  const shareButton =
+    item.status === 'sealed' ? (
+      <Button
+        variant="secondary"
+        label={shareWord}
+        busy={sharing}
+        disabled={busy}
+        onPress={() => void run(() => shareFile(session.id, item, shareWord), setSharing)}
+      />
+    ) : null;
 
   const status =
     item.status === 'sealed'
@@ -121,6 +128,7 @@ function ItemCard({ item, session }: { item: EvidenceItem; session: SessionState
         </AppText>
       ) : null}
       {item.kind === 'photo' && inLocker ? <Button variant="secondary" label={t('photo.open')} onPress={openPhoto} /> : null}
+      {item.kind === 'photo' ? shareButton : null}
       {item.kind === 'audio' && inLocker ? (
         listening ? (
           <View style={styles.videoButtons}>
@@ -131,15 +139,17 @@ function ItemCard({ item, session }: { item: EvidenceItem; session: SessionState
           <Button variant="secondary" label={t('player.playSound')} onPress={() => setListening(true)} />
         )
       ) : null}
+      {item.kind === 'audio' ? shareButton : null}
       {isVideo ? (
         <View style={styles.videoButtons}>
           <Button
             variant="secondary"
             label={needsCopy(item) ? t('video.playCopy') : t('video.play')}
             busy={busy}
+            disabled={sharing}
             onPress={() => void run(() => playVideo(session.id, item, t('video.play')))}
           />
-          <Button variant="secondary" label={t('video.share')} disabled={busy} onPress={share} />
+          {shareButton}
         </View>
       ) : null}
     </Card>
@@ -152,7 +162,8 @@ export function SessionDetail({ id }: { id: string }) {
   const [checking, setChecking] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [witnessing, setWitnessing] = useState(false);
-  const [joining, setJoining] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [folder, setFolder] = useState<ExportFolder | null>(readExportFolder);
 
   if (!session) {
     return (
@@ -241,24 +252,90 @@ export function SessionDetail({ id }: { id: string }) {
     ]);
   };
 
-  const shareJoined = async () => {
-    setJoining(true);
+  // The record's two actions (fix round 1, group 9): share a playable copy, or export the bundle.
+  const target = shareTarget(session, summary.kind);
+  const word = shareKind(target);
+  const shareLabel = word ? t(SHARE_WORD[word]) : null;
+  const shareHelp = !target
+    ? null
+    : target.kind === 'each'
+      ? t('share.each')
+      : target.kind === 'joined'
+        ? t('share.helpJoined')
+        : needsCopy(target.item)
+          ? t('share.helpCopy')
+          : t('share.helpFile');
+
+  const shareRecord = async () => {
+    if (!target || target.kind === 'each' || !shareLabel) return;
+    setSharing(true);
     try {
-      await shareJoinedCopy(id, t('joined.share'));
+      if (target.kind === 'joined') await shareJoinedCopy(id, shareLabel);
+      else await shareFile(id, target.item, shareLabel);
     } catch (error) {
-      const words = error instanceof JoinError ? t(`joined.error.${error.code}`) : error instanceof Error ? error.message : String(error);
-      Alert.alert(t('locker.errorTitle'), words);
+      Alert.alert(t('locker.errorTitle'), error instanceof JoinError ? t(`joined.error.${error.code}`) : message(error));
     } finally {
-      setJoining(false);
+      setSharing(false);
+    }
+  };
+
+  const bundleError = (error: unknown) => (error instanceof BundleBusyError ? t('export.recording') : message(error));
+  const folderName = (f: ExportFolder) => f.name ?? t('export.someFolder');
+
+  const shareBundleNow = async () => {
+    setExporting(true);
+    try {
+      await shareBundle(id, t('locker.exportDialog'));
+    } catch (error) {
+      Alert.alert(t('locker.errorTitle'), bundleError(error));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  /** The folder picker; the folder chosen is kept for next time. Null if the user cancels. */
+  const chooseFolder = async (): Promise<ExportFolder | null> => {
+    try {
+      const picked = await pickExportFolder();
+      if (picked) {
+        saveExportFolder(picked);
+        setFolder(picked);
+      }
+      return picked;
+    } catch (error) {
+      Alert.alert(t('locker.errorTitle'), error instanceof ExportFolderError ? t(`export.problem.${error.problem}`) : message(error));
+      return null;
     }
   };
 
   const exportBundle = async () => {
     setExporting(true);
     try {
-      await shareBundle(id, t('locker.exportDialog'));
-    } catch (error) {
-      Alert.alert(t('locker.errorTitle'), error instanceof Error ? error.message : String(error));
+      const into = folder ?? (await chooseFolder());
+      if (!into) return;
+      try {
+        const saved = await exportToFolder(id, into);
+        if (JSON.stringify(saved.folder) !== JSON.stringify(into)) {
+          saveExportFolder(saved.folder);
+          setFolder(saved.folder);
+        }
+        const where = folderName(saved.folder);
+        Alert.alert(
+          t('export.savedTitle'),
+          saved.fileName ? t('export.savedBody', { file: saved.fileName, folder: where }) : t('export.savedBodyNoName', { folder: where }),
+        );
+      } catch (error) {
+        // A problem making the bundle (a file missing, say) is not the folder's fault.
+        if (!(error instanceof ExportFolderError)) {
+          Alert.alert(t('export.failedTitle'), bundleError(error));
+          return;
+        }
+        Alert.alert(t('export.failedTitle'), t('export.failedBody', { folder: folderName(into), reason: t(`export.problem.${error.problem}`) }), [
+          { text: t('export.cancel'), style: 'cancel' },
+          { text: t('export.choose'), onPress: () => void chooseFolder() },
+          { text: t('export.shareInstead'), onPress: () => void shareBundleNow() },
+        ]);
+      }
     } finally {
       setExporting(false);
     }
@@ -279,22 +356,35 @@ export function SessionDetail({ id }: { id: string }) {
           <AppText variant="label">{t('player.heading')}</AppText>
           <AppText color="textMuted">{t('player.help')}</AppText>
           <RecordingPlayer sessionId={id} items={session.items} />
-          {needsJoinedCopy(session) ? (
-            <>
-              <Button
-                variant="secondary"
-                label={joining ? t('joined.making') : t('joined.share')}
-                busy={joining}
-                onPress={() => void shareJoined()}
-              />
-              <AppText color="textMuted">{t('joined.help')}</AppText>
-              {session.joined ? (
-                <AppText color="textMuted" selectable>
-                  {t(session.joined.reencoded ? 'joined.madeReencoded' : 'joined.made', { sha256: session.joined.sha256 })}
-                </AppText>
-              ) : null}
-            </>
+        </Card>
+      ) : null}
+
+      {target ? (
+        <Card>
+          {shareLabel ? (
+            <Button
+              label={sharing && target.kind === 'joined' ? t('joined.making') : shareLabel}
+              busy={sharing}
+              disabled={exporting}
+              onPress={() => void shareRecord()}
+            />
           ) : null}
+          {shareHelp ? <AppText color="textMuted">{shareHelp}</AppText> : null}
+          {target.kind === 'joined' && session.joined ? (
+            <AppText color="textMuted" selectable>
+              {t(session.joined.reencoded ? 'joined.madeReencoded' : 'joined.made', { sha256: session.joined.sha256 })}
+            </AppText>
+          ) : null}
+
+          <Button variant="secondary" label={t('export.button')} busy={exporting} disabled={sharing} onPress={() => void exportBundle()} />
+          <AppText color="textMuted">{t('export.help')}</AppText>
+          <AppText color="textMuted">{folder ? t('export.savesTo', { folder: folderName(folder) }) : t('export.firstTime')}</AppText>
+          <View style={styles.links}>
+            {folder ? (
+              <Button variant="secondary" label={t('export.change')} disabled={exporting} onPress={() => void chooseFolder()} />
+            ) : null}
+            <Button variant="secondary" label={t('export.shareInstead')} disabled={exporting || sharing} onPress={() => void shareBundleNow()} />
+          </View>
         </Card>
       ) : null}
 
@@ -329,7 +419,6 @@ export function SessionDetail({ id }: { id: string }) {
 
       <Button label={t('witness.send')} busy={witnessing} disabled={sealed === 0} onPress={witness} />
       <AppText color="textMuted">{t('witness.help')}</AppText>
-      <Button variant="secondary" label={t('locker.export')} busy={exporting} disabled={sealed === 0} onPress={exportBundle} />
       <Button
         variant="secondary"
         label={session.certificate ? t('certificate.openAgain') : t('certificate.open')}
@@ -363,4 +452,5 @@ const styles = StyleSheet.create({
   mark: { width: 24, textAlign: 'center' },
   statusText: { flex: 1, gap: 2 },
   videoButtons: { gap: spacing.sm, marginTop: spacing.sm },
+  links: { gap: spacing.sm },
 });

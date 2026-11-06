@@ -1,6 +1,6 @@
 # Saakshi evidence bundle format
 
-**Version 0.7** (draft, 6 November 2026; 0.5 and 0.6 were also 6 November 2026, 0.3 and 0.4 were 5 November 2026, 0.2 was 21 October 2026, 0.1 was 20 October 2026). Status: in use by the app from its first release; may change before 1.0, always with a new version number.
+**Version 0.8** (draft, 6 November 2026; 0.5, 0.6 and 0.7 were also 6 November 2026, 0.3 and 0.4 were 5 November 2026, 0.2 was 21 October 2026, 0.1 was 20 October 2026). Status: in use by the app from its first release; may change before 1.0, always with a new version number.
 
 This document defines how Saakshi records the integrity of photos and videos, and the bundle it exports. It is written so that anyone (a lawyer, a court-appointed expert, another app) can check a bundle with standard tools and without Saakshi. Other apps and forks may produce and read this format. The key words MUST, SHOULD and MAY are used as in RFC 2119.
 
@@ -67,7 +67,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 ```json
 {
   "type": "saakshi.evidence.record",
-  "version": "0.7",
+  "version": "0.8",
   "id": "3f0a1c9e-5d0b-4a8e-9a3c-2f1b7c6d5e4f",
   "session": "8c2d4b6a-1e3f-4a5b-9c7d-0e1f2a3b4c5d",
   "sequence": 3,
@@ -122,7 +122,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 
 | Member | Meaning |
 |---|---|
-| `type`, `version` | Always `"saakshi.evidence.record"` and `"0.7"` for this version. |
+| `type`, `version` | Always `"saakshi.evidence.record"` and `"0.8"` for this version. |
 | `id` | UUID (version 4) of this record. |
 | `session` | UUID of the capture session. |
 | `sequence` | Position in the session's chain, from 0, counting every record in the order it was made: each file's record when the file closed, and from 0.5 each checkpoint (section 4a). |
@@ -130,7 +130,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 | `recording` | From 0.5: the recorder's random id for the file, which its checkpoints (section 4a) also carry. Null for a file with no checkpoints. |
 | `previous` | Null for `sequence` 0. Otherwise the previous record in the session: its `id`, the SHA-256 of its record file (section 5) and the SHA-256 of its media file. |
 | `interrupted` | True when the recording was cut off and this record was made when the app next opened (section 3, step 6). |
-| `file` | The media file: its name inside the bundle's `media/` folder, IANA media type, size in bytes, and fingerprints. |
+| `file` | The media file: the app's name for it (up to 0.7 also its name inside the bundle's `media/` folder; from 0.8 the bundle gives it a name a person can read, section 7), IANA media type, size in bytes, and fingerprints. |
 | `capture.mode` | `"camera"` (the evidence camera), `"body-cam"` or `"bug"`. |
 | `capture.startedAt`, `endedAt` | When the camera started and stopped writing this file, by the phone's clock. Equal for a photo. |
 | `capture.endedAtSource` | `"recorder"`: the recorder reported the end. `"file-modified"`: the file's last-write time, for an interrupted file. |
@@ -154,7 +154,7 @@ A checkpoint is signed while a body-cam file (from 0.5) or a bug-mode file (from
 ```json
 {
   "type": "saakshi.evidence.checkpoint",
-  "version": "0.7",
+  "version": "0.8",
   "id": "5d1e…",
   "session": "8c2d4b6a-1e3f-4a5b-9c7d-0e1f2a3b4c5d",
   "sequence": 7,
@@ -220,7 +220,7 @@ Apple's attestation object (CBOR, with a certificate chain to Apple's App Attest
 ```json
 {
   "type": "saakshi.device-key",
-  "version": "0.7",
+  "version": "0.8",
   "keyId": "…",
   "algorithm": "ES256",
   "publicKeySpki": "<Base64 of DER SubjectPublicKeyInfo>",
@@ -243,54 +243,66 @@ Apple's attestation object (CBOR, with a certificate chain to Apple's App Attest
 
 ## 7. Bundle
 
-A ZIP file named `saakshi-<first 8 characters of session>-<YYYYMMDD-HHMM local>.zip`. Entries are stored without compression (method 0). ZIP64 is used when an entry or the archive passes 4 GiB.
+A ZIP file named `Saakshi <record name>.zip`, for example `Saakshi 2026-11-05 10-40 IST Body-cam.zip`: when the record's first file started (IST) and what recorded it (`Body-cam`, `Bug mode`, `Photo`, `Photos`, `Video`, `Videos` or `Camera`), as the app and the witness message (section 9) name it. Entries are stored without compression (method 0). ZIP64 is used when an entry or the archive passes 4 GiB. From 0.8 a reader may also rely on the ZIP being plain: each name once, and a plain path; each local header the same as its central-directory entry; no data descriptors, no symbolic links, and no extra fields but ZIP64's; the entries one after another from the start, with the central directory right after the last; then, only if needed, the ZIP64 end record and locator; and the end record in the last 22 bytes, with no comment, agreeing with the ZIP64 record.
+
+From 0.8 the folders and files have names a person can read (fix round 1, group 9), and every part of each name comes from a signed record, so a reader can work it out and check it:
+- **an original:** `Original files/<capture.startedAt in IST, YYYY-MM-DD HH-MM-SS> IST <label><extension of file.name>`;
+- **a file's record:** `Signed records/<sequence, four digits> <label>.json`, and its signature the same plus `.sig`;
+- **a checkpoint record:** `Signed records/<sequence, four digits> <label of the file with the same recording> checkpoint <checkpoint>.json` (without the label if that file's record is not in the bundle);
+- **the label:** the kind, from `file.mediaType` (`image/…` "photo", `audio/…` "sound", `video/…` "video"), and the file's number among the bundle's files of that kind in chain order, from 1: `video 1`, `sound 1`, `photo 2`. The witness message numbers the files the same way, with the kind in the app's language.
+
+The four-digit `sequence` makes a folder list the records in chain order. The app's own names stay in each signed record (`file.name`) and in the manifest.
 
 ```
+README.txt                                          (English and Hindi, for a lay reader)
+Hash report.txt
+Certificate Part A.pdf                              (when the user has made one)
+Original files/2026-11-05 10-40-12 IST video 1.mp4
+Original files/2026-11-05 10-52-30 IST sound 1.aac
+Signed records/0000 video 1 checkpoint 0.json       (from 0.5, checkpoints are among the records)
+Signed records/0000 video 1 checkpoint 0.json.sig
+…
+Signed records/0074 video 1.json
+Signed records/0074 video 1.json.sig
+…
 manifest.json
 device-key.json
-media/0000-photo.jpg
-media/0001-video.ts             (evidence camera: one file per video)
-media/0002-clip0-seg0.ts        (body-cam: one file per clip from 0.5)
-media/0003-audio0-seg0.aac
-records/0000.json
-records/0000.json.sig
-records/0001.json
-records/0001.json.sig
-…                               (from 0.5, checkpoint records are among these)
-hash-report.txt
-certificate-part-a.pdf      (when the user has made one)
-README.txt
 ```
 
-`manifest.json` lists what the bundle holds. It is not signed; everything in it can be checked against the signed records:
+Up to 0.7 the layout was `manifest.json`, `device-key.json`, `media/<file.name>`, `records/<sequence>.json` and `.json.sig`, `hash-report.txt`, `certificate-part-a.pdf` and `README.txt`, and the bundle was named `saakshi-<first 8 characters of session>-<YYYYMMDD-HHMM>.zip`.
+
+`manifest.json` lists what the bundle holds, with the machine identifiers. It is not signed; everything in it can be checked against the signed records:
 
 ```json
 {
   "type": "saakshi.evidence.bundle",
-  "version": "0.7",
+  "version": "0.8",
   "session": "8c2d4b6a-…",
-  "createdAt": "2026-10-20T10:15:00.000Z",
+  "name": "2026-11-05 10-40 IST Body-cam",
+  "createdAt": "2026-11-05T06:15:00.000Z",
   "app": { "id": "in.aayushtainwala.saakshi", "version": "1.0.0", "build": "1" },
   "chainHead": "<recordSha256 of the last record>",
   "records": [
-    { "record": "records/0000.json", "signature": "records/0000.json.sig", "media": "media/0000-photo.jpg", "recordSha256": "…", "fileSha256": "…", "recording": null }
+    { "record": "Signed records/0074 video 1.json", "signature": "Signed records/0074 video 1.json.sig", "media": "Original files/2026-11-05 10-40-12 IST video 1.mp4", "recordId": "…", "fileName": "0074-clip0-seg0.mp4", "recordSha256": "…", "fileSha256": "…", "recording": "9b3f…" }
   ],
   "checkpoints": [
-    { "record": "records/0005.json", "signature": "records/0005.json.sig", "recording": "9b3f…", "checkpoint": 0, "size": 3801088, "sha256": "…", "recordSha256": "…" }
+    { "record": "Signed records/0000 video 1 checkpoint 0.json", "signature": "Signed records/0000 video 1 checkpoint 0.json.sig", "recordId": "…", "recording": "9b3f…", "checkpoint": 0, "size": 3801088, "sha256": "…", "recordSha256": "…" }
   ],
   "witness": [
-    { "sentAt": "2026-10-20T09:05:12.000Z", "chainHead": "…", "recipients": 2, "result": "sent" }
+    { "sentAt": "2026-11-05T05:20:12.000Z", "chainHead": "…", "recipients": 2, "result": "sent" }
   ],
-  "certificate": "certificate-part-a.pdf",
+  "certificate": "Certificate Part A.pdf",
   "timestamps": []
 }
 ```
 
+- `name` (from 0.8) is the record's name, as in the bundle's file name.
+- `records` lists the files' records: where each record, its signature and its original are in the bundle, and (from 0.8) the record's `id` and the app's name for the file (`fileName`, the record's `file.name`). A reader finds a record's original through this list; up to 0.7 it is `media/<file.name>`. Because the manifest is not signed, a reader works each name out from the signed record (above) rather than trusting it, and checks that every file in `Original files/` is some record's: then the file at each readable name is the one checked against a signed record.
+- `checkpoints` (from 0.5) lists the checkpoint records. Both kinds are in the records folder, numbered by `sequence`.
 - `witness` lists every witness message the app opened for the user (section 9), including ones the user cancelled. `recipients` is how many recipients the app filled in; 0 means the user chose them in the SMS app. `result` is what the phone reported: `"sent"`, `"cancelled"` or `"unknown"` (Android always reports "unknown").
-- `checkpoints` (from 0.5) lists the checkpoint records; `records` lists the files' records. Both are in `records/`, numbered by `sequence`.
 - `certificate` is null when no certificate has been made.
-- `hash-report.txt` is a plain-text table of every file's name, size, SHA-256, SHA-1 and MD5, every record's SHA-256, how many checkpoints each body-cam or bug-mode file has and what the last one covers, and the chain head, with times in IST. It is the hash report the Schedule asks to be enclosed.
-- `README.txt` repeats section 10 in short.
+- `Hash report.txt` is a plain-text table of every file's name in the bundle and in its record, its size, SHA-256, SHA-1 and MD5, every record's name and SHA-256, how many checkpoints each body-cam or bug-mode file has and what the last one covers, and the chain head, with times in IST. It is the hash report the Schedule asks to be enclosed. A certificate made from 0.8 names the files as the bundle does.
+- `README.txt` says, in English and then in Hindi, for a reader with no technical background, what each file and folder is and why it is there, and gives section 10 in short with commands that name this bundle's own files. It is UTF-8 with a byte-order mark and Windows line ends, so that Notepad shows it as it is.
 
 ## 8. BSA s.63 certificate, Part A
 
@@ -349,15 +361,23 @@ With standard tools (`unzip`, `sha256sum`, `openssl`):
 
 1. Unzip the bundle.
 2. **Public key:** save the `publicKeyPem` value from `device-key.json` as `key.pem`. Check that `openssl pkey -pubin -in key.pem -outform DER | sha256sum` equals `keyId`, and equals `key.id` in every record.
-3. **Signatures:** for each record, run `openssl dgst -sha256 -verify key.pem -signature records/0000.json.sig records/0000.json`. It must print `Verified OK`.
-4. **Files:** for each file's record, `sha256sum media/<file.name>` must equal `file.sha256`, and the size must equal `file.size`.
-4a. **Checkpoints (from 0.5):** for each checkpoint record, find the file's record with the same `recording`. `head -c <file.size of the checkpoint> media/<file.name> | sha256sum` must equal the checkpoint's `file.sha256`. The checkpoints of one file have rising numbers (a number may be missing, if that checkpoint could not be signed), each covers more bytes than the last, and all come before the file's record in the chain.
-5. **Chain:** sort all records, files' and checkpoints', by `sequence`, from 0 with no gaps. Record 0 has `previous` null. Each later record's `previous.recordSha256` must equal `sha256sum` of the previous record file, and its `previous.fileSha256` the previous record's `file.sha256`. The `sha256sum` of the last record file is the chain head; compare it with `chainHead` in the manifest and with any witness message.
+3. **Signatures:** for each record, run `openssl dgst -sha256 -verify key.pem -signature "Signed records/0000 video 1 checkpoint 0.json.sig" "Signed records/0000 video 1 checkpoint 0.json"` (up to 0.7: `records/0000.json`). It must print `Verified OK`.
+4. **Files:** for each file's record, find its original: from 0.8 at the name section 7 gives from the record, which the manifest's `media` and the hash report also give; up to 0.7, `media/<file.name>`. Its `sha256sum` must equal `file.sha256`, and its size `file.size`. From 0.8, every file in `Original files/` must be some record's original, and each record's own name must be the one section 7 gives: otherwise a name a person reads, such as when a video started, could be wrong.
+4a. **Checkpoints (from 0.5):** for each checkpoint record, find the file's record with the same `recording`, and that file's original as in step 4. `head -c <file.size of the checkpoint> "<original>" | sha256sum` must equal the checkpoint's `file.sha256`. The checkpoints of one file have rising numbers (a number may be missing, if that checkpoint could not be signed), each covers more bytes than the last, and all come before the file's record in the chain.
+5. **Chain:** sort all records, files' and checkpoints', by `sequence` (from 0.8 their names start with it), from 0 with no gaps. Record 0 has `previous` null. Each later record's `previous.recordSha256` must equal `sha256sum` of the previous record file, and its `previous.fileSha256` the previous record's `file.sha256`. The `sha256sum` of the last record file is the chain head; compare it with `chainHead` in the manifest and with any witness message.
 6. **Attestation:**
    - Android: verify the certificate chain up to a Google hardware attestation root, check the leaf's public key equals the device key, and read the attestation extension (package name `in.aayushtainwala.saakshi`, the app's signing-certificate digest published with each release, security level, verified-boot state). Also check Google's attestation revocation list.
    - iPhone: verify the App Attest object as Apple documents for servers ("Validating apps that connect to your server"), with App ID `<Team ID>.in.aayushtainwala.saakshi` and `clientDataHash` equal to SHA-256 of the device key's DER public key.
 
-`tools/verify-bundle.mjs` in the Saakshi repository runs steps 2–5 with Node.js and no other dependencies, step 4a included (it reads each file once and takes the SHA-256 of every checkpointed prefix on the way). The tool reads versions 0.1 to 0.7, and does not yet check attestation chains (step 6).
+`tools/verify-bundle.mjs` in the Saakshi repository runs steps 2–5 with Node.js and no other dependencies, step 4a included (it reads each file once and takes the SHA-256 of every checkpointed prefix on the way). The tool reads versions 0.1 to 0.8, lists each file it checked, and does not yet check attestation chains (step 6). For a 0.8 bundle it works out every name from the signed records and fails on any that differ, in the folders or in the manifest. For any bundle it fails on:
+- a file that is not part of the bundle's one layout (for example a copy in a look-alike folder, or at the top);
+- a file in the originals' or records' folder that no record accounts for;
+- names a computer may treat as the same (they differ only in case, or in how a letter is written);
+- a ZIP that is not plain (section 7): a name twice, or with `.` or `..` in it; a local header that differs from the central directory, for example by naming another file; an extra field such as the Unicode Path field (0x7075), which some unzip tools take as the name (ZIP64's and the common timestamp and owner fields are allowed); a gap between entries; an entry marked as a symbolic link; anything between the central directory and the end records, or a ZIP64 record that disagrees with the end record (either could lead an unzip tool to a second archive in the file).
+
+It skips what a computer adds when unzipping (macOS's `.DS_Store`, `._` files and `__MACOSX/`, and Windows's `Thumbs.db` and `desktop.ini`). It allows `key.pem`, which README.txt's steps make, but only if it is the key in `device-key.json`.
+
+The chain shows a record changed, added or taken out of the middle. Records taken off the end show only against a chain head held elsewhere, such as in a witness message: neither the tool nor the manifest's `chainHead` (which is not signed) can show it.
 
 ## 11. Playable copies (Android)
 
@@ -411,9 +431,10 @@ To check a joined copy: verify its record's signature as in section 10, step 3; 
 - **0.2** (21 October 2026): one file per evidence-camera video, in a cut-off-safe container; pieces for body-cam and bug mode; markers and interrupted files; new record members `interrupted`, `capture.mode`, `capture.endedAtSource`, `capture.endReason`, `capture.gapBeforeMs` and `capture.rotationDegrees`; playable copies of Android videos with their own signed records (section 11).
 - **0.3** (5 November 2026): body-cam on iPhone records video and sound in the same file while the app is on screen, and sound-only pieces only while video can't record (section 3, step 8); new `capture.endReason` values `"sound-resumed"` and `"video-resumed"`. No record member was added or removed; only the version and the allowed `endReason` values changed.
 - **0.4** (5 November 2026): iPhone body-cam video ends only when iOS stops the camera, and its `capture.endReason` gives iOS's reason: new values `"camera-in-use"` and `"system-pressure"` (section 3, step 8). No record member was added or removed.
-- **0.5** (this document, 6 November 2026): body-cam records one continuous file per unbroken stretch instead of pieces; signed checkpoint records (section 4a) while each file is written, in the chain; new record member `recording`; manifest `checkpoints`; iPhone body-cam files are fragmented MP4 (`.mp4`) and sound-only files ADTS AAC (`.aac`), both written by the app and cut-off safe (section 3, steps 2, 7 and 9).
+- **0.5** (6 November 2026): body-cam records one continuous file per unbroken stretch instead of pieces; signed checkpoint records (section 4a) while each file is written, in the chain; new record member `recording`; manifest `checkpoints`; iPhone body-cam files are fragmented MP4 (`.mp4`) and sound-only files ADTS AAC (`.aac`), both written by the app and cut-off safe (section 3, steps 2, 7 and 9).
 - **0.6** (6 November 2026): bug mode records one continuous file per unbroken stretch instead of 2-minute pieces, with checkpoint records (section 4a) as for body-cam, and its files are ADTS AAC (`.aac`) on iPhone too (section 3, steps 2, 7 and 9). No record member was added or removed.
 - **0.7** (6 November 2026): joined copies of a record's files for sharing, with their own signed records (section 11a). No member of the records in a bundle was added or removed.
+- **0.8** (6 November 2026): the bundle, its folders and its files have names a person can read (section 7): `Saakshi <record name>.zip`, `Original files/`, `Signed records/`, `Hash report.txt`, `Certificate Part A.pdf`; the manifest gains `name` and, for each record, `recordId` and `fileName`, and is how a reader finds a record's original; README.txt is in English and Hindi. No record member was added or removed.
 - **Witness message v1** (6 November 2026): section 9. The message's format is versioned on its own; the bundle format is unchanged by it.
 - **Later (planned, R2):** OpenTimestamps proofs for each chain head and record, in `timestamps/<recordSha256>.ots`, listed in the manifest's `timestamps`; upload state for copies in the user's cloud drive.
 - **1.1 of the app** (planned): C2PA Content Credentials and sensor readings.

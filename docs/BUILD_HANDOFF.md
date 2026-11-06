@@ -19,29 +19,29 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 | 1. Body-cam: back swipe, and sound in the video (C2, C6) | Merged: https://github.com/AayushTainwala/Saakshi/pull/16. Not yet run on a phone. |
 | 2. Body-cam: other fixes (C1–C3) | Merged: https://github.com/AayushTainwala/Saakshi/pull/17. Not yet run on a phone. |
 | 2a. Body-cam: one continuous file, with checkpoints | Merged: https://github.com/AayushTainwala/Saakshi/pull/18. Not yet run on a phone. |
-| 2b. Bug mode: one continuous file, with checkpoints (owner said yes, 6 Nov) | Built: https://github.com/AayushTainwala/Saakshi/pull/20 (branch `claude/keen-rubin-urautd`, from `main` after #19). Not yet run on a phone. |
-| 3. Records list and playback (B1, C6) | Built: https://github.com/AayushTainwala/Saakshi/pull/21 (branch `claude/fix-round-1-group-3`, stacked on #20). Not yet run on a phone. |
-| 4. Evidence camera: front and back, zoom (B2) | Built: https://github.com/AayushTainwala/Saakshi/pull/22 (branch `claude/fix-round-1-group-4`, stacked on #21). Research items reported below, not built. Not yet run on a phone. |
-| 5. Why a recording ended (B8) | Built: https://github.com/AayushTainwala/Saakshi/pull/23 (branch `claude/fix-round-1-group-5`, stacked on #22). Not yet run on a phone. |
-| 6. Trusted contacts, three ticks per person (B5) | Built: https://github.com/AayushTainwala/Saakshi/pull/24 (branch `claude/fix-round-1-group-6`, stacked on #23). Not yet run on a phone. |
-| 7. Witness message (B5) | Built: https://github.com/AayushTainwala/Saakshi/pull/25 (branch `claude/fix-round-1-group-7`, stacked on #24). Not yet run on a phone. |
-| 8. Certificate: one profile (B7) | Built: https://github.com/AayushTainwala/Saakshi/pull/26 (branch `claude/fix-round-1-group-8`, stacked on #25). Not yet run on a phone. |
-| 9 | Not started |
+| 2b. Bug mode: one continuous file, with checkpoints (owner said yes, 6 Nov) | Merged: https://github.com/AayushTainwala/Saakshi/pull/20. Not yet run on a phone. |
+| 3. Records list and playback (B1, C6) | Merged: https://github.com/AayushTainwala/Saakshi/pull/21. Not yet run on a phone. |
+| 4. Evidence camera: front and back, zoom (B2) | Merged: https://github.com/AayushTainwala/Saakshi/pull/22. Research items reported below, not built. Not yet run on a phone. |
+| 5. Why a recording ended (B8) | Merged: https://github.com/AayushTainwala/Saakshi/pull/23. Not yet run on a phone. |
+| 6. Trusted contacts, three ticks per person (B5) | Merged: https://github.com/AayushTainwala/Saakshi/pull/24. Not yet run on a phone. |
+| 7. Witness message (B5) | Merged: https://github.com/AayushTainwala/Saakshi/pull/25. Not yet run on a phone. |
+| 8. Certificate: one profile (B7) | Merged: https://github.com/AayushTainwala/Saakshi/pull/26. Not yet run on a phone. |
+| 9. Export (B6) | Built: https://github.com/AayushTainwala/Saakshi/pull/27 (branch `claude/fix-round-1-group-9`, on `main`). Not yet run on a phone. |
 
 ### Where fix round 1 stands, and what's next (6 Nov 2026)
 
 For the session that takes over. Read the brief, then this section, then CLAUDE.md as usual.
 
-- **Finished:** groups 1, 2 and 2a are merged into `main` (#16, #17, #18). Each pull request has plain test steps for the owner. Typecheck, lint and all 307 tests pass, and both native builds pass on every one.
-- **Built since:** bug mode as one continuous file with checkpoints (#20, "Bug mode: one continuous file" below). With it, typecheck, lint and 320 tests pass (three tests of the old iPhone pieces went with them).
-- **Not yet tested:** nothing from fix round 1 has run on a phone. The owner's next TestFlight round should follow the test steps in #16, #17 and #18. Step C of #18, a forced restart while recording, is the genuine cut-off test that round 1 couldn't do.
-- **Next: group 3** (records list and playback), on a new branch from the latest `main` (for example `claude/fix-round-1-group-3`), then groups 4 to 9 in the brief's order, one pull request each. The owner merges each pull request; when asked, stack the next group on the previous branch instead, as group 2 was.
+- **Finished:** groups 1 to 8 are merged into `main`: #16, #17 and #18, bug mode (#20), then #21 to #26. Each pull request has plain test steps for the owner, and both native builds passed on every one.
+- **Open:** group 9, export (#27, on `main`). It is the brief's last group. Typecheck, lint and 396 tests pass, and both native builds pass on its native code.
+- **Not yet tested:** nothing from fix round 1 has run on a phone. The owner's next TestFlight round should follow the test steps in each pull request, #16 to #27. Step C of #18, a forced restart while recording, is the genuine cut-off test that round 1 couldn't do.
+- **Next:** the owner's answers to the "(Fix round 1)" questions below, then whatever they decide. Nothing else in the brief is left to build.
 - **What group 3 starts from:**
   - **Body-cam files now:** one file per clip. iPhone video is fragmented MP4 (`.mp4`), and each file's timeline starts at 0. iPhone sound-only files are ADTS (`.aac`). Android is MPEG-TS (`.ts`), with its existing MP4 copy (`Remuxer.kt`).
   - **Bug mode (from #20):** one continuous ADTS AAC file (`.aac`) per recording on both phones, with checkpoints; a follow-on file of the same clip only after the microphone was lost (a call) or a file failed.
   - **Group 3's joined MP4 copy:** it needs a multi-file record, which now happens only when an iPhone user left the app. Its "copy" record can follow `export/playableCopy.ts` and spec section 11.
   - **Sessions now hold `checkpoints`** beside `items`. Any list of a session's records must count both; `lastLink()` in `capture/pipeline.ts` gives the chain head.
-- **Bundle format:** 0.6 with #20 (bug mode), 0.7 with #21 (joined copies). Group 9 needs a new version (0.8, …). Update `FORMAT_VERSION`, the record-version strings in `seal.test.ts`, `playableCopy.test.ts` and `deviceKey.test.ts`, `SUPPORTED_VERSIONS` in `tools/verify-bundle.mjs`, and spec section 12.
+- **Bundle format:** 0.6 with #20 (bug mode), 0.7 with #21 (joined copies), 0.8 with group 9 (names a person can read). A later change needs 0.9: update `FORMAT_VERSION`, the record-version strings in `seal.test.ts`, `playableCopy.test.ts`, `deviceKey.test.ts`, `joinedCopy.test.ts` and `checkpointBundle.test.ts`, `SUPPORTED_VERSIONS` in `tools/verify-bundle.mjs`, and spec section 12.
 - **Left on purpose for later groups:**
   - putting the latest checkpoint in the witness message (group 7). Bug mode's automatic texts already carry it (#20); the message the user sends from a record does not yet. Bug mode's automatic texts are also not noted in the session's `witness` list (they never were); group 7 could add that;
   - telling "phone locked" from "left Saakshi", and showing end reasons in plain words on the record screen (group 5);
@@ -362,6 +362,69 @@ All three checks came out feasible, so nothing falls back to pieces.
 
 **NEEDS OWNER REVIEW:** the new strings (`profile` in `record.json`, `certificates` in `settings.json`, English and Hindi). The Settings line refers to "section 63(4)(c) of the Bharatiya Sakshya Adhiniyam, 2023", as the existing certificate screen does (law.md 1A).
 
+### Group 9: export (#27)
+
+**What was built** (brief section 9; SPEC E5, "Export"):
+- **Two clear actions on every record**, in one card under the player:
+  - **"Share video"** (or "Share photo") sends a playable file through the share sheet, to WhatsApp, Instagram, YouTube, Mail and so on. On iPhone it is the original. On Android it is the MP4 copy, with no question first: the original goes in the bundle. A body-cam record with several video files shares its joined copy (group 3).
+  - **"Export evidence bundle"** saves the full ZIP. The card says where it saves, or that the first time asks for a folder, and offers "Change folder" and "Share the bundle instead".
+  - Each file's card also has its own "Share video", "Share photo" or "Share sound".
+- **The default export folder.** The user picks it once.
+  - iPhone: Apple's document picker for folders, kept as a security-scoped bookmark (`ExportFolder.swift`). Each export resolves the bookmark, opens the folder, copies the ZIP in under file coordination, and closes it. A name that is taken becomes "… (2).zip". A stale bookmark is made again. This follows Apple's "Providing access to directories".
+  - Android: expo-file-system's folder picker, which takes a persistable Storage Access Framework permission. The ZIP is written straight into the folder, and a half-written one is deleted if the export fails.
+  - If the folder has gone, the app says so and offers to choose another or to share instead. The choice is kept on the phone (`evidence/export-folder.json`).
+- **Names a person can read: bundle format 0.8** (spec section 7). For example:
+  - the bundle: `Saakshi 2026-11-06 10-40 IST Body-cam.zip`;
+  - the originals: `Original files/2026-11-06 10-40-12 IST video 1.mp4`;
+  - the records: `Signed records/0074 video 1.json`, and checkpoints like `Signed records/0000 video 1 checkpoint 0.json`. The number is the record's place in the chain, so the folder lists them in order;
+  - also `Hash report.txt` and `Certificate Part A.pdf`.
+  
+  The machine identifiers (session id, record ids, the app's own file names) stay in `manifest.json`. The manifest now says which original goes with which record. The hash report gives both names for every file. `tools/verify-bundle.mjs` reads 0.8 and every older layout. The tests check it with `openssl`, `sha256sum`-style hashing, and Python's `zipfile` reading the names.
+- **README.txt in English and then Hindi**, for someone with no technical background (`export/readme.ts`). It covers:
+  - what each file and folder is, and why it is there;
+  - how the fingerprints and the chain prove nothing changed;
+  - how a lawyer or expert checks the bundle: the one-line tool, or by hand, with commands that name this bundle's own files.
+  
+  It has a byte-order mark and Windows line ends, so Notepad on an older PC shows the Hindi and the lines.
+- **A certificate made from now on** names the files as the bundle does. One made before keeps the old names (`media/0003-clip0-seg0.mp4`), which the hash report gives as each file's "Name in record".
+- **Guards:** a bundle can't be made while its record is still recording or being sealed, and a record can't be deleted while its bundle is being written or copied.
+- **An independent review** found these, and I fixed them:
+  - **the checking tool could say "OK" about a tampered 0.8 bundle.** It found each original through the manifest, which isn't signed, so a doctored file could sit at the readable name with the genuine one elsewhere. Now each record's file must be directly in `Original files/`, no file may be claimed twice, every file there must be claimed, and paths outside the bundle are refused. The tool lists each file it checked. Four new tests make such bundles, and each fails as it should (they passed the old tool);
+  - **the README claimed too much:** that a record "cannot be removed" without it showing. Records taken off the end show only against a chain head held elsewhere, such as a witness message. The README (both languages), the spec and the tool now say so;
+  - **every export failure blamed the folder,** even a missing file in the record. Folder problems and bundle problems now have their own messages;
+  - **the iPhone's folder errors were in English only.** They now have codes, which the app says in English or Hindi;
+  - **on iPhone, a failed copy could leave half a bundle behind,** and the record could be deleted during the copy. Both are fixed. The folder's name is now the one the Files app shows ("iCloud Drive", not "com~apple~CloudDocs").
+- **A second review of those fixes** found three more ways to get "OK" about a misleading bundle, and a small race. All are fixed:
+  - **the readable names weren't checked.** A video renamed to another start time, with the manifest changed to match, passed. Now the tool works every name out from the signed records (spec section 7 gives the rule exactly) and fails on any difference, so the time in a file's name is as trustworthy as its record. The app names files by the same rule;
+  - **a copy in a look-alike folder passed.** Examples are "ORIGINAL FILES/", a Cyrillic "О" and a trailing space, and on a Mac or Windows PC such a copy can land on the real file when unzipped. Now nothing may sit outside the bundle's one layout (except `key.pem`, which the README's steps make), and names a computer would treat as one fail;
+  - **a ZIP holding a name twice passed,** because unzip tools differ on which copy they keep. That now fails, as does a ZIP entry whose local header gives another name;
+  - **every export shared one cache folder,** so sharing one record during another's long copy could remove the file being copied. Each record now has its own.
+  - Seven new tests make such bundles; each passed the earlier tool and fails now.
+- **A third review** found that a crafted ZIP, though not a folder, could still unpack a doctored copy at the readable name: through `.` in a name, a local header naming another file on an entry the tool never read, or the Unicode Path extra field, which Python's `zipfile` takes as the name. The app writes plain ZIPs, so the tool now refuses anything else: every name a plain path, every local header the same as the central directory, no extra fields but ZIP64's and timestamps, no gaps between entries, no symbolic links. It skips only the exact files a computer adds (`.DS_Store`, `._`, `__MACOSX/`, `Thumbs.db`, `desktop.ini`), and a `key.pem` left in the bundle must be its key. Three more tests; the reviewer's own attack bundles all fail now.
+- **A fourth, last review** of the ZIP reader found one more: nothing after the central directory was checked, so a second archive could follow it, which Info-ZIP, Python and Java would unpack instead. The tool now requires exactly the ending the app writes (the end record in the last 22 bytes, no comment, the directory right before it or before the ZIP64 records, which must agree). The reviewer found nothing else, and confirmed the app's own ZIPs, ordinary and ZIP64, pass and unpack the same in those tools. One more test.
+- **Left as they are:**
+  - on Android, if the app is killed while it writes, a cut-short ZIP can stay in the folder under the bundle's name. expo-file-system can't rename a file in such a folder, so it can't be written under a temporary name first. No ZIP tool or the checking tool will accept it;
+  - on iPhone, the bundle is made in the cache, then copied in, so it needs about twice its size free for a moment.
+- Typecheck, lint and 396 tests pass.
+
+**Built so, for you to confirm** (also in "Owner questions"):
+- A sound-only record (bug mode) has **"Share sound"**.
+- An evidence-camera record with several photos or videos has no record-level share. Each is shared from its own card, because the share sheet takes one file.
+- File and folder names in the bundle are in English, whatever the app's language, so that they read the same for every lawyer and court and every ZIP tool handles them.
+
+**NEEDS OWNER REVIEW:**
+- The README as a whole, since a court reader may rely on what it says the bundle proves: in particular "How the proof works".
+- Its Hindi.
+- Its closing lines on section 63(4)(c). They say what the old README said: Part A by the person in charge of the device, Part B by an expert (law.md 1A, s.63(4)(c); 1B, the Schedule).
+- The new strings (`share` and `export` in `record.json`, English and Hindi).
+
+**Not checked:** the brief asks the README to agree with the bundle walkthrough the review session is giving you. That walkthrough isn't in the repository, so I couldn't compare them. Please check them against each other, or point me to it.
+
+**Not verified (needs a phone):**
+- iPhone: the folder picker and bookmark with "On My iPhone", iCloud Drive and a third-party provider, including after the app restarts.
+- Android: a folder on the phone and one in Google Drive's provider. Writing into Drive's provider is the least certain.
+- How long a large bundle takes to save.
+
 ## Owner questions
 
 Streams add questions here as `- [ ] (Stream X) question`.
@@ -390,6 +453,8 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [ ] (Fix round 1) **Camera research (group 4).** Switching between front and back during one video needs the app's own iPhone recorder (about 400–700 lines of Swift, medium risk) and, on Android, either an undocumented hand-over (high risk) or a GPU step (600–1,000 more lines). Dual capture is a larger separate feature (1,000–2,000 lines per platform, high risk, newer phones only). Build either, and when? Details in "Group 4" above.
 - [ ] (Fix round 1) **No playback while recording.** Group 3 lets nothing play while Saakshi is recording (for example, bug mode in the background), so the recording doesn't pick the playback up, and iPhone doesn't take the microphone from the recorder. The player says so. Is that right, or should playback be allowed (on Android, where the microphone isn't taken)?
 - [ ] (Fix round 1) **Bug mode and the 3% auto-save.** You decided on 22 Oct that bug mode has no 3% auto-save, because its pieces were short and a dying battery lost at most the piece being recorded. With one file, a dying battery now leaves that one file cut off: it still plays up to the cut, its checkpoints prove all but about the last 10 seconds, and it is sealed as interrupted when the app next opens. Keep it so, or add the 3% stop-and-save that body-cam has (which would end bug mode cleanly at 3%, before the phone dies)? I've kept your 22 Oct decision until you answer.
+- [ ] (Fix round 1) **Export (group 9): three things built so.** (1) A bug-mode or other sound-only record's button is "Share sound". (2) An evidence-camera record with several photos or videos shares each from its own card, since the share sheet takes one file. (3) The bundle's file and folder names are in English in both languages of the app. Right, or change any?
+- [ ] (Fix round 1) **README and the review session's walkthrough (group 9).** The walkthrough isn't in the repository, so the bundle's README (English and Hindi) couldn't be checked against it. Please compare them, or point me to the walkthrough.
 - [ ] (Stream C) **Helpline list updates.** The Help tab fetches `helplines/helplines.json` from raw.githubusercontent.com each time it opens (a plain GET; nothing of the user's is sent, but GitHub sees the phone's IP address). Keep it automatic, or only on a "Check for updates" tap? And should the list be signed, so that a compromised `main` branch can't change numbers on every phone? Today it is only schema-checked.
 - [ ] (Stream C) **Lawyers and medics list.** The schema (`src/modules/helplines/schema.ts`, `helplines/README.md`) shows name, phone, city, state and languages, and records the registration number, consent date and an expiry (`listedUntil`) in the public file. Is publishing the registration number right, or should it be checked and kept off GitHub? Who collects the written consent, and where is it kept?
 - [ ] (Stream C) **"What police may ask of a phone"** (SPEC G5) is left out of the guide: `docs/research/law.md` has nothing on demands to unlock a phone or give a passcode. It needs its own research from statutes and judgments first. Shall I do that next?

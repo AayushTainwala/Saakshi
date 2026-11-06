@@ -41,7 +41,7 @@ const KIND_WORD: Record<MediaKind, string> = { video: 'video', audio: 'sound', p
  * "video 1", "sound 2". `word` gives the kind in the reader's language.
  */
 export function fileLabels(
-  items: readonly EvidenceItem[],
+  items: readonly Pick<EvidenceItem, 'sequence' | 'kind'>[],
   word: (kind: MediaKind) => string = (kind) => KIND_WORD[kind],
 ): Map<number, string> {
   const counts: Record<MediaKind, number> = { video: 0, audio: 0, photo: 0 };

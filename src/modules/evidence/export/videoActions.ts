@@ -46,19 +46,23 @@ export async function playVideo(sessionId: string, item: EvidenceItem, title: st
   else await Sharing.shareAsync(uri, { mimeType, dialogTitle: title });
 }
 
-/** Shares the original file, or (Android .ts videos) its MP4 copy. */
-export async function shareVideo(
-  sessionId: string,
-  item: EvidenceItem,
-  which: 'original' | 'copy',
-  dialogTitle: string,
-): Promise<void> {
-  if (which === 'copy') {
-    const { uri } = await playableUri(sessionId, item);
-    await Sharing.shareAsync(uri, { mimeType: 'video/mp4', UTI: 'public.mpeg-4', dialogTitle });
-    return;
-  }
-  await Sharing.shareAsync(fileLocker.mediaUri(sessionId, item.media), { mimeType: item.mediaType, dialogTitle });
+const UTI: Record<string, string> = {
+  'video/mp4': 'public.mpeg-4',
+  'video/quicktime': 'com.apple.quicktime-movie',
+  'image/jpeg': 'public.jpeg',
+  'image/heic': 'public.heic',
+  'audio/aac': 'public.aac-audio',
+  'audio/mp4': 'public.mpeg-4-audio',
+};
+
+/**
+ * Shares a file through the phone's share sheet, to WhatsApp, Mail and so on (fix round 1, group 9):
+ * the original, or for an Android MPEG-TS video its MP4 copy, which plays everywhere. The original
+ * stays in the locker and goes in the bundle.
+ */
+export async function shareFile(sessionId: string, item: EvidenceItem, dialogTitle: string): Promise<void> {
+  const { uri, mimeType } = await playableUri(sessionId, item);
+  await Sharing.shareAsync(uri, { mimeType, ...(UTI[mimeType] ? { UTI: UTI[mimeType] } : {}), dialogTitle });
 }
 
 const joinDeps: JoinDeps = {

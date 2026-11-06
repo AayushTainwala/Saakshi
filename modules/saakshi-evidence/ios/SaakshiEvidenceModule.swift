@@ -130,6 +130,20 @@ public class SaakshiEvidenceModule: Module {
       try await Joiner.join(request)
     }
 
+    // The default export folder (ExportFolder.swift; fix round 1, group 9): the user picks a
+    // folder once, and bundles are copied into it with one tap.
+    AsyncFunction("pickExportFolder") { (promise: Promise) in
+      guard let controller = self.appContext?.utilities?.currentViewController() else {
+        promise.reject("ERR_NO_SCREEN", "There is no screen to show the folder picker on.")
+        return
+      }
+      ExportFolder.shared.pick(from: controller, promise: promise)
+    }.runOnQueue(.main)
+
+    AsyncFunction("saveToExportFolder") { (bookmark: String, source: URL, name: String) throws -> [String: Any] in
+      try ExportFolder.save(bookmark: bookmark, source: source, name: name)
+    }
+
     // iPhone recordings are already QuickTime files that play everywhere; no copy is made.
     AsyncFunction("remuxToMp4") { (_: String, _: String, _: Int?) -> String in
       throw Exception(name: "ERR_UNSUPPORTED", description: "Remuxing is only needed for Android recordings")

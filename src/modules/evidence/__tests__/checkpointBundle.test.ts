@@ -5,13 +5,14 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { CaptureSession } from '../capture/pipeline';
-import { type BundledCheckpoint, buildManifest, type BundledRecord, chainHead, hashReport, README } from '../export/contents';
+import { type BundledCheckpoint, type BundledRecord, chainHead } from '../export/contents';
 import { crc32 } from '../export/zip';
 import { mergeDeviceKey } from '../integrity/deviceKey';
-import type { CheckpointRecord, EvidenceRecord } from '../integrity/record';
 import { createCheckpointSealer, createSealer, type SealerDeps } from '../integrity/seal';
 import { checkSession } from '../locker/check';
+import { loadCheckpoints, loadSealed } from '../locker/records';
 import type { CheckpointInput, ClosedFile, FileDigests } from '../types';
+import { bundleFilesOf } from './bundleFiles';
 import { memoryLocker } from './memoryLocker';
 import { nodeSha256Hex, testSigner } from './testSigner';
 
@@ -117,36 +118,15 @@ async function makeSession(options: { videoLength?: number; failCheckpoint?: num
     null,
     new Date('2026-11-05T05:00:00.000Z'),
   );
-  const records: BundledRecord[] = state.items.map((item) => ({
-    record: JSON.parse(locker.records.get(`${id}/${item.record!.file}`)!.body) as EvidenceRecord,
-    recordFile: item.record!.file,
-    mediaFile: item.media,
-    recordSha256: item.recordSha256!,
-  }));
-  const checkpoints: BundledCheckpoint[] = state.checkpoints!.map((item) => ({
-    record: JSON.parse(locker.records.get(`${id}/${item.record!.file}`)!.body) as CheckpointRecord,
-    recordFile: item.record!.file,
-    recordSha256: item.recordSha256!,
-  }));
+  const records: BundledRecord[] = loadSealed(locker.store, id).map((entry) => entry.bundled);
+  const checkpoints: BundledCheckpoint[] = loadCheckpoints(locker.store, id).map((entry) => entry.bundled);
   return { locker, id, state, deviceKey, records, checkpoints };
 }
 
 async function bundleFolder(options: Parameters<typeof makeSession>[0] = {}, change?: (files: Map<string, Uint8Array>) => void) {
   const ctx = await makeSession(options);
-  const { locker, id, state, deviceKey, records, checkpoints } = ctx;
-  const now = new Date('2026-11-05T06:00:00.000Z');
-  const enc = (s: string) => new TextEncoder().encode(s);
-  const files = new Map<string, Uint8Array>();
-  files.set('manifest.json', enc(JSON.stringify(buildManifest(state, records, now, app, false, checkpoints), null, 2)));
-  files.set('device-key.json', enc(JSON.stringify(deviceKey, null, 2)));
-  for (const item of state.items) files.set(`media/${item.media}`, locker.files.get(locker.store.mediaUri(id, item.media))!);
-  for (const name of [...state.items.map((i) => i.record!.file), ...state.checkpoints!.map((c) => c.record!.file)]) {
-    const stored = locker.records.get(`${id}/${name}`)!;
-    files.set(`records/${name}`, enc(stored.body));
-    files.set(`records/${name}.sig`, stored.signature);
-  }
-  files.set('hash-report.txt', enc(hashReport(state, records, deviceKey, now, 0, checkpoints)));
-  files.set('README.txt', enc(README));
+  const { locker, id, deviceKey } = ctx;
+  const { files } = bundleFilesOf(locker, id, deviceKey, new Date('2026-11-05T06:00:00.000Z'), app);
   change?.(files);
   const dir = mkdtempSync(join(tmpdir(), 'saakshi-checkpoints-'));
   cleanup.push(dir);
@@ -155,6 +135,13 @@ async function bundleFolder(options: Parameters<typeof makeSession>[0] = {}, cha
     writeFileSync(join(dir, name), bytes);
   }
   return { ...ctx, dir, files };
+}
+
+/** The one bundle path that ends with `end`, such as "video 1.mp4". */
+function named(files: Map<string, Uint8Array> | string[], end: string): string {
+  const found = [...(Array.isArray(files) ? files : files.keys())].filter((name) => name.endsWith(end));
+  if (found.length !== 1) throw new Error(`${found.length} files end with ${end}`);
+  return found[0];
 }
 
 function runVerifier(path: string) {
@@ -180,7 +167,7 @@ describe('checkpoints in the chain (format 0.5)', () => {
     ]);
     const first = checkpoints[0].record;
     expect(first.type).toBe('saakshi.evidence.checkpoint');
-    expect(first.version).toBe('0.7');
+    expect(first.version).toBe('0.8');
     expect(first.previous).toBeNull();
     expect(first.file).toEqual({ mediaType: 'video/mp4', size: 7_520, sha256: state.checkpoints![0].sha256 });
     expect(first.capture.checkpointAt).toBe('2026-11-05T05:10:10.000Z');
@@ -224,13 +211,22 @@ describe('checkpoints in the chain (format 0.5)', () => {
     expect(out).toContain('Records: 6 (4 of them checkpoints)');
     expect(out).toContain(`Chain head: ${records[1].recordSha256}`);
     expect(code).toBe(0);
-    const report = new TextDecoder().decode(files.get('hash-report.txt'));
-    expect(report).toContain('Checkpoints:     3 signed while it was being recorded (records/0000.json to records/0003.json);');
+    const report = new TextDecoder().decode(files.get('Hash report.txt'));
+    expect(report).toContain('Checkpoints:     3 signed while it was being recorded (Signed records/, 0000 to 0003);');
     expect(report).toContain('covers its first 22,560 bytes');
     const manifest = JSON.parse(new TextDecoder().decode(files.get('manifest.json')));
-    expect(manifest.version).toBe('0.7');
+    expect(manifest.version).toBe('0.8');
     expect(manifest.checkpoints).toHaveLength(4);
-    expect(manifest.checkpoints[0]).toMatchObject({ record: 'records/0000.json', recording: 'rec-a', checkpoint: 0, size: 7_520 });
+    expect(manifest.checkpoints[0]).toMatchObject({ record: 'Signed records/0000 video 1 checkpoint 0.json', recording: 'rec-a', checkpoint: 0, size: 7_520 });
+    // Each checkpoint is named after the file it belongs to.
+    expect([...files.keys()].filter((name) => name.startsWith('Signed records/') && name.endsWith('.json'))).toEqual([
+      'Signed records/0000 video 1 checkpoint 0.json',
+      'Signed records/0001 video 1 checkpoint 1.json',
+      'Signed records/0002 sound 1 checkpoint 0.json',
+      'Signed records/0003 video 1 checkpoint 2.json',
+      'Signed records/0004 video 1.json',
+      'Signed records/0005 sound 1.json',
+    ]);
   });
 
   it('still verifies when one checkpoint could not be signed: the next one covers its bytes', async () => {
@@ -246,30 +242,30 @@ describe('checkpoints in the chain (format 0.5)', () => {
   });
 
   it('catches a byte changed inside a checkpointed stretch', async () => {
-    const { dir } = await bundleFolder({}, (files) => {
-      const name = 'media/0004-clip0-seg0.mp4';
+    const { dir, files } = await bundleFolder({}, (files) => {
+      const name = named(files, 'video 1.mp4');
       const bytes = new Uint8Array(files.get(name)!);
       bytes[100] ^= 0xff;
       files.set(name, bytes);
     });
     const { code, out } = runVerifier(dir);
     expect(code).toBe(1);
-    expect(out).toMatch(/records\/0000\.json: the first 7520 bytes of media\/0004-clip0-seg0\.mp4 have SHA-256 [0-9a-f]{64}, not/);
-    expect(out).toMatch(/records\/0003\.json: the first 22560 bytes/);
+    expect(out).toContain(`Signed records/0000 video 1 checkpoint 0.json: the first 7520 bytes of ${named(files, 'video 1.mp4')} have SHA-256 `);
+    expect(out).toContain('Signed records/0003 video 1 checkpoint 2.json: the first 22560 bytes');
   });
 
   it('catches a file shorter than what its checkpoints signed', async () => {
     // As if the recorder had rewritten the file after the checkpoints: it is now 20,000 bytes.
-    const { dir } = await bundleFolder({ videoLength: 20_000 });
+    const { dir, files } = await bundleFolder({ videoLength: 20_000 });
     const { code, out } = runVerifier(dir);
     expect(code).toBe(1);
-    expect(out).toContain('records/0003.json: covers 22560 bytes, but media/0004-clip0-seg0.mp4 has only 20000');
+    expect(out).toContain(`Signed records/0003 video 1 checkpoint 2.json: covers 22560 bytes, but ${named(files, 'video 1.mp4')} has only 20000`);
   });
 
   it('catches a missing checkpoint record', async () => {
     const { dir } = await bundleFolder({}, (files) => {
-      files.delete('records/0001.json');
-      files.delete('records/0001.json.sig');
+      files.delete('Signed records/0001 video 1 checkpoint 1.json');
+      files.delete('Signed records/0001 video 1 checkpoint 1.json.sig');
     });
     const { code, out } = runVerifier(dir);
     expect(code).toBe(1);
@@ -280,12 +276,12 @@ describe('checkpoints in the chain (format 0.5)', () => {
 
   it("catches checkpoints whose file's record is missing", async () => {
     const { dir } = await bundleFolder({}, (files) => {
-      files.delete('records/0005.json');
-      files.delete('records/0005.json.sig');
-      files.delete('media/0005-audio1-seg0.aac');
+      files.delete('Signed records/0005 sound 1.json');
+      files.delete('Signed records/0005 sound 1.json.sig');
+      files.delete(named(files, 'sound 1.aac'));
     });
     const { code, out } = runVerifier(dir);
     expect(code).toBe(1);
-    expect(out).toContain("records/0002.json: checkpoint of recording rec-b, whose file's record is not in the bundle");
+    expect(out).toContain("Signed records/0002 sound 1 checkpoint 0.json: checkpoint of recording rec-b, whose file's record is not in the bundle");
   });
 });
