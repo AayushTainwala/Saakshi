@@ -23,7 +23,8 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 | 3. Records list and playback (B1, C6) | Built: https://github.com/AayushTainwala/Saakshi/pull/21 (branch `claude/fix-round-1-group-3`, stacked on #20). Not yet run on a phone. |
 | 4. Evidence camera: front and back, zoom (B2) | Built: https://github.com/AayushTainwala/Saakshi/pull/22 (branch `claude/fix-round-1-group-4`, stacked on #21). Research items reported below, not built. Not yet run on a phone. |
 | 5. Why a recording ended (B8) | Built: https://github.com/AayushTainwala/Saakshi/pull/23 (branch `claude/fix-round-1-group-5`, stacked on #22). Not yet run on a phone. |
-| 6–9 | Not started |
+| 6. Trusted contacts, three ticks per person (B5) | Built: https://github.com/AayushTainwala/Saakshi/pull/24 (branch `claude/fix-round-1-group-6`, stacked on #23). Not yet run on a phone. |
+| 7–9 | Not started |
 
 ### Where fix round 1 stands, and what's next (6 Nov 2026)
 
@@ -307,6 +308,22 @@ All three checks came out feasible, so nothing falls back to pieces.
 **For the next test round, a genuine cut-off:** while recording (evidence camera, body-cam or bug mode), force-restart the iPhone: volume up, volume down, then hold the side button until the Apple logo. When Saakshi opens again, the record should say "Cut off: …", and Check files should pass.
 
 **Not verified:** on a phone, that the evidence camera now keeps recording under Control Center and Notification Center (expo-camera's capture session isn't stopped when the app is only covered; untested).
+
+### Group 6: trusted contacts, three ticks per person (#24)
+
+**What was built** (your decision of 5 Nov; SPEC S1):
+- Each trusted contact has three ticks: **SOS alerts**, **Live location**, **Witness messages**.
+  - All are ticked for someone new, and for everyone saved before. The contacts file is now version 2; older files read as all ticked.
+  - The ticks show under each person on the contacts screen, with a warning if none is ticked.
+- Every message fills in the people ticked for it, so nobody types a recipient at the moment of sending:
+  - SOS alert, including confiscation mode's: SOS.
+  - Live-location link, including "send again" and confiscation mode's late link: live location.
+  - The witness message from a record: witness. It now fills its recipients in; before, you chose them in Messages.
+  - Bug mode's witness texts: witness.
+- **Confiscation mode:** when its SOS alert carries the live link, the link also goes on its own to anyone ticked for live location but not for SOS alerts, who would otherwise not get it.
+- **For other modules:** `getTrustedContacts(use?)` and `textTrustedContacts(message, { use })` from `@/modules/sos`.
+
+**Not verified:** on a phone, that iPhone's Messages composer opens with the witness recipients filled in.
 
 ## Owner questions
 
