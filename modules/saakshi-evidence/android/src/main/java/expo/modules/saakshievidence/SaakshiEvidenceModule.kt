@@ -69,6 +69,29 @@ class SaakshiEvidenceModule : Module() {
       }
     }
 
+    // A record's files joined into one MP4 copy for sharing, without re-encoding (fix round 1,
+    // group 3). `request` is JoinRequest from src/modules/evidence/export/joinedCopy.ts.
+    AsyncFunction("joinToMp4") Coroutine { request: Map<String, Any?> ->
+      withContext(Dispatchers.IO) {
+        fun segments(key: String): List<Remuxer.Segment> =
+          (request[key] as? List<*>).orEmpty().mapNotNull { entry ->
+            val segment = entry as? Map<*, *> ?: return@mapNotNull null
+            val uri = segment["uri"] as? String ?: return@mapNotNull null
+            fun micros(name: String) = (((segment[name] as? Number)?.toDouble() ?: 0.0) * 1_000_000).toLong()
+            Remuxer.Segment(fileFromUri(uri), micros("at"), micros("from"), micros("length"))
+          }
+        val output = request["output"] as? String ?: throw CodedException("ERR_JOIN", "No output", null)
+        val target = File(Uri.parse(output).path ?: output)
+        val joined = Remuxer.join(segments("video"), segments("audio"), target, (request["rotationDegrees"] as? Number)?.toInt())
+        mapOf(
+          "uri" to "file://${target.absolutePath}",
+          "reencoded" to false,
+          "placedVideo" to joined.placedVideo,
+          "placedAudio" to joined.placedAudio,
+        )
+      }
+    }
+
     // Volume-up presses while body-cam mode's lock screen or unlock practice shows (the screen is on).
     AsyncFunction("volumeKeysStart") {
       appContext.currentActivity?.let { VolumeKeys.enable(it) }

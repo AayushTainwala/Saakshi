@@ -191,6 +191,8 @@ export class CaptureSession {
       ...(file.interrupted ? { interrupted: true } : {}),
       ...(file.endReason ? { endReason: file.endReason } : {}),
       ...(file.recording ? { recording: file.recording } : {}),
+      ...(file.mode ? { mode: file.mode } : {}),
+      ...(typeof file.rotationDegrees === 'number' ? { rotationDegrees: file.rotationDegrees } : {}),
     };
     const releaseMarker = () => {
       if (file.pendingMarker) this.deps.store.deletePending(session.id, file.pendingMarker);
@@ -253,6 +255,7 @@ export class CaptureSession {
       sha256: checkpoint.sha256,
       at: checkpoint.at.toISOString(),
       status: 'failed',
+      ...(checkpoint.mode ? { mode: checkpoint.mode } : {}),
     };
     try {
       if (!this.deps.sealCheckpoint) throw new Error('No checkpoint sealer');

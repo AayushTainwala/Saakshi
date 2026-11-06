@@ -1,20 +1,19 @@
 import { Link, router } from 'expo-router';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 
-import { AppText, Button, Card, Screen } from '@/components';
-import { spacing, touchTarget, useTheme } from '@/theme';
+import { AppText, Button, Screen } from '@/components';
+import { touchTarget } from '@/theme';
 
 import { recoverInterruptedRecordings } from '../capture/recoverDevice';
 import { attestIfNeeded } from '../integrity/deviceKey';
 import { fileLocker } from '../locker/store';
 import { useSessions } from '../locker/useSessions';
-import { formatIST } from './format';
+import { RecordRow } from './RecordRow';
 
 export function RecordHome() {
   const { t } = useTranslation('record');
-  const { colors } = useTheme();
   const sessions = useSessions();
 
   // Create the signing key ahead of the first recording and, on iPhone, retry App Attest until it
@@ -37,17 +36,7 @@ export function RecordHome() {
       {sessions.map((session) => (
         <Link key={session.id} href={{ pathname: '/record/[session]', params: { session: session.id } }} asChild>
           <Pressable accessibilityRole="button" style={styles.row}>
-            {({ pressed }) => (
-              <Card style={[styles.card, pressed && { backgroundColor: colors.surfaceRaised }]}>
-                <View style={styles.cardText}>
-                  <AppText variant="label">{formatIST(session.createdAt)}</AppText>
-                  <AppText color="textMuted">{t('locker.files', { count: session.items.length })}</AppText>
-                </View>
-                <AppText variant="label" color="textMuted">
-                  ›
-                </AppText>
-              </Card>
-            )}
+            {({ pressed }) => <RecordRow session={session} pressed={pressed} />}
           </Pressable>
         </Link>
       ))}
@@ -57,6 +46,4 @@ export function RecordHome() {
 
 const styles = StyleSheet.create({
   row: { minHeight: touchTarget },
-  card: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  cardText: { flex: 1, gap: spacing.xs },
 });

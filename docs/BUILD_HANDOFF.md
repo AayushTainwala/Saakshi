@@ -20,7 +20,7 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 | 2. Body-cam: other fixes (C1–C3) | Merged: https://github.com/AayushTainwala/Saakshi/pull/17. Not yet run on a phone. |
 | 2a. Body-cam: one continuous file, with checkpoints | Merged: https://github.com/AayushTainwala/Saakshi/pull/18. Not yet run on a phone. |
 | 2b. Bug mode: one continuous file, with checkpoints (owner said yes, 6 Nov) | Built: https://github.com/AayushTainwala/Saakshi/pull/20 (branch `claude/keen-rubin-urautd`, from `main` after #19). Not yet run on a phone. |
-| 3. Records list and playback (B1, C6) | **Next.** Not started. |
+| 3. Records list and playback (B1, C6) | Built: https://github.com/AayushTainwala/Saakshi/pull/21 (branch `claude/fix-round-1-group-3`, stacked on #20). Not yet run on a phone. |
 | 4–9 | Not started |
 
 ### Where fix round 1 stands, and what's next (6 Nov 2026)
@@ -36,7 +36,7 @@ For the session that takes over. Read the brief, then this section, then CLAUDE.
   - **Bug mode (from #20):** one continuous ADTS AAC file (`.aac`) per recording on both phones, with checkpoints; a follow-on file of the same clip only after the microphone was lost (a call) or a file failed.
   - **Group 3's joined MP4 copy:** it needs a multi-file record, which now happens only when an iPhone user left the app. Its "copy" record can follow `export/playableCopy.ts` and spec section 11.
   - **Sessions now hold `checkpoints`** beside `items`. Any list of a session's records must count both; `lastLink()` in `capture/pipeline.ts` gives the chain head.
-- **Bundle format:** 0.6 with #20 (bug mode). Groups 3 and 9 each need a new version (0.7, …). Update `FORMAT_VERSION`, the record-version strings in `seal.test.ts`, `playableCopy.test.ts` and `deviceKey.test.ts`, `SUPPORTED_VERSIONS` in `tools/verify-bundle.mjs`, and spec section 12.
+- **Bundle format:** 0.6 with #20 (bug mode), 0.7 with #21 (joined copies). Group 9 needs a new version (0.8, …). Update `FORMAT_VERSION`, the record-version strings in `seal.test.ts`, `playableCopy.test.ts` and `deviceKey.test.ts`, `SUPPORTED_VERSIONS` in `tools/verify-bundle.mjs`, and spec section 12.
 - **Left on purpose for later groups:**
   - putting the latest checkpoint in the witness message (group 7). Bug mode's automatic texts already carry it (#20); the message the user sends from a record does not yet. Bug mode's automatic texts are also not noted in the session's `witness` list (they never were); group 7 could add that;
   - telling "phone locked" from "left Saakshi", and showing end reasons in plain words on the record screen (group 5);
@@ -189,6 +189,48 @@ All three checks came out feasible, so nothing falls back to pieces.
 - If body-cam and bug mode ever ran together on iPhone (for example, confiscation mode started from the code pad over body-cam), both would use the microphone at once; neither switches the sound session off or changes it under the other, but this hasn't been tried.
 - Found by the review, not changed (it was so before #20): the crash-recovery check at app start trusts that a session not marked active in the running JavaScript is finished. If the app's JavaScript ever restarted while Android's service kept recording, the file being written could be sealed early as interrupted. Nothing calls `bugRecorderRunning()` yet.
 
+### Group 3: records list and playback (#21)
+
+**What was built:**
+- **The records list** shows each record as what it is: "Body-cam", "Bug mode", "Photo", "2 videos", "Video and 2 photos". It also shows its length ("12 min 5 s"), "Started 06/11/2026 10:40 IST" and a picture.
+  - The picture is the photo itself, or a video's frame at one second, made once by `expo-video-thumbnails`.
+  - Video pictures are kept in the session's `thumbs/` folder. They are not evidence, never go in a bundle, and go when the record is deleted.
+  - Body-cam and bug mode are measured from Start to Stop; the evidence camera adds up its videos' lengths.
+  - Each file's mode and rotation are now kept in the locker's bookkeeping. Older sessions read them from the signed record.
+- **Photos** open full screen.
+- **Sound files** play in the app.
+- **One player per body-cam or bug-mode record** (`expo-video`): it plays the files end to end with their sound, and shows the total length and which file is playing.
+  - Each file starts where the one before stopped, so iPhone's half-second hand-over overlaps aren't heard twice.
+  - Sound-only stretches say so. Gaps where nothing was recorded (a phone call) are said too.
+  - Android `.ts` videos play from their MP4 copy.
+  - **Older body-cam records** (your test round 1) saved muted video pieces with sound in separate overlapping files. The player plays their sound end to end, says why, and each video still plays on its own.
+- **Nothing plays while Saakshi is recording** (bug mode in the background, for example). The microphone would pick the playback up, and on iPhone playing takes the sound session from the recorder. **For you to confirm** (SPEC E5 says "built so").
+- **Joined MP4 copy for sharing**, offered where a body-cam record has more than one video file: on iPhone after you left the app; on Android only after a recorder error. "Share the whole video" makes it once.
+  - Each video file's picture sits at its place in time, with no new picture in between. The sound comes from the video and sound-only files, each stretch once, placed by each file's own clock so picture and sound stay in step.
+  - iPhone (`Joiner.swift`): `AVMutableComposition` exported with the passthrough preset. It re-encodes only if the clips were filmed turned different ways or passthrough fails, and then the record says so.
+  - Android (`Remuxer.join`): `MediaExtractor` into `MediaMuxer`, samples copied unchanged and interleaved by time. Files turned different ways are not joined, and the app says why.
+  - Its own signed record (`saakshi.evidence.joined-copy`, bundle format **0.7**, spec section 11a) lists every source file's record and SHA-256, and where each stretch went, naming only what the phone actually placed.
+  - It is labelled as a copy, and is never in the bundle or the certificate.
+- **New dependencies:** `expo-video` 58.0.13 and `expo-video-thumbnails` 58.0.2, both MIT, SDK-matched, with no new permissions. expo-video's config plugin is **not** in `app.json`: given `false` options, it removes iPhone's background `audio` mode, which bug mode and body-cam need.
+- **An independent review** found and I fixed:
+  - the older records above;
+  - playback that could start during a recording (after making an Android copy);
+  - the plugin problem;
+  - evidence pictures left in expo-image's disk cache after a delete (now never cached);
+  - deletes racing a copy or thumbnail (now refused until it's done);
+  - duplicate copy jobs;
+  - session updates lost while a copy was signed;
+  - sound drifting from picture in the joined copy;
+  - Android trimming inside a file;
+  - rotation of Android MP4-fallback files;
+  - untranslated join errors.
+
+**Not verified:**
+- Nothing has run on a phone. The Swift and Kotlin compiled in the Native build workflow for the first version; the review fixes are building.
+- Whether the iPhone passthrough export accepts a composition with empty stretches and sound from both `.mp4` and `.aac` files. If not, it re-encodes and says so.
+- Whether AVPlayer and ExoPlayer play every file as expected: fragmented `.mp4` with no edit list, ADTS `.aac`, older `.m4a`.
+- Android video frames from MPEG-TS for thumbnails (`MediaMetadataRetriever`).
+
 ## Owner questions
 
 Streams add questions here as `- [ ] (Stream X) question`.
@@ -214,6 +256,7 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [x] (Stream B, for Stream D) **Apple Team ID.** The widget extension needs `ios.appleTeamId` in `app.json`. *Answered (owner's review of R2):* `5NYAUT5C56` (not secret); set in `app.json`.
 - [x] (Fix round 1) **Camera picture on the iPhone body-cam screen.** *Withdrawn 5 Nov:* the old iPhone body-cam drew the camera's live picture under its controls, but behind an 85%-black layer, so it couldn't really be seen (the owner never noticed it). The new recorder draws no picture, as Android never did. Nothing changes for the user.
 - [x] (Fix round 1) **Bug mode, continuous too?** *Answered 6 Nov:* yes, like body-cam (iPhone: the cut-off-safe AAC writer; witness texts, at most every 10 minutes, carry the latest checkpoint). Built in #20; SPEC E8.
+- [ ] (Fix round 1) **No playback while recording.** Group 3 lets nothing play while Saakshi is recording (for example, bug mode in the background), so the recording doesn't pick the playback up, and iPhone doesn't take the microphone from the recorder. The player says so. Is that right, or should playback be allowed (on Android, where the microphone isn't taken)?
 - [ ] (Fix round 1) **Bug mode and the 3% auto-save.** You decided on 22 Oct that bug mode has no 3% auto-save, because its pieces were short and a dying battery lost at most the piece being recorded. With one file, a dying battery now leaves that one file cut off: it still plays up to the cut, its checkpoints prove all but about the last 10 seconds, and it is sealed as interrupted when the app next opens. Keep it so, or add the 3% stop-and-save that body-cam has (which would end bug mode cleanly at 3%, before the phone dies)? I've kept your 22 Oct decision until you answer.
 - [ ] (Stream C) **Helpline list updates.** The Help tab fetches `helplines/helplines.json` from raw.githubusercontent.com each time it opens (a plain GET; nothing of the user's is sent, but GitHub sees the phone's IP address). Keep it automatic, or only on a "Check for updates" tap? And should the list be signed, so that a compromised `main` branch can't change numbers on every phone? Today it is only schema-checked.
 - [ ] (Stream C) **Lawyers and medics list.** The schema (`src/modules/helplines/schema.ts`, `helplines/README.md`) shows name, phone, city, state and languages, and records the registration number, consent date and an expiry (`listedUntil`) in the public file. Is publishing the registration number right, or should it be checked and kept off GitHub? Who collects the written consent, and where is it kept?

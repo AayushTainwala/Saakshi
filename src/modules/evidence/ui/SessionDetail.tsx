@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Button, Card, Screen } from '@/components';
 import { spacing } from '@/theme';
@@ -11,11 +11,17 @@ import { shareBundle } from '../export/bundle';
 import { runCheck } from '../locker/actions';
 import { deleteSession, SessionBusyError } from '../locker/delete';
 import { fileLocker } from '../locker/store';
-import { needsCopy, playVideo, shareVideo } from '../export/videoActions';
+import { JoinError, needsJoinedCopy } from '../export/joinedCopy';
+import { needsCopy, playVideo, shareJoinedCopy, shareVideo } from '../export/videoActions';
+import { recordModeOf } from '../locker/records';
+import { summarize } from '../locker/summary';
 import { useSession } from '../locker/useSessions';
 import { sendWitnessMessage, SmsUnavailableError } from '../witness/send';
 import type { EvidenceItem, SessionState } from '../types';
 import { formatBytes, formatIST } from './format';
+import { kindLabel, lengthLabel } from './labels';
+import { RecordingPlayer } from './RecordingPlayer';
+import { Thumbnail } from './RecordRow';
 
 export function chainHeadOf(session: SessionState): string | null {
   return lastLink(session)?.recordSha256 ?? null;
@@ -38,8 +44,11 @@ function StatusRow({ done, label, detail }: { done: boolean; label: string; deta
 function ItemCard({ item, session }: { item: EvidenceItem; session: SessionState }) {
   const { t } = useTranslation('record');
   const [busy, setBusy] = useState(false);
+  const [listening, setListening] = useState(false);
   const copy = session.copies?.[String(item.sequence)];
   const isVideo = item.kind === 'video' && item.status === 'sealed';
+  const inLocker = item.status === 'sealed' || item.status === 'hashed';
+  const openPhoto = () => router.push({ pathname: '/photo', params: { session: session.id, sequence: String(item.sequence) } });
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -73,6 +82,15 @@ function ItemCard({ item, session }: { item: EvidenceItem; session: SessionState
         : t('locker.itemPending');
   return (
     <Card>
+      {inLocker && (item.kind === 'photo' || item.kind === 'video') ? (
+        item.kind === 'photo' ? (
+          <Pressable accessibilityRole="imagebutton" accessibilityLabel={t('photo.open')} onPress={openPhoto}>
+            <Thumbnail sessionId={session.id} item={item} size={96} />
+          </Pressable>
+        ) : (
+          <Thumbnail sessionId={session.id} item={item} size={96} />
+        )
+      ) : null}
       <AppText variant="label">
         {item.segment
           ? t(item.kind === 'audio' ? 'locker.audioSegment' : 'locker.segment', {
@@ -99,6 +117,17 @@ function ItemCard({ item, session }: { item: EvidenceItem; session: SessionState
           {t('video.copyMade', { sha256: copy.sha256 })}
         </AppText>
       ) : null}
+      {item.kind === 'photo' && inLocker ? <Button variant="secondary" label={t('photo.open')} onPress={openPhoto} /> : null}
+      {item.kind === 'audio' && inLocker ? (
+        listening ? (
+          <View style={styles.videoButtons}>
+            <RecordingPlayer sessionId={session.id} items={[item]} autoPlay showParts={false} />
+            <Button variant="secondary" label={t('player.closeSound')} onPress={() => setListening(false)} />
+          </View>
+        ) : (
+          <Button variant="secondary" label={t('player.playSound')} onPress={() => setListening(true)} />
+        )
+      ) : null}
       {isVideo ? (
         <View style={styles.videoButtons}>
           <Button
@@ -120,6 +149,7 @@ export function SessionDetail({ id }: { id: string }) {
   const [checking, setChecking] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [witnessing, setWitnessing] = useState(false);
+  const [joining, setJoining] = useState(false);
 
   if (!session) {
     return (
@@ -130,6 +160,8 @@ export function SessionDetail({ id }: { id: string }) {
   }
 
   const sealed = session.items.filter((item) => item.status === 'sealed').length;
+  const summary = summarize(session, (item) => recordModeOf(session.id, item));
+  const kind = kindLabel(t, summary);
   const head = chainHeadOf(session);
   const lastWitness = session.witness.filter((w) => w.result !== 'cancelled').at(-1);
 
@@ -188,6 +220,18 @@ export function SessionDetail({ id }: { id: string }) {
     ]);
   };
 
+  const shareJoined = async () => {
+    setJoining(true);
+    try {
+      await shareJoinedCopy(id, t('joined.share'));
+    } catch (error) {
+      const words = error instanceof JoinError ? t(`joined.error.${error.code}`) : error instanceof Error ? error.message : String(error);
+      Alert.alert(t('locker.errorTitle'), words);
+    } finally {
+      setJoining(false);
+    }
+  };
+
   const exportBundle = async () => {
     setExporting(true);
     try {
@@ -201,7 +245,34 @@ export function SessionDetail({ id }: { id: string }) {
 
   return (
     <Screen>
-      <AppText variant="heading">{formatIST(session.createdAt)}</AppText>
+      <AppText variant="heading">
+        {summary.lengthMs !== null ? t('list.summary', { kind, length: lengthLabel(t, summary.lengthMs) }) : kind}
+      </AppText>
+      <AppText color="textMuted">{t('list.started', { time: formatIST(summary.startedAt, true) })}</AppText>
+
+      {summary.kind !== 'camera' && summary.videos + summary.sounds > 0 ? (
+        <Card>
+          <AppText variant="label">{t('player.heading')}</AppText>
+          <AppText color="textMuted">{t('player.help')}</AppText>
+          <RecordingPlayer sessionId={id} items={session.items} />
+          {needsJoinedCopy(session) ? (
+            <>
+              <Button
+                variant="secondary"
+                label={joining ? t('joined.making') : t('joined.share')}
+                busy={joining}
+                onPress={() => void shareJoined()}
+              />
+              <AppText color="textMuted">{t('joined.help')}</AppText>
+              {session.joined ? (
+                <AppText color="textMuted" selectable>
+                  {t(session.joined.reencoded ? 'joined.madeReencoded' : 'joined.made', { sha256: session.joined.sha256 })}
+                </AppText>
+              ) : null}
+            </>
+          ) : null}
+        </Card>
+      ) : null}
 
       <Card>
         <StatusRow
