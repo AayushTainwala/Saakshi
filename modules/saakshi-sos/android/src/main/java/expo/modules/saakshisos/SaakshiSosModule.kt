@@ -26,7 +26,7 @@ class SaakshiSosModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("SaakshiSos")
 
-    Events("onBugPieceClosed", "onBugCheckpoint", "onBugRecorderError", "onBugRecorderStopped")
+    Events("onBugPieceClosed", "onBugCheckpoint", "onBugRecorderError", "onBugRecorderStarted", "onBugRecorderStopped")
 
     OnCreate {
       BugRecorder.listener = { name, body -> sendEvent(name, body) }

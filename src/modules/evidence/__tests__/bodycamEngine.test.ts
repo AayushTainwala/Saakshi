@@ -283,7 +283,7 @@ describe('checkpoints (format 0.5)', () => {
   it('hands out upload parts that end on checkpoints and join up to the whole file', async () => {
     const parts: UploadPart[] = [];
     setBodyCamPartListener((part) => parts.push(part));
-    const { native, common, file } = setup();
+    const { native, common, file, session } = setup();
     const engine = androidBodyCam({ ...common, partSeconds: 20, notificationTitle: 't', notificationText: 'x', notificationStop: 's' }, native);
     await engine.start();
     native.fire('onCheckpoint', checkpointEvent('rec-b', 0, 1000, '2026-11-05T05:10:10.000Z'));
@@ -293,6 +293,9 @@ describe('checkpoints (format 0.5)', () => {
     const stopping = engine.stop();
     native.fire('onRecordingClosed', closed({ uri: file('file:///s/incoming/rec-b.ts'), endReason: 'stopped', recording: 'rec-b', finalSize: 4500, finalSha256: 'e'.repeat(64) }));
     await stopping;
+    // Parts come as their checkpoints are signed, and the last once the file is sealed.
+    await session.drain();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(parts.map((p) => [p.index, p.offset, p.length, p.endsAt.checkpoint, p.final])).toEqual([
       [0, 0, 2000, 1, false],
       [1, 2000, 2000, 3, false],

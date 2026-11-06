@@ -20,7 +20,8 @@ export type SignedPoint = {
 };
 
 export type BugDeps = {
-  startEngine: () => Promise<BugEngine>;
+  /** Starts recording; `onProblem` hears what goes wrong while it records. */
+  startEngine: (onProblem: (message: string) => void) => Promise<BugEngine>;
   /** Texts the message to trusted contacts with no tap; resolves to how many texts went, or 0. */
   witness: (message: string) => Promise<number>;
   /** How many texts a witness message costs now (one per contact), or 0 if it can't go. */
@@ -51,6 +52,8 @@ export type BugState = {
   witnessed: number;
   lastWitnessAt: string | null;
   error: string | null;
+  /** The latest thing that went wrong while recording (recording carries on, or tries to). */
+  problem: { message: string; at: string } | null;
 };
 
 const IDLE: BugState = {
@@ -64,6 +67,7 @@ const IDLE: BugState = {
   witnessed: 0,
   lastWitnessAt: null,
   error: null,
+  problem: null,
 };
 
 /** The Live Activity is updated at most this often (checkpoints come every 10 seconds). */
@@ -133,7 +137,9 @@ export class BugModeController {
     this.newest = null;
     this.lastActivityUpdate = null;
     try {
-      const engine = await this.deps.startEngine();
+      const engine = await this.deps.startEngine((message) => {
+        if (this.current.running) this.set({ ...this.current, problem: { message, at: this.deps.now().toISOString() } });
+      });
       this.engine = engine;
       this.set({ ...IDLE, running: true, startedAt: this.deps.now().toISOString(), sessionId: engine.session.id });
       this.unsubscribe = engine.session.subscribe(() => this.scan(engine.session));

@@ -165,6 +165,9 @@ describe('startSoundRecording (bug mode, one continuous file with checkpoints)',
     };
     native.stopResult = [closedB];
     native.closed(closedB);
+    // A late event from an earlier recording, whose files are in another session's folder.
+    native.closed({ ...closedB, uri: 'mem://other-session/incoming/bug-0-0.aac', recording: 'old' });
+    native.checkpoint(checkpointOf('old', 'mem://other-session/incoming/bug-0-0.aac', 0, 3, second, 2_000, 50));
     await handle.stop();
     return { ...ctx, id, options, a, b };
   }
@@ -204,13 +207,15 @@ describe('startSoundRecording (bug mode, one continuous file with checkpoints)',
   });
 
   it('cuts upload parts that end on checkpoints and join into each file', async () => {
-    const { parts, first, second } = await record();
+    const { parts, first, second, id } = await record();
     expect(parts.map((p) => [p.recording, p.index, p.offset, p.length, p.endsAt.checkpoint, p.final])).toEqual([
       ['rec-a', 0, 0, 8_000, 1, false],
       ['rec-a', 1, 8_000, 4_000, null, true],
       ['rec-b', 0, 0, 5_000, null, true],
     ]);
     expect(parts[0].endsAt.sha256).toBe(sha(first.subarray(0, 8_000)));
+    // The last part names the file where it now is, in the locker.
+    expect(parts[1].uri).toBe(`mem://${id}/media/0003-audio0-seg0.aac`);
     expect(parts[1].endsAt.sha256).toBe(sha(first));
     expect(parts[2].endsAt.sha256).toBe(sha(second));
   });
@@ -265,6 +270,38 @@ describe('startSoundRecording (bug mode, one continuous file with checkpoints)',
     expect(result.stdout + result.stderr).toContain('OK: signatures, files, checkpoints and chain check out.');
     expect(result.stdout).toContain('Records: 6 (4 of them checkpoints)');
     expect(result.status).toBe(0);
+  });
+
+  it('ends upload parts only on checkpoints that were signed', async () => {
+    const { native, media, locker, parts } = setup();
+    const failing = new CaptureSession({
+      store: locker.store,
+      now: () => new Date('2026-11-06T05:11:00.000Z'),
+      newId: () => 'id',
+      hash: async (uri) => digestsOf(media.get(uri)!),
+      sealCheckpoint: async () => {
+        throw new Error('no key');
+      },
+    });
+    const handle = await startSoundRecording({
+      mode: 'bug',
+      native,
+      location: () => location,
+      session: failing,
+      store: locker.store,
+      partSeconds: () => 5,
+      onPart: (part) => parts.push(part),
+    });
+    const uri = `${native.started[0].outputDir}/bug-0-0.aac`;
+    const bytes = new Uint8Array(6_000).map((_, i) => i % 256);
+    native.checkpoint(checkpointOf('r', uri, 0, 0, bytes, 3_000, 0));
+    media.set(uri, bytes);
+    native.stopResult = [
+      { uri, clip: 0, index: 0, startedAt: at(0), endedAt: at(20), endReason: 'stopped', gapBeforeMs: null, recording: 'r', finalSize: 6_000, finalSha256: sha(bytes) },
+    ];
+    await handle.stop();
+    // The checkpoint couldn't be signed, so the only part is the whole file.
+    expect(parts.map((p) => [p.offset, p.length, p.final])).toEqual([[0, 6_000, true]]);
   });
 
   it('gives a file closed by Stop the stop reason', async () => {

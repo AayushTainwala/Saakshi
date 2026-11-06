@@ -142,27 +142,36 @@ export async function startSoundRecording(options: SoundRecordingOptions): Promi
   );
   let stopReason: EndReason | null = null;
   const added = new Set<string>();
+  const base = store.sessionDirUri(session.ensureSession().id).replace(/\/$/, '');
+  const outputDir = `${base}/incoming`;
+  // Only this recording's files: a late event from an earlier recording still stopping is not ours.
+  const ours = (uri: string) => uri.startsWith(`${outputDir}/`);
   const close = (event: SoundClosed) => {
-    if (added.has(event.uri)) return;
+    if (added.has(event.uri) || !ours(event.uri)) return;
     added.add(event.uri);
-    void session.add(closedSoundFile(event, mode, location(), stopReason));
-    if (event.recording && event.finalSha256 && typeof event.finalSize === 'number') {
-      parts.closed({ recording: event.recording, uri: event.uri, size: event.finalSize, sha256: event.finalSha256 });
-    }
+    void session.add(closedSoundFile(event, mode, location(), stopReason)).then((item) => {
+      // The last part ends at the file's end, as sealed (the recorder's own fingerprint if sealing failed).
+      const size = item.digests?.size ?? event.finalSize;
+      const sha256 = item.digests?.sha256 ?? event.finalSha256;
+      const uri = item.status === 'sealed' || item.status === 'hashed' ? store.mediaUri(session.id!, item.media) : event.uri;
+      if (event.recording && sha256 && typeof size === 'number') parts.closed({ recording: event.recording, uri, size, sha256 });
+    });
   };
   const subscription = native.listen({
     checkpoint: (event) => {
-      void session.addCheckpoint(soundCheckpoint(event, mode, location()));
-      parts.checkpoint({ ...event, at: new Date(event.at), startedAt: new Date(event.startedAt) });
+      if (!ours(event.uri)) return;
+      void session.addCheckpoint(soundCheckpoint(event, mode, location())).then((item) => {
+        // Parts end only on checkpoints that were signed.
+        if (item.status === 'sealed') parts.checkpoint({ ...event, at: new Date(event.at), startedAt: new Date(event.startedAt) });
+      });
     },
     closed: close,
     error: (message) => options.onProblem?.(message),
   });
 
-  const base = store.sessionDirUri(session.ensureSession().id).replace(/\/$/, '');
   try {
     await native.start({
-      outputDir: `${base}/incoming`,
+      outputDir,
       pendingDir: `${base}/pending`,
       clip: session.nextClip(),
       checkpointSeconds: SOUND_CHECKPOINT_SECONDS,

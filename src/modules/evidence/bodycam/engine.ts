@@ -3,7 +3,7 @@ import SaakshiEvidence, { type CheckpointEvent, type RecordingClosedEvent } from
 import type { CaptureSession } from '../capture/pipeline';
 import { extensionOf, mediaTypeFor } from '../locker/media';
 import type { LockerStore } from '../locker/store';
-import type { CheckpointInput, ClosedFile, EndReason, LocationSnapshot } from '../types';
+import type { CheckpointInput, ClosedFile, EndReason, EvidenceItem, LocationSnapshot } from '../types';
 import { BODYCAM_CHECKPOINT_SECONDS, DEFAULT_UPLOAD_PART_SECONDS } from './constants';
 import { PartPlanner } from './parts';
 
@@ -79,14 +79,20 @@ export function checkpointFromEvent(event: CheckpointEvent, location: LocationSn
 function checkpoints(native: NativeBodyCam, common: Common) {
   const parts = new PartPlanner(() => common.partSeconds ?? DEFAULT_UPLOAD_PART_SECONDS);
   const subscription = native.addListener('onCheckpoint', (event: CheckpointEvent) => {
-    void common.session.addCheckpoint(checkpointFromEvent(event, common.location()));
-    parts.checkpoint({ ...event, at: new Date(event.at), startedAt: new Date(event.startedAt) });
+    void common.session.addCheckpoint(checkpointFromEvent(event, common.location())).then((item) => {
+      // Parts end only on checkpoints that were signed.
+      if (item.status === 'sealed') parts.checkpoint({ ...event, at: new Date(event.at), startedAt: new Date(event.startedAt) });
+    });
   });
   return {
-    closed(event: RecordingClosedEvent) {
-      if (event.recording && event.finalSha256 && typeof event.finalSize === 'number') {
-        parts.closed({ recording: event.recording, uri: event.uri, size: event.finalSize, sha256: event.finalSha256 });
-      }
+    /** After the file's own record: the last part ends at the file's end, as sealed. */
+    closed(event: RecordingClosedEvent, sealed: Promise<EvidenceItem>) {
+      void sealed.then((item) => {
+        const size = item.digests?.size ?? event.finalSize;
+        const sha256 = item.digests?.sha256 ?? event.finalSha256;
+        const uri = item.status === 'sealed' || item.status === 'hashed' ? common.store.mediaUri(common.session.id!, item.media) : event.uri;
+        if (event.recording && sha256 && typeof size === 'number') parts.closed({ recording: event.recording, uri, size, sha256 });
+      });
     },
     remove: () => subscription.remove(),
   };
@@ -115,8 +121,7 @@ export function androidBodyCam(
   let finished = false;
   const marks = checkpoints(native, common);
   const subscription = native.addListener('onRecordingClosed', (event: RecordingClosedEvent) => {
-    void common.session.add(closedFileFromEvent(event, common.location(), stopReason));
-    marks.closed(event);
+    marks.closed(event, common.session.add(closedFileFromEvent(event, common.location(), stopReason)));
     if (event.endReason !== 'piece-complete') {
       finished = true;
       onFinal?.();
@@ -180,8 +185,7 @@ export function iosBodyCam(
   const add = (event: RecordingClosedEvent) => {
     if (added.has(event.uri)) return;
     added.add(event.uri);
-    void common.session.add(closedFileFromEvent(event, common.location(), stopReason));
-    marks.closed(event);
+    marks.closed(event, common.session.add(closedFileFromEvent(event, common.location(), stopReason)));
   };
   const closedSubscription = native.addListener('onRecordingClosed', add);
   const errorSubscription = native.addListener('onRecorderError', (event: { message: string }) =>

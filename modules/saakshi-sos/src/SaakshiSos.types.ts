@@ -71,6 +71,8 @@ export type SaakshiSosEvents = {
   onBugPieceClosed: (event: BugPieceClosedEvent) => void;
   onBugCheckpoint: (event: BugCheckpointEvent) => void;
   onBugRecorderError: (event: { message: string }) => void;
+  /** Sent once the first file is recording, after bugRecorderStart. */
+  onBugRecorderStarted: () => void;
   /** Sent once Stop has closed the last file (after its onBugPieceClosed). */
   onBugRecorderStopped: () => void;
 };

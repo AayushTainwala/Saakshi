@@ -115,6 +115,7 @@
     "noCheckpointYet": "The first checkpoint is signed about 10 seconds after Start.",
     "failed_one": "{{count}} file could not be signed; it is kept as it is.",
     "failed_other": "{{count}} files could not be signed; they are kept as they are.",
+    "problem": "Problem at {{time}}: {{detail}}",
     "witnessed": "Last fingerprint texted at {{time}}.",
     "micDenied": "Saakshi needs microphone permission for bug mode.",
     "error": "Bug mode could not start: {{detail}}",

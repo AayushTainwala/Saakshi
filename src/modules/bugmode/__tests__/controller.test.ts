@@ -60,8 +60,12 @@ function setup(options: { contacts?: number } = {}) {
   const fake = fakeSession();
   let clock = Date.parse('2026-10-20T09:00:00Z');
   const stopEngine = jest.fn(async (): Promise<void> => undefined);
+  let onProblem: ((message: string) => void) | null = null;
   const deps: BugDeps = {
-    startEngine: jest.fn(async () => ({ session: fake.session, stop: stopEngine })),
+    startEngine: jest.fn(async (problem: (message: string) => void) => {
+      onProblem = problem;
+      return { session: fake.session, stop: stopEngine };
+    }),
     witnessCost: jest.fn(async () => options.contacts ?? 2),
     witness: jest.fn(async () => options.contacts ?? 2),
     witnessText: (latest, startedAt) => `since ${startedAt}, to ${latest.at}: ${latest.recordSha256}`,
@@ -70,7 +74,7 @@ function setup(options: { contacts?: number } = {}) {
   };
   const advance = (seconds: number) => void (clock += seconds * 1000);
   const time = () => new Date(clock).toISOString();
-  return { bug: new BugModeController(deps), deps, fake, stopEngine, advance, time };
+  return { bug: new BugModeController(deps), deps, fake, stopEngine, advance, time, problem: (m: string) => onProblem?.(m) };
 }
 
 describe('BugModeController', () => {
@@ -149,6 +153,16 @@ describe('BugModeController', () => {
     await bug.stop();
     expect(deps.witness).toHaveBeenCalledWith('since 2026-10-20T09:00:00.000Z, to 2026-10-20T09:00:05.000Z: hash-0');
     expect(bug.getState()).toMatchObject({ running: false, files: 1, witnessed: 1 });
+  });
+
+  it('shows the latest problem the recorder reports while it records', async () => {
+    const { bug, problem } = setup();
+    await bug.start();
+    problem('No sound has come from the microphone for 10 seconds. Trying again.');
+    expect(bug.getState().problem).toEqual({
+      message: 'No sound has come from the microphone for 10 seconds. Trying again.',
+      at: '2026-10-20T09:00:00.000Z',
+    });
   });
 
   it('stops the recorder and the Live Activity', async () => {

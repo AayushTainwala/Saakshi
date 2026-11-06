@@ -70,6 +70,9 @@ export function BugModeScreen() {
               : t('bug.noCheckpointYet')}
           </AppText>
           {state.failed > 0 ? <AppText color="danger">{t('bug.failed', { count: state.failed })}</AppText> : null}
+          {state.problem ? (
+            <AppText color="danger">{t('bug.problem', { time: timeIST(state.problem.at, true), detail: state.problem.message })}</AppText>
+          ) : null}
           {state.lastWitnessAt ? <AppText>{t('bug.witnessed', { time: timeIST(state.lastWitnessAt) })}</AppText> : null}
           <Button variant="danger" label={t('bug.stop')} busy={busy} onPress={() => void stop()} />
         </Card>

@@ -28,9 +28,11 @@ function formatTimeIST(iso: string): string {
 const liveActivity = SaakshiSos && Platform.OS === 'ios' ? SaakshiSos : null;
 
 export const bugMode = new BugModeController({
-  startEngine: () =>
-    startBugEngine({ title: i18n.t('sos:bug.noticeTitle'), text: i18n.t('sos:bug.noticeText') }, (part) =>
-      partListener?.(part),
+  startEngine: (onProblem) =>
+    startBugEngine(
+      { title: i18n.t('sos:bug.noticeTitle'), text: i18n.t('sos:bug.noticeText') },
+      (part) => partListener?.(part),
+      onProblem,
     ),
   witnessCost: async () => ((await canTextWithoutTap()) ? (await getTrustedContacts()).length : 0),
   witness: async (message) => {

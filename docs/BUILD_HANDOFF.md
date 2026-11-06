@@ -28,7 +28,7 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 For the session that takes over. Read the brief, then this section, then CLAUDE.md as usual.
 
 - **Finished:** groups 1, 2 and 2a are merged into `main` (#16, #17, #18). Each pull request has plain test steps for the owner. Typecheck, lint and all 307 tests pass, and both native builds pass on every one.
-- **Built since:** bug mode as one continuous file with checkpoints (#20, "Bug mode: one continuous file" below). With it, typecheck, lint and 316 tests pass (three tests of the old iPhone pieces went with them).
+- **Built since:** bug mode as one continuous file with checkpoints (#20, "Bug mode: one continuous file" below). With it, typecheck, lint and 320 tests pass (three tests of the old iPhone pieces went with them).
 - **Not yet tested:** nothing from fix round 1 has run on a phone. The owner's next TestFlight round should follow the test steps in #16, #17 and #18. Step C of #18, a forced restart while recording, is the genuine cut-off test that round 1 couldn't do.
 - **Next: group 3** (records list and playback), on a new branch from the latest `main` (for example `claude/fix-round-1-group-3`), then groups 4 to 9 in the brief's order, one pull request each. The owner merges each pull request; when asked, stack the next group on the previous branch instead, as group 2 was.
 - **What group 3 starts from:**
@@ -169,12 +169,25 @@ All three checks came out feasible, so nothing falls back to pieces.
 - **Location:** each record takes the latest fix, now asked for at most once a minute (it was once per piece).
 - **Bundle format 0.6** (`docs/spec/evidence-bundle.md`): bug mode's files, checkpoints and follow-on files as above; no record member was added or removed. `tools/verify-bundle.mjs` reads 0.1 to 0.6. A test makes a real signed bug-mode bundle (two files after a call, four checkpoints) and the checker passes it.
 - The App Review note on bug mode (`store/apple/review-notes.md`) now says one file, signed every 10 seconds.
+- **An independent review** of the new code (by a separate agent, before the pull request was ready) found no compile errors and no case where a checkpoint could disagree with its file or come after its file's close. It found ten problems in how failures are handled, all fixed in #20:
+  - Android: if MediaRecorder stops writing (AOSP's `AACWriter` stops on a write or microphone error without telling anyone, for example when the phone is full), nothing noticed. Now a file that hasn't grown for 30 seconds ends as `"error"` and a new one starts. A failure while closing a file can no longer crash the app, and the service always says when Stop is done.
+  - Android: a recorder could be left running if its marker couldn't be written. The marker is now written before the recorder starts.
+  - Recorder problems never reached the screen, and an Android start that never recorded looked like success. Now the bug-mode screen shows the latest problem, and on Android Start waits (up to 8 seconds) until the first file is recording, or fails with the reason.
+  - iPhone: a microphone whose first sound took more than 2 seconds could loop without ever recording, silently. Late first sound is now kept; an engine with no sound after 5 seconds is started afresh; 10 seconds without sound is reported on screen.
+  - Android: file end times were taken after the final fingerprint (up to a second late); now right after the recorder stops.
+  - A stop taking more than 5 seconds could let the old file's late events reach the next recording. Each recording now takes only events for files in its own session folder, and a Start while the last recording is still stopping fails with a message.
+  - iPhone: bug mode now leaves the sound session as it is while body-cam runs, sets it only when it differs, and restarts its microphone at most once a second, so the two can't make each other restart in a loop.
+  - iPhone: the stall and retry timers now use the uptime clock, which a clock change doesn't move.
+  - Upload parts could end on a checkpoint that wasn't signed. Parts are now cut only from signed checkpoints, and the last part from the file as sealed. Body-cam had the same pattern (group 2a) and is fixed the same way here.
+  - Android: the service released its wake lock before the last file was closed and fingerprinted; now it waits.
+- **Compiled before CI:** `BugRecorder.kt` and `AdtsCheckpointer.kt` compile with the JetBrains compiler against small Java stand-ins for the Android classes they use (signatures copied from the Android API). The rest of the Kotlin and all Swift compile only in the Native build workflow.
 
 **Not verified:**
 - Nothing has run on a phone, and the Swift and Android Kotlin compile only in the Native build workflow.
 - Most important to test: an iPhone recording with the phone locked for 30 minutes or more (that sound keeps coming, and checkpoints keep being signed); a phone call during bug mode on both phones; a forced restart while recording (the file should play up to the cut and be sealed as interrupted when the app opens, with its checkpoints); Android with the screen off for an hour on a Samsung and a Xiaomi, Oppo or Vivo.
 - As before for iPhone, after a call that ends while Saakshi is in the background, sound may not restart until the user returns to the app (iOS may refuse to start a recording from the background; the recorder then tries it as non-mixable).
-- If body-cam and bug mode ever ran together on iPhone (for example, confiscation mode started from the code pad over body-cam), both would use the microphone at once; neither now switches the sound session off while the other is running, but this hasn't been tried.
+- If body-cam and bug mode ever ran together on iPhone (for example, confiscation mode started from the code pad over body-cam), both would use the microphone at once; neither switches the sound session off or changes it under the other, but this hasn't been tried.
+- Found by the review, not changed (it was so before #20): the crash-recovery check at app start trusts that a session not marked active in the running JavaScript is finished. If the app's JavaScript ever restarted while Android's service kept recording, the file being written could be sealed early as interrupted. Nothing calls `bugRecorderRunning()` yet.
 
 ## Owner questions
 

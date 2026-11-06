@@ -46,10 +46,17 @@ final class SoundRecorder {
   var emit: ((String, [String: Any]) -> Void)?
 
   // Seconds.
-  /// No sound for this long: the microphone has stopped, even if iOS didn't say so.
+  /// No sound for this long after sound was arriving: the microphone has stopped, even if iOS didn't say so.
   private static let stallSeconds = 2.0
+  /// A started engine whose first sound hasn't come in this long is started afresh (its sound, if it
+  /// comes meanwhile, is still kept).
+  private static let firstSoundSeconds = 5.0
   /// While the microphone is off, try to start it again this often.
   private static let retrySeconds = 10.0
+  /// Never start the engine afresh more often than this.
+  private static let minRestartSeconds = 1.0
+  /// No sound for this long: say so once (until sound comes again).
+  private static let silenceReportSeconds = 10.0
   /// After a file can't be created or written, wait this long before starting another.
   private static let fileRetrySeconds = 5.0
 
@@ -70,10 +77,15 @@ final class SoundRecorder {
   /// Sound from the current engine is arriving.
   private var audioOn = false
   /// The engine has started and its first sound is due.
-  private var pendingSince: Date?
-  private var lastArrival: Date?
-  private var lastAttempt: Date?
-  private var fileRetryAt: Date?
+  // Timers count on the phone's uptime clock, which the user can't change (file times use the
+  // wall clock, which is what records state).
+  private var pendingSince: TimeInterval?
+  private var lastArrival: TimeInterval?
+  private var lastAttempt: TimeInterval?
+  private var fileRetryAt: TimeInterval?
+  /// Since when no sound has arrived (Start, or the last sound).
+  private var silentSince: TimeInterval = 0
+  private var reportedSilence = false
   private var reportedStartFailure = false
   private var stopping = false
   private var closedWhileStopping: [[String: Any]] = []
@@ -129,6 +141,8 @@ final class SoundRecorder {
       lastArrival = nil
       lastAttempt = nil
       fileRetryAt = nil
+      silentSince = Self.uptime
+      reportedSilence = false
       reportedStartFailure = false
       stopping = false
       closedWhileStopping = []
@@ -202,38 +216,45 @@ final class SoundRecorder {
     engine = nil
     generation += 1
     let current = generation
-    lastAttempt = Date()
+    lastAttempt = Self.uptime
     let session = AVAudioSession.sharedInstance()
-    // Mixable, so music or video in another app doesn't stop the recording.
-    try session.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers])
+    // Mixable, so music or video in another app doesn't stop the recording. Set only when it isn't
+    // so already, and never while body-cam is recording (its setting suits both, and changing the
+    // mode under it would restart its microphone).
+    if !BodyCamRecorder.shared.isRunning,
+      session.category != .playAndRecord || session.mode != .default || !session.categoryOptions.contains(.mixWithOthers)
+    {
+      try session.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers])
+    }
     try session.setActive(true)
-    let engine = AVAudioEngine()
-    let input = engine.inputNode
+    let fresh = AVAudioEngine()
+    let input = fresh.inputNode
     let format = input.outputFormat(forBus: 0)
     guard format.sampleRate > 0, format.channelCount > 0 else { throw Failure.noMicrophone }
     input.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, when in
       guard let self, let chunk = SoundChunk(buffer, at: when) else { return }
       self.queue.async { self.handle(chunk, generation: current) }
     }
-    engine.prepare()
+    fresh.prepare()
     do {
-      try engine.start()
+      try fresh.start()
     } catch where inBackground {
       // Apple: starting a mixable recording from the background usually fails. Try as a
       // non-mixable one, so sound comes back after a phone call even if the user hasn't returned.
       // It stays non-mixable until bug mode stops.
       try session.setCategory(.playAndRecord, mode: .default, options: [])
       try session.setActive(true)
-      try engine.start()
+      try fresh.start()
     }
-    self.engine = engine
-    pendingSince = Date()
+    engine = fresh
+    pendingSince = Self.uptime
     reportedStartFailure = false
   }
 
   /// Tries to start the microphone again; says so once if it can't, and keeps trying.
   private func restartEngine() {
     guard isRunning, !stopping else { return }
+    if let last = lastAttempt, Self.uptime - last < Self.minRestartSeconds { return }
     do {
       try startEngine()
     } catch {
@@ -261,11 +282,13 @@ final class SoundRecorder {
       audioOn = true
       pendingSince = nil
     }
-    lastArrival = Date()
+    lastArrival = Self.uptime
+    silentSince = Self.uptime
+    reportedSilence = false
     if file == nil {
       // Stop closes the file and takes no new one.
       if stopping { return }
-      if let retryAt = fileRetryAt, Date() < retryAt { return }
+      if let retryAt = fileRetryAt, Self.uptime < retryAt { return }
       file = open(config, format: chunk.pcm.format, startedAt: chunk.startedAt)
     }
     guard let current = file else { return }
@@ -276,7 +299,7 @@ final class SoundRecorder {
     } catch {
       emitError("Writing \(current.url.lastPathComponent) failed: \(error.localizedDescription)")
       close(current, reason: "error")
-      fileRetryAt = Date().addingTimeInterval(Self.fileRetrySeconds)
+      fileRetryAt = Self.uptime + Self.fileRetrySeconds
     }
   }
 
@@ -347,16 +370,21 @@ final class SoundRecorder {
 
   private func tick() {
     guard config != nil, !stopping else { return }
-    let now = Date()
-    if audioOn, let last = lastArrival, now.timeIntervalSince(last) > Self.stallSeconds {
+    let now = Self.uptime
+    if audioOn, let last = lastArrival, now - last > Self.stallSeconds {
       // Sound was arriving and stopped: start again at once.
       audioLost()
       restartEngine()
-    } else if let since = pendingSince, now.timeIntervalSince(since) > Self.stallSeconds {
-      // The engine started but no sound came: try again at the usual pace.
-      audioLost()
-    } else if !audioOn, pendingSince == nil, lastAttempt.map({ now.timeIntervalSince($0) > Self.retrySeconds }) ?? true {
+    } else if let since = pendingSince, now - since > Self.firstSoundSeconds {
+      // The engine started but no sound has come: start it afresh. (Until then, late first sound
+      // from it is kept.)
       restartEngine()
+    } else if !audioOn, pendingSince == nil, lastAttempt.map({ now - $0 > Self.retrySeconds }) ?? true {
+      restartEngine()
+    }
+    if !reportedSilence, now - silentSince > Self.silenceReportSeconds {
+      reportedSilence = true
+      emitError("No sound has come from the microphone for \(Int(Self.silenceReportSeconds)) seconds. Trying again.")
     }
   }
 
@@ -382,7 +410,7 @@ final class SoundRecorder {
       return file
     } catch {
       try? FileManager.default.removeItem(at: url)
-      fileRetryAt = Date().addingTimeInterval(Self.fileRetrySeconds)
+      fileRetryAt = Self.uptime + Self.fileRetrySeconds
       emitError("A sound file could not be started: \(error.localizedDescription)")
       return nil
     }
@@ -457,6 +485,8 @@ final class SoundRecorder {
       "startedAt": iso.string(from: file.startedAt),
     ])
   }
+
+  private static var uptime: TimeInterval { ProcessInfo.processInfo.systemUptime }
 
   private func emitError(_ message: String) {
     NSLog("[Saakshi sound] %@", message)

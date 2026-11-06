@@ -15,6 +15,8 @@ function fakeSos() {
     stops: 0,
     /** Fire onBugRecorderStopped when stopped, as the service does. */
     confirmStop: true,
+    /** What the recorder in the service says after a start: started, an error, or nothing. */
+    onStart: 'started' as 'started' | 'error' | 'silent',
     addListener(name: string, listener: (event: never) => void) {
       if (!listeners.has(name)) listeners.set(name, new Set());
       listeners.get(name)!.add(listener);
@@ -22,6 +24,8 @@ function fakeSos() {
     },
     async bugRecorderStart(options: BugRecorderOptions) {
       native.started.push(options);
+      if (native.onStart === 'started') setTimeout(() => native.fire('onBugRecorderStarted', {}), 10);
+      if (native.onStart === 'error') setTimeout(() => native.fire('onBugRecorderError', { message: 'Could not start recording: busy' }), 10);
     },
     async bugRecorderStop() {
       native.stops++;
@@ -105,6 +109,33 @@ describe('androidRecorder (bug mode on Android)', () => {
     ]);
     subscription.remove();
     expect(sos.listenerCount()).toBe(0);
+  });
+
+  it('fails Start with the recorder\'s reason, and stops the service, if the first file cannot start', async () => {
+    const sos = fakeSos();
+    sos.onStart = 'error';
+    const recorder = androidRecorder({ title: 't', text: 'x' }, sos);
+    await expect(
+      recorder.start({ outputDir: 'file:///s/incoming', pendingDir: 'file:///s/pending', clip: 0, checkpointSeconds: 10 }),
+    ).rejects.toThrow('Could not start recording: busy');
+    expect(sos.stops).toBe(1);
+    expect(sos.listenerCount()).toBe(0);
+  });
+
+  it('fails Start if the recorder says nothing for 8 seconds', async () => {
+    jest.useFakeTimers();
+    try {
+      const sos = fakeSos();
+      sos.onStart = 'silent';
+      const recorder = androidRecorder({ title: 't', text: 'x' }, sos);
+      const starting = recorder.start({ outputDir: 'file:///s/incoming', pendingDir: 'file:///s/pending', clip: 0, checkpointSeconds: 10 });
+      const outcome = starting.catch((e: Error) => e.message);
+      await jest.advanceTimersByTimeAsync(8100);
+      await expect(outcome).resolves.toBe('Recording did not start');
+      expect(sos.stops).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('stops once the service says the last file has closed', async () => {

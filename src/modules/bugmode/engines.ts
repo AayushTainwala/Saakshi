@@ -72,6 +72,9 @@ function fromAndroid(event: BugPieceClosedEvent): SoundClosed {
 
 type AndroidNative = Pick<NonNullable<typeof SaakshiSos>, 'addListener' | 'bugRecorderStart' | 'bugRecorderStop'>;
 
+/** How long Start waits for the Android recorder to say its first file is recording. */
+const START_TIMEOUT_MS = 8000;
+
 /**
  * Android: the app's own recorder in a microphone foreground service (modules/saakshi-sos), writing
  * one cut-off-safe AAC file with checkpoints and its crash-recovery marker into the evidence
@@ -93,8 +96,28 @@ export function androidRecorder(
       ];
       return { remove: () => subscriptions.forEach((s) => s.remove()) };
     },
+    // The service starts at once; the recorder in it may not. Resolves once the first file is
+    // recording, or rejects with the recorder's reason (and stops the service).
     start: (options) =>
-      native.bugRecorderStart({ ...options, notificationTitle: notice.title, notificationText: notice.text }),
+      new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const settle = (error?: Error) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          started.remove();
+          failed.remove();
+          if (!error) return resolve();
+          void native.bugRecorderStop().catch(() => undefined);
+          reject(error);
+        };
+        const started = native.addListener('onBugRecorderStarted', () => settle());
+        const failed = native.addListener('onBugRecorderError', (event) => settle(new Error(event.message)));
+        const timer = setTimeout(() => settle(new Error('Recording did not start')), START_TIMEOUT_MS);
+        native
+          .bugRecorderStart({ ...options, notificationTitle: notice.title, notificationText: notice.text })
+          .catch((error: unknown) => settle(error instanceof Error ? error : new Error(String(error))));
+      }),
     async stop() {
       let timer: ReturnType<typeof setTimeout> | undefined;
       const done = new Promise<void>((resolve) => {
@@ -114,6 +137,7 @@ export function androidRecorder(
 export function startBugEngine(
   notice: { title: string; text: string },
   onPart: (part: UploadPart) => void,
+  onProblem: (message: string) => void,
 ): Promise<BugEngine> {
   return (async () => {
     await ensureMicrophone();
@@ -131,7 +155,7 @@ export function startBugEngine(
       if (!ios) throw new Error('Bug mode is not built into this app');
       native = ios;
     }
-    const handle = await startSoundRecording({ mode: 'bug', native, location: locationTracker(), onPart });
+    const handle = await startSoundRecording({ mode: 'bug', native, location: locationTracker(), onPart, onProblem });
     return { session: handle.session, stop: (reason) => handle.stop(reason) };
   })();
 }

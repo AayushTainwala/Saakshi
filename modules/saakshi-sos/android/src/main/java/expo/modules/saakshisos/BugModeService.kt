@@ -9,7 +9,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import java.io.File
 
@@ -21,6 +23,7 @@ import java.io.File
  */
 class BugModeService : Service() {
   private var wakeLock: PowerManager.WakeLock? = null
+  private val main = Handler(Looper.getMainLooper())
 
   override fun onBind(intent: Intent?): IBinder? = null
 
@@ -42,11 +45,7 @@ class BugModeService : Service() {
     } else {
       startForeground(NOTIFICATION_ID, notification)
     }
-    wakeLock = (getSystemService(Context.POWER_SERVICE) as PowerManager)
-      .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Saakshi:BugMode")
-      .apply { acquire() }
-
-    BugRecorder.start(
+    val started = BugRecorder.start(
       this,
       BugRecorder.Config(
         outputDir = File(intent.getStringExtra(EXTRA_OUTPUT_DIR)!!),
@@ -55,21 +54,32 @@ class BugModeService : Service() {
         clip = intent.getIntExtra(EXTRA_CLIP, 0)
       )
     )
+    // Not started while an earlier recording is still stopping: that stop ends the service.
+    if (!started) return
+    wakeLock?.let { if (it.isHeld) it.release() }
+    wakeLock = (getSystemService(Context.POWER_SERVICE) as PowerManager)
+      .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Saakshi:BugMode")
+      .apply { acquire() }
     running = true
   }
 
   private fun stop() {
-    BugRecorder.stop()
-    wakeLock?.let { if (it.isHeld) it.release() }
-    wakeLock = null
     running = false
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-      stopForeground(STOP_FOREGROUND_REMOVE)
-    } else {
-      @Suppress("DEPRECATION")
-      stopForeground(true)
+    // The wake lock and the foreground service stay until the recorder has closed and
+    // fingerprinted the file, so that this finishes with the screen off.
+    BugRecorder.stop {
+      main.post {
+        wakeLock?.let { if (it.isHeld) it.release() }
+        wakeLock = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+          stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+          @Suppress("DEPRECATION")
+          stopForeground(true)
+        }
+        stopSelf()
+      }
     }
-    stopSelf()
   }
 
   override fun onDestroy() {
