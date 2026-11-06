@@ -19,6 +19,7 @@ import { useSession } from '../locker/useSessions';
 import { sendWitnessMessage, SmsUnavailableError } from '../witness/send';
 import type { EvidenceItem, SessionState } from '../types';
 import { formatBytes, formatIST } from './format';
+import { endReasonLabel } from './endReasons';
 import { kindLabel, lengthLabel } from './labels';
 import { RecordingPlayer } from './RecordingPlayer';
 import { Thumbnail } from './RecordRow';
@@ -48,6 +49,7 @@ function ItemCard({ item, session }: { item: EvidenceItem; session: SessionState
   const copy = session.copies?.[String(item.sequence)];
   const isVideo = item.kind === 'video' && item.status === 'sealed';
   const inLocker = item.status === 'sealed' || item.status === 'hashed';
+  const ended = item.kind === 'photo' ? null : endReasonLabel(t, item);
   const openPhoto = () => router.push({ pathname: '/photo', params: { session: session.id, sequence: String(item.sequence) } });
 
   const run = async (action: () => Promise<void>) => {
@@ -106,7 +108,7 @@ function ItemCard({ item, session }: { item: EvidenceItem; session: SessionState
       <AppText color={item.status === 'failed' ? 'danger' : item.status === 'sealed' ? 'success' : 'textMuted'}>
         {status}
       </AppText>
-      {item.interrupted ? <AppText color="warning">{t('locker.itemInterrupted')}</AppText> : null}
+      {ended ? <AppText color={item.interrupted ? 'warning' : 'textMuted'}>{t('ended.label', { reason: ended })}</AppText> : null}
       {item.digests ? (
         <AppText variant="mono" selectable accessibilityLabel={t('locker.sha256')}>
           SHA-256 {item.digests.sha256}
@@ -162,6 +164,9 @@ export function SessionDetail({ id }: { id: string }) {
   const sealed = session.items.filter((item) => item.status === 'sealed').length;
   const summary = summarize(session, (item) => recordModeOf(session.id, item));
   const kind = kindLabel(t, summary);
+  // How the recording as a whole ended: its last file's reason.
+  const last = [...session.items].filter((i) => i.kind !== 'photo').sort((a, b) => Date.parse(a.endedAt) - Date.parse(b.endedAt)).at(-1);
+  const endedHow = last ? endReasonLabel(t, last) : null;
   const head = chainHeadOf(session);
   const lastWitness = session.witness.filter((w) => w.result !== 'cancelled').at(-1);
 
@@ -249,6 +254,9 @@ export function SessionDetail({ id }: { id: string }) {
         {summary.lengthMs !== null ? t('list.summary', { kind, length: lengthLabel(t, summary.lengthMs) }) : kind}
       </AppText>
       <AppText color="textMuted">{t('list.started', { time: formatIST(summary.startedAt, true) })}</AppText>
+      {endedHow && summary.kind !== 'camera' ? (
+        <AppText color={last?.interrupted ? 'warning' : 'textMuted'}>{t('ended.label', { reason: endedHow })}</AppText>
+      ) : null}
 
       {summary.kind !== 'camera' && summary.videos + summary.sounds > 0 ? (
         <Card>
