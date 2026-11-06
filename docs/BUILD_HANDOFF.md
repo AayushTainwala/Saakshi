@@ -26,7 +26,7 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 | 6. Trusted contacts, three ticks per person (B5) | Built: https://github.com/AayushTainwala/Saakshi/pull/24 (branch `claude/fix-round-1-group-6`, stacked on #23). Not yet run on a phone. |
 | 7. Witness message (B5) | Built: https://github.com/AayushTainwala/Saakshi/pull/25 (branch `claude/fix-round-1-group-7`, stacked on #24). Not yet run on a phone. |
 | 8. Certificate: one profile (B7) | Built: https://github.com/AayushTainwala/Saakshi/pull/26 (branch `claude/fix-round-1-group-8`, stacked on #25). Not yet run on a phone. |
-| 9. Export (B6) | Built: branch `claude/fix-round-1-group-9`, stacked on #26 (pull request below). Not yet run on a phone. |
+| 9. Export (B6) | Built: https://github.com/AayushTainwala/Saakshi/pull/27 (branch `claude/fix-round-1-group-9`, stacked on #26). Not yet run on a phone. |
 
 ### Where fix round 1 stands, and what's next (6 Nov 2026)
 
@@ -362,7 +362,7 @@ All three checks came out feasible, so nothing falls back to pieces.
 
 **NEEDS OWNER REVIEW:** the new strings (`profile` in `record.json`, `certificates` in `settings.json`, English and Hindi). The Settings line refers to "section 63(4)(c) of the Bharatiya Sakshya Adhiniyam, 2023", as the existing certificate screen does (law.md 1A).
 
-### Group 9: export (pull request to follow #26)
+### Group 9: export (#27)
 
 **What was built** (brief section 9; SPEC E5, "Export"):
 - **Two clear actions on every record**, in one card under the player:
