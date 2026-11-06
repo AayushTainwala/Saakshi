@@ -21,7 +21,7 @@ The owner's decisions after his SOS test are in `docs/SPEC.md` (sections 4, 5, 6
 | 1.2 Secret code, Settings | Built: https://github.com/AayushTainwala/Saakshi/pull/32 (on top of 1.1). Not yet run on a phone. |
 | 1.3 SOS swipes, Pocket recording, "My phone is being taken" | Split in two, as the brief allows. **A** (the page, the move, the quick trigger): https://github.com/AayushTainwala/Saakshi/pull/33. **B** ("My phone is being taken", Stop gating, the server migration): https://github.com/AayushTainwala/Saakshi/pull/34. Not yet run on a phone. |
 | 1.4 Alerts (both links, battery level, calm Share my location) | Built: https://github.com/AayushTainwala/Saakshi/pull/35 (on top of 1.3B). Not yet run on a phone. |
-| 1.5 Low battery at 5%, bundle format 0.9 | Built: branch `round-2/1-5-low-battery`, on top of 1.4. Not yet run on a phone. |
+| 1.5 Low battery at 5%, bundle format 0.9 | Built: https://github.com/AayushTainwala/Saakshi/pull/36 (on top of 1.4). Not yet run on a phone. |
 | 2.1–2.3 E7, Google Drive | Not started (needs the owner's Google Cloud project; owner's guide "Round 2 setup guide" is in his vault) |
 | 3.1 Protocol `docs/spec/alerts.md` | Not started. **Documents only; needs the owner's review before Part 3 code.** May start with Part 1. |
 | 3.2–3.5 Server, pairing, receiving, silence alarm | Not started (needs the Apple push key and Google's notification service) |
