@@ -12,7 +12,7 @@ import {
 } from '@/modules/evidence';
 import { getCurrentFix } from '@/modules/location';
 
-import type { BugEngine } from './controller';
+import type { BugEngine, StartedFrom } from './controller';
 
 export class MicrophoneDeniedError extends Error {}
 
@@ -70,7 +70,7 @@ function fromAndroid(event: BugPieceClosedEvent): SoundClosed {
   };
 }
 
-type AndroidNative = Pick<NonNullable<typeof SaakshiSos>, 'addListener' | 'bugRecorderStart' | 'bugRecorderStop'>;
+type AndroidNative = Pick<NonNullable<typeof SaakshiSos>, 'addListener' | 'bugRecorderStart' | 'bugRecorderStop' | 'bugRecorderHandOver'>;
 
 /** How long Start waits for the Android recorder to say its first file is recording. */
 const START_TIMEOUT_MS = 8000;
@@ -118,6 +118,7 @@ export function androidRecorder(
           .bugRecorderStart({ ...options, notificationTitle: notice.title, notificationText: notice.text })
           .catch((error: unknown) => settle(error instanceof Error ? error : new Error(String(error))));
       }),
+    handOver: (reason) => native.bugRecorderHandOver(reason),
     async stop() {
       let timer: ReturnType<typeof setTimeout> | undefined;
       const done = new Promise<void>((resolve) => {
@@ -138,6 +139,7 @@ export function startBugEngine(
   notice: { title: string; text: string },
   onPart: (part: UploadPart) => void,
   onProblem: (message: string) => void,
+  startedFrom: StartedFrom = 'pocket',
 ): Promise<BugEngine> {
   return (async () => {
     await ensureMicrophone();
@@ -155,7 +157,7 @@ export function startBugEngine(
       if (!ios) throw new Error('Pocket recording is not built into this app');
       native = ios;
     }
-    const handle = await startSoundRecording({ mode: 'bug', native, location: locationTracker(), onPart, onProblem });
-    return { session: handle.session, stop: (reason) => handle.stop(reason) };
+    const handle = await startSoundRecording({ mode: 'bug', startedFrom, native, location: locationTracker(), onPart, onProblem });
+    return { session: handle.session, stop: (reason) => handle.stop(reason), handOver: () => handle.handOver() };
   })();
 }

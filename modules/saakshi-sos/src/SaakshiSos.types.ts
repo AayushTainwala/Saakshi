@@ -26,7 +26,7 @@ export type BugPieceClosedEvent = {
   index: number;
   startedAt: string;
   endedAt: string;
-  endReason: 'stopped' | 'error';
+  endReason: 'stopped' | 'error' | 'low-battery';
   gapBeforeMs: number | null;
   /** The crash-recovery marker's file name in the session's pending/ folder. */
   marker: string;

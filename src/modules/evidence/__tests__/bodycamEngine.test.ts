@@ -27,6 +27,14 @@ function fakeNative() {
     async bodyCamStop() {
       return native.stopResult;
     },
+    handOvers: [] as { reason: string; saving: boolean }[],
+    saving: [] as boolean[],
+    async bodyCamHandOver(reason: string, saving: boolean) {
+      native.handOvers.push({ reason, saving });
+    },
+    async bodyCamSetSaving(on: boolean) {
+      native.saving.push(on);
+    },
     fire(name: string, event: unknown) {
       for (const listener of listeners.get(name) ?? []) listener(event as never);
     },
@@ -205,6 +213,36 @@ describe('iosBodyCam', () => {
     const engine = iosBodyCam(common, native);
     await expect(engine.start()).rejects.toThrow('no camera');
     expect(native.listenerCount()).toBe(0);
+  });
+});
+
+describe('the low-battery handover in body-cam (round 2, group 1.5)', () => {
+  it('Android: a file closed as "low-battery" is not the last; Stop still waits for the last one', async () => {
+    const { native, common, session, locker, file } = setup();
+    const engine = androidBodyCam({ ...common, notificationTitle: 't', notificationText: 'x' }, native);
+    await engine.start();
+    await engine.handOver(true);
+    expect(native.handOvers).toEqual([{ reason: 'low-battery', saving: true }]);
+    native.fire('onRecordingClosed', closed({ uri: file('file:///p0.ts'), endReason: 'low-battery' }));
+    const stopping = engine.stop();
+    native.fire('onRecordingClosed', closed({ uri: file('file:///p1.ts'), index: 1, endReason: 'stopped', gapBeforeMs: 900 }));
+    await stopping;
+    await session.finish();
+    expect(locker.store.readSession('sess')!.items.map((i) => [i.segment, i.endReason])).toEqual([
+      [{ clip: 0, index: 0 }, 'low-battery'],
+      [{ clip: 0, index: 1 }, 'stopped'],
+    ]);
+  });
+
+  it('iPhone: hands over at 480p, and saving mode can be turned off for the next file', async () => {
+    const { native, common } = setup();
+    const engine = iosBodyCam(common, native);
+    await engine.start();
+    await engine.handOver(true);
+    await engine.setSaving(false);
+    expect(native.handOvers).toEqual([{ reason: 'low-battery', saving: true }]);
+    expect(native.saving).toEqual([false]);
+    await engine.stop();
   });
 });
 

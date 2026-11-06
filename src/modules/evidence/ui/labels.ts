@@ -19,7 +19,7 @@ export function clockLabel(ms: number): string {
   return h > 0 ? `${h}:${two(m)}:${two(s)}` : `${m}:${two(s)}`;
 }
 
-/** What a record is: "Body-cam", "Bug mode", "Photo", "2 videos", "Video and 3 photos". */
+/** What a record is: "Body-cam", "Pocket recording", "Photo", "2 videos", "Video and 3 photos". */
 export function kindLabel(t: T, summary: RecordSummary): string {
   if (summary.kind === 'body-cam') return t('list.bodyCam');
   if (summary.kind === 'bug') return t('list.bug');

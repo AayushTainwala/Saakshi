@@ -24,7 +24,8 @@ describe('why a recording ended, in plain words (fix round 1, group 5)', () => {
   it('says what the owner asked for', () => {
     const t = i18n.getFixedT('en', 'record');
     expect(endReasonLabel(t, { endReason: 'stopped' })).toBe('You stopped it.');
-    expect(endReasonLabel(t, { endReason: 'low-battery' })).toBe('Battery low: stopped and saved.');
+    // Round 2: the file closes at 5% and the recording carries on in the next one (nothing stops at 3% now).
+    expect(endReasonLabel(t, { endReason: 'low-battery' })).toBe('Battery low: this file was closed and saved.');
     expect(endReasonLabel(t, { endReason: 'app-left' })).toMatch(/^Stopped when you left Saakshi or locked the phone/);
     // Cut off wins over anything else known.
     expect(endReasonLabel(t, { endReason: 'interrupted', interrupted: true })).toMatch(/^Cut off: the app closed or the phone switched off/);

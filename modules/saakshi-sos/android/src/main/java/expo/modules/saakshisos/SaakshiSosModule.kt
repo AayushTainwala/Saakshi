@@ -108,6 +108,12 @@ class SaakshiSosModule : Module() {
 
     Function("bugRecorderRunning") { BugModeService.running }
 
+    // The low-battery handover at 5% (round 2, group 1.5): the file being written closes as
+    // "low-battery" and a new one continues at once.
+    AsyncFunction("bugRecorderHandOver") { reason: String ->
+      BugRecorder.handOver(reason)
+    }
+
     // iPhone only. Android's backup is off for the whole app (android:allowBackup="false").
     AsyncFunction("setExcludedFromBackup") { _: String, _: Boolean -> 0 }
 

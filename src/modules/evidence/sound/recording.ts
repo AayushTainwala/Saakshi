@@ -7,7 +7,7 @@ import { createEvidenceSession } from '../capture/deps';
 import type { CaptureSession } from '../capture/pipeline';
 import { extensionOf, mediaTypeFor } from '../locker/media';
 import { fileLocker, type LockerStore } from '../locker/store';
-import type { CaptureMode, CheckpointInput, ClosedFile, EndReason, LocationSnapshot } from '../types';
+import type { CaptureMode, CheckpointInput, ClosedFile, EndReason, LocationSnapshot, StartedFrom } from '../types';
 
 /**
  * A sound recording's file is checkpointed about this often (seconds of sound): the same pace as
@@ -60,16 +60,25 @@ export type SoundRecorderNative = {
   start: (options: { outputDir: string; pendingDir: string; clip: number; checkpointSeconds: number }) => Promise<void>;
   /** Resolves once every file is closed, with the files the stop closed (if they also came as events, they are added once). */
   stop: () => Promise<SoundClosed[]>;
+  /** The low-battery handover (round 2, group 1.5): the file closes with `reason`, the next continues. */
+  handOver?: (reason: 'low-battery') => Promise<void>;
 };
 
 export type SoundRecordingHandle = {
   session: CaptureSession;
   /** Stops recording, and waits until every file and checkpoint is sealed. */
   stop: (reason?: EndReason) => Promise<void>;
+  /**
+   * The low-battery handover at 5% (round 2, group 1.5; bundle format 0.9): the file being
+   * written closes cleanly as "low-battery" and a new file of the same clip continues.
+   */
+  handOver: () => Promise<void>;
 };
 
 export type SoundRecordingOptions = {
   mode: CaptureMode;
+  /** Pocket recording (format 0.9, `capture.startedFrom`): on its own, or by "My phone is being taken". */
+  startedFrom?: StartedFrom;
   native: SoundRecorderNative;
   /** The place each record carries: the latest fix, never waited for. */
   location: () => LocationSnapshot;
@@ -89,8 +98,10 @@ export function closedSoundFile(
   mode: CaptureMode,
   location: LocationSnapshot,
   stopReason: EndReason | null,
+  startedFrom?: StartedFrom,
 ): ClosedFile {
   return {
+    ...(mode === 'bug' && startedFrom ? { startedFrom } : {}),
     uri: event.uri,
     kind: 'audio',
     segment: { clip: event.clip, index: event.index },
@@ -108,8 +119,14 @@ export function closedSoundFile(
 }
 
 /** A checkpoint of a sound file, ready to be sealed into the session's chain. */
-export function soundCheckpoint(event: SoundCheckpoint, mode: CaptureMode, location: LocationSnapshot): CheckpointInput {
+export function soundCheckpoint(
+  event: SoundCheckpoint,
+  mode: CaptureMode,
+  location: LocationSnapshot,
+  startedFrom?: StartedFrom,
+): CheckpointInput {
   return {
+    ...(mode === 'bug' && startedFrom ? { startedFrom } : {}),
     recording: event.recording,
     index: event.checkpoint,
     kind: 'audio',
@@ -133,7 +150,7 @@ export function soundCheckpoint(event: SoundCheckpoint, mode: CaptureMode, locat
  * crash-recovery marker and is sealed when the app next opens.
  */
 export async function startSoundRecording(options: SoundRecordingOptions): Promise<SoundRecordingHandle> {
-  const { mode, native, location } = options;
+  const { mode, native, location, startedFrom } = options;
   const session = options.session ?? createEvidenceSession();
   const store = options.store ?? fileLocker;
   const parts = new PartPlanner(
@@ -149,7 +166,7 @@ export async function startSoundRecording(options: SoundRecordingOptions): Promi
   const close = (event: SoundClosed) => {
     if (added.has(event.uri) || !ours(event.uri)) return;
     added.add(event.uri);
-    void session.add(closedSoundFile(event, mode, location(), stopReason)).then((item) => {
+    void session.add(closedSoundFile(event, mode, location(), stopReason, startedFrom)).then((item) => {
       // The last part ends at the file's end, as sealed (the recorder's own fingerprint if sealing failed).
       const size = item.digests?.size ?? event.finalSize;
       const sha256 = item.digests?.sha256 ?? event.finalSha256;
@@ -160,7 +177,7 @@ export async function startSoundRecording(options: SoundRecordingOptions): Promi
   const subscription = native.listen({
     checkpoint: (event) => {
       if (!ours(event.uri)) return;
-      void session.addCheckpoint(soundCheckpoint(event, mode, location())).then((item) => {
+      void session.addCheckpoint(soundCheckpoint(event, mode, location(), startedFrom)).then((item) => {
         // Parts end only on checkpoints that were signed.
         if (item.status === 'sealed') parts.checkpoint({ ...event, at: new Date(event.at), startedAt: new Date(event.startedAt) });
       });
@@ -187,6 +204,9 @@ export async function startSoundRecording(options: SoundRecordingOptions): Promi
 
   return {
     session,
+    handOver: async () => {
+      await native.handOver?.('low-battery');
+    },
     async stop(reason = 'stopped') {
       stopReason = reason;
       try {
@@ -199,7 +219,7 @@ export async function startSoundRecording(options: SoundRecordingOptions): Promi
   };
 }
 
-type NativeSound = Pick<NonNullable<typeof SaakshiEvidence>, 'addListener' | 'soundStart' | 'soundStop'>;
+type NativeSound = Pick<NonNullable<typeof SaakshiEvidence>, 'addListener' | 'soundStart' | 'soundStop' | 'soundHandOver'>;
 
 function fromNative(event: SoundClosedEvent): SoundClosed {
   return { ...event, recording: event.recording ?? null };
@@ -219,6 +239,7 @@ export function soundRecorder(nativeModule: NativeSound | null | undefined = Saa
       return { remove: () => subscriptions.forEach((s) => s.remove()) };
     },
     start: (options) => native.soundStart({ ...options, mode: 'bug' }),
+    handOver: (reason) => native.soundHandOver(reason),
     async stop() {
       return ((await native.soundStop()) ?? []).map(fromNative);
     },

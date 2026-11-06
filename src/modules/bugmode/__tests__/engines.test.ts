@@ -31,6 +31,10 @@ function fakeSos() {
       native.stops++;
       if (native.confirmStop) setTimeout(() => native.fire('onBugRecorderStopped', {}), 10);
     },
+    handOvers: [] as string[],
+    async bugRecorderHandOver(reason: string) {
+      native.handOvers.push(reason);
+    },
     fire(name: string, event: unknown) {
       for (const listener of listeners.get(name) ?? []) listener(event as never);
     },

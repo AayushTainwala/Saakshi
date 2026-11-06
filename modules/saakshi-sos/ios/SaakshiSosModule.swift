@@ -62,6 +62,9 @@ public class SaakshiSosModule: Module {
     // Android only: bug mode's recorder. iPhone records through expo-audio (Stream A's AudioPieces).
     Function("bugRecorderRunning") { () -> Bool in false }
 
+    // Android only: Pocket recording's handover on iPhone is in the evidence module (soundHandOver).
+    AsyncFunction("bugRecorderHandOver") { (_: String) in }
+
     // Apple's contact picker runs outside the app and hands back only what the user picks, so no
     // contacts permission is asked for.
     AsyncFunction("pickPhoneNumber") { (promise: Promise) in

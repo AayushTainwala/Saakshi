@@ -17,7 +17,31 @@ import { closeSync, createReadStream, existsSync, openSync, readdirSync, readFil
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 
-const SUPPORTED_VERSIONS = ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'];
+const SUPPORTED_VERSIONS = ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'];
+/**
+ * From 0.9 a record may carry `capture.batteryPercent` (a whole number, 0 to 100) and, for a
+ * sound-only record (`capture.mode` "bug", Pocket recording), `capture.startedFrom` ("pocket" or
+ * "phone-taken"). Both are optional; an older record must not have them.
+ */
+function newMemberProblems(record) {
+  const problems = [];
+  const capture = record.capture ?? {};
+  const before09 = SUPPORTED_VERSIONS.indexOf(record.version) < SUPPORTED_VERSIONS.indexOf('0.9');
+  if ('batteryPercent' in capture) {
+    if (before09) problems.push(`capture.batteryPercent is not part of format ${record.version}`);
+    const value = capture.batteryPercent;
+    if (!Number.isInteger(value) || value < 0 || value > 100) problems.push(`capture.batteryPercent must be a whole number from 0 to 100, not ${JSON.stringify(value)}`);
+  }
+  if ('startedFrom' in capture) {
+    if (before09) problems.push(`capture.startedFrom is not part of format ${record.version}`);
+    if (capture.mode !== 'bug') problems.push('capture.startedFrom is only for a sound-only (Pocket recording) record');
+    if (capture.startedFrom !== 'pocket' && capture.startedFrom !== 'phone-taken') {
+      problems.push(`capture.startedFrom must be "pocket" or "phone-taken", not ${JSON.stringify(capture.startedFrom)}`);
+    }
+  }
+  return problems;
+}
+
 // Where the records are: records/ up to 0.7, "Signed records/" from 0.8.
 const RECORD_PATH = /^(records|Signed records)\/[^/]+\.json$/;
 // Where the originals are: media/ up to 0.7, "Original files/" from 0.8.
@@ -475,6 +499,7 @@ export async function verifyBundle(path) {
       const isCheckpoint = record.type === CHECKPOINT_TYPE;
       if (record.type !== RECORD_TYPE && !isCheckpoint) fail(`${label}: not a Saakshi record`);
       if (!SUPPORTED_VERSIONS.includes(record.version)) fail(`${label}: unknown version ${record.version}`);
+      for (const problem of newMemberProblems(record)) fail(`${label}: ${problem}`);
       if (record.key?.id !== keyFile.keyId) fail(`${label}: signed by a different key (${record.key?.id})`);
       if (record.sequence !== index) fail(`${label}: sequence ${record.sequence}, expected ${index} (a record is missing or out of order)`);
       const named = namesFromRecords.get(name);

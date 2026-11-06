@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, Button, Card, OptionGroup, Screen } from '@/components';
 import { requireSecretCode } from '@/modules/secretcode';
-import { type BatteryAction, useLowBattery } from '@/platform/battery';
+import { type BatteryAction, setSavingMode, useLowBattery } from '@/platform/battery';
 import { palettes, spacing } from '@/theme';
 
 import { createEvidenceSession } from '../capture/deps';
@@ -258,16 +258,32 @@ export function BodyCamScreen() {
     await stop();
   }, [stop]);
 
-  // Spec E1: warn at 10% and 5%; at 3%, stop and save so a dying battery never cuts a piece off.
+  // SPEC E1, low battery (owner, 6 Nov 2026): a warning at 10%; at 5% the file closes cleanly and a
+  // new one carries on at 480p and 15 frames a second, in saving mode; charging ends saving mode.
+  // Nothing stops by itself.
   const [batteryNote, setBatteryNote] = useState<string | null>(null);
   const onBattery = useCallback(
     (action: BatteryAction) => {
-      if (action.type === 'warn') setBatteryNote(t('battery.warn', { percent: action.percent }));
-      else void stop('low-battery');
+      if (action.type === 'warn') {
+        if (action.percent > 5) setBatteryNote(t('battery.handoverSoon', { percent: action.percent }));
+      } else if (action.type === 'low') {
+        setBatteryNote(t('battery.handedOverVideo'));
+        void engine.current?.handOver(true);
+        setSavingMode(true);
+      } else {
+        setBatteryNote(t('battery.charging'));
+        void engine.current?.setSaving(false);
+        setSavingMode(false);
+      }
     },
-    [stop, t],
+    [t],
   );
   useLowBattery(phase === 'running', onBattery);
+  // Saving mode ends with the recording.
+  useEffect(() => {
+    if (phase !== 'running') return;
+    return () => setSavingMode(false);
+  }, [phase]);
 
   // If the screen goes away anyway, the recording still ends as one complete record.
   useEffect(

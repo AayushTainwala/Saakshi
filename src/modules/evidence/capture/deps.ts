@@ -1,5 +1,7 @@
 import { randomUUID } from 'expo-crypto';
 
+import { readBatteryPercent } from '@/platform/battery';
+
 import { deviceSigner } from '../integrity/deviceKey';
 import { appInfo, deviceInfo, timeZone } from '../integrity/environment';
 import { hashFile } from '../integrity/hash';
@@ -17,6 +19,8 @@ export function createPipelineDeps(): PipelineDeps {
     device: deviceInfo,
     app: appInfo,
     timeZone,
+    // Format 0.9: each file's and checkpoint's record carries the battery level.
+    battery: () => readBatteryPercent(),
   };
   return {
     store: fileLocker,

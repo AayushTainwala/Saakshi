@@ -10,6 +10,14 @@ import { PartPlanner } from './parts';
 export type BodyCamEngine = {
   start: () => Promise<void>;
   stop: (reason?: EndReason) => Promise<void>;
+  /**
+   * The low-battery handover at 5% (round 2, group 1.5): the file being written closes as
+   * "low-battery" and a new file of the same clip continues, at 480p and 15 frames a second when
+   * `saving`.
+   */
+  handOver: (saving: boolean) => Promise<void>;
+  /** Saving mode on or off (off once the phone is charging); it applies from the next file. */
+  setSaving: (on: boolean) => Promise<void>;
 };
 
 type Common = {
@@ -21,7 +29,10 @@ type Common = {
   partSeconds?: number;
 };
 
-type NativeBodyCam = Pick<NonNullable<typeof SaakshiEvidence>, 'addListener' | 'bodyCamStart' | 'bodyCamStop'>;
+type NativeBodyCam = Pick<
+  NonNullable<typeof SaakshiEvidence>,
+  'addListener' | 'bodyCamStart' | 'bodyCamStop' | 'bodyCamHandOver' | 'bodyCamSetSaving'
+>;
 
 function requireNative(native: NativeBodyCam | null | undefined): NativeBodyCam {
   if (!native) throw new Error('The SaakshiEvidence native module is not available in this build.');
@@ -122,7 +133,8 @@ export function androidBodyCam(
   const marks = checkpoints(native, common);
   const subscription = native.addListener('onRecordingClosed', (event: RecordingClosedEvent) => {
     marks.closed(event, common.session.add(closedFileFromEvent(event, common.location(), stopReason)));
-    if (event.endReason !== 'piece-complete') {
+    // A piece or the low-battery handover is followed by the next file; anything else was the last.
+    if (event.endReason !== 'piece-complete' && event.endReason !== 'low-battery') {
       finished = true;
       onFinal?.();
     }
@@ -141,6 +153,8 @@ export function androidBodyCam(
         notificationText: common.notificationText,
       });
     },
+    handOver: (saving) => native.bodyCamHandOver('low-battery', saving),
+    setSaving: (on) => native.bodyCamSetSaving(on),
     async stop(reason = 'stopped') {
       stopReason = reason;
       // Already over, for example stopped from the notification.
@@ -214,6 +228,8 @@ export function iosBodyCam(
         throw error;
       }
     },
+    handOver: (saving) => native.bodyCamHandOver('low-battery', saving),
+    setSaving: (on) => native.bodyCamSetSaving(on),
     async stop(reason = 'stopped') {
       stopReason = reason;
       try {

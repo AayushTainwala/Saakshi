@@ -14,7 +14,7 @@ import java.util.UUID
 import org.json.JSONObject
 
 /**
- * Bug mode's sound recorder on Android (spec E8): the microphone into AAC with ADTS framing
+ * Pocket recording's sound recorder on Android (spec E8; bug mode until round 2): the microphone into AAC with ADTS framing
  * (`.aac`), which needs nothing written at the end, so a file cut off by a dead battery still plays
  * up to the cut.
  *
@@ -117,6 +117,24 @@ object BugRecorder {
         }
         done.forEach { it() }
       }
+    }
+  }
+
+  /**
+   * The low-battery handover at 5% (round 2, group 1.5; bundle format 0.9): the file being written
+   * closes cleanly with `reason` and the next file of the same clip starts at once, on the path of
+   * the fail-safe new file. The old recorder is stopped and the new one started before the old file
+   * is fingerprinted and reported, so the gap is only the time to stop one recorder and start the
+   * next.
+   */
+  fun handOver(reason: String) {
+    post {
+      val piece = current ?: return@post
+      if (stopping) return@post
+      current = null
+      val (endedAt, endReason) = stopRecorder(piece, reason)
+      begin()
+      complete(piece, endedAt, endReason, byStop = false)
     }
   }
 
@@ -223,6 +241,12 @@ object BugRecorder {
   }
 
   private fun finish(piece: Piece, reason: String, byStop: Boolean) {
+    val (endedAt, endReason) = stopRecorder(piece, reason)
+    complete(piece, endedAt, endReason, byStop)
+  }
+
+  /** Stops the piece's recorder: when its sound ended, and the reason it ended with. */
+  private fun stopRecorder(piece: Piece, reason: String): Pair<Long, String> {
     var endReason = reason
     try {
       piece.recorder.stop()
@@ -230,10 +254,15 @@ object BugRecorder {
       // Stopped with no audio captured, or the media server died. What is on disk stays.
       endReason = "error"
     }
-    // The sound ended here, before the waiting and hashing below.
+    // The sound ended here, before the waiting and hashing that follow.
     val endedAt = System.currentTimeMillis()
     lastEnded = endedAt
     runCatching { piece.recorder.release() }
+    return endedAt to endReason
+  }
+
+  /** Fingerprints the stopped piece's whole file, updates its marker and reports it. */
+  private fun complete(piece: Piece, endedAt: Long, endReason: String, byStop: Boolean) {
     // AACWriter closes its file when its thread ends, inside stop(); wait in case a phone's writer
     // is slower (at most about a second), so the final fingerprint covers every byte.
     var last = -1L

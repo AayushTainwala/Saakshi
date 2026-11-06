@@ -60,11 +60,12 @@ function setup(options: { contacts?: number } = {}) {
   const fake = fakeSession();
   let clock = Date.parse('2026-10-20T09:00:00Z');
   const stopEngine = jest.fn(async (): Promise<void> => undefined);
+  const handOverEngine = jest.fn(async (): Promise<void> => undefined);
   let onProblem: ((message: string) => void) | null = null;
   const deps: BugDeps = {
     startEngine: jest.fn(async (problem: (message: string) => void) => {
       onProblem = problem;
-      return { session: fake.session, stop: stopEngine };
+      return { session: fake.session, stop: stopEngine, handOver: handOverEngine };
     }),
     witnessCost: jest.fn(async () => options.contacts ?? 2),
     witness: jest.fn(async () => options.contacts ?? 2),
@@ -76,6 +77,49 @@ function setup(options: { contacts?: number } = {}) {
   const time = () => new Date(clock).toISOString();
   return { bug: new BugModeController(deps), deps, fake, stopEngine, advance, time, problem: (m: string) => onProblem?.(m) };
 }
+
+describe('Pocket recording at low battery (round 2, group 1.5)', () => {
+  function withBattery() {
+    const ctx = setup();
+    let onAction: ((action: import('@/platform/battery').BatteryAction) => void) | null = null;
+    const unwatch = jest.fn();
+    const saving: boolean[] = [];
+    ctx.deps.watchBattery = (next) => {
+      onAction = next;
+      return unwatch;
+    };
+    ctx.deps.savingMode = (on) => void saving.push(on);
+    return { ...ctx, battery: (action: import('@/platform/battery').BatteryAction) => onAction?.(action), unwatch, saving };
+  }
+
+  it('at 5% hands over to a new file and turns saving mode on; nothing stops', async () => {
+    const { bug, battery, saving, deps, stopEngine } = withBattery();
+    await bug.start({ startedFrom: 'phone-taken', liveActivity: false });
+    expect(deps.startEngine).toHaveBeenCalledWith(expect.any(Function), { startedFrom: 'phone-taken' });
+    battery({ type: 'warn', percent: 10 });
+    expect(bug.getState()).toMatchObject({ running: true, batteryWarning: 10, saving: false });
+    battery({ type: 'warn', percent: 5 });
+    battery({ type: 'low' });
+    const engine = await (deps.startEngine as jest.Mock).mock.results[0].value;
+    expect(engine.handOver).toHaveBeenCalledTimes(1);
+    expect(bug.getState()).toMatchObject({ running: true, saving: true });
+    expect(saving).toEqual([true]);
+    expect(stopEngine).not.toHaveBeenCalled();
+  });
+
+  it('ends saving mode when the phone charges, and when the recording stops', async () => {
+    const { bug, battery, saving, unwatch } = withBattery();
+    await bug.start();
+    battery({ type: 'low' });
+    battery({ type: 'charging' });
+    expect(bug.getState().saving).toBe(false);
+    expect(saving).toEqual([true, false]);
+    battery({ type: 'low' });
+    await bug.stop();
+    expect(unwatch).toHaveBeenCalledTimes(1);
+    expect(saving).toEqual([true, false, true, false]);
+  });
+});
 
 describe('BugModeController in "My phone is being taken" (round 2, group 1.3)', () => {
   it('records without Saakshi\'s Live Activity, and says where it was started from', async () => {

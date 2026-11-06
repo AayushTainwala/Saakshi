@@ -52,6 +52,16 @@ declare class SaakshiEvidenceModule extends NativeModule<SaakshiEvidenceEvents> 
   bodyCamStop(): Promise<RecordingClosedEvent[] | null | undefined>;
   bodyCamRunning(): boolean;
   /**
+   * The low-battery handover at 5% (round 2, group 1.5): the file being written closes with
+   * `reason` ("low-battery") and a new file of the same clip continues; with `saving`, at 480p and
+   * 15 frames a second.
+   */
+  bodyCamHandOver(reason: string, saving: boolean): Promise<void>;
+  /** Saving mode on or off; it applies from the next file. */
+  bodyCamSetSaving(saving: boolean): Promise<void>;
+  /** iPhone: Pocket recording's handover (the file closes with `reason`, the next continues). */
+  soundHandOver(reason: string): Promise<void>;
+  /**
    * iPhone only: bug mode's sound recorder (SoundRecorder.swift), one continuous ADTS AAC file with
    * checkpoints. Rejects if the microphone can't start. (Android bug mode records in SaakshiSos.)
    */
