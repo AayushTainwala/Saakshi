@@ -16,9 +16,14 @@ import { planPlayback } from './playback';
 
 type Phase = 'idle' | 'preparing' | 'playing' | 'paused' | 'ended' | 'error';
 
-/** Plays from `seconds` into the file (past sound the file before already played). */
+/** Moves to `seconds` into the file (past sound the file before already played). */
+function seek(player: VideoPlayer, seconds: number): void {
+  player.currentTime = seconds;
+}
+
+/** Plays from `seconds` into the file. */
 function start(player: VideoPlayer, seconds: number): void {
-  if (seconds > 0) player.currentTime = seconds;
+  if (seconds > 0) seek(player, seconds);
   player.play();
 }
 
@@ -71,6 +76,12 @@ export function RecordingPlayer({
       if (mine !== generation.current) return;
       await player.replaceAsync({ uri });
       if (mine !== generation.current) return;
+      if (anyActive()) {
+        // A recording started while this file was being got ready: wait, ready to play from here.
+        if (target.startAt > 0) seek(player, target.startAt);
+        setPhase('paused');
+        return;
+      }
       start(player, target.startAt);
       setPhase('playing');
     } catch (e) {
@@ -83,11 +94,17 @@ export function RecordingPlayer({
   useEventListener(player, 'playToEnd', () => {
     const next = index.current + 1;
     if (next < plan.parts.length) {
+      // load() itself waits if a recording has started.
       void load(next);
     } else {
       setPhase('ended');
       setPositionMs(plan.totalMs);
     }
+  });
+
+  // The button follows the player, which iOS also pauses (for example when the app leaves the screen).
+  useEventListener(player, 'playingChange', ({ isPlaying }) => {
+    setPhase((p) => (!isPlaying && p === 'playing' ? 'paused' : isPlaying && p === 'paused' ? 'playing' : p));
   });
 
   useEventListener(player, 'timeUpdate', ({ currentTime }) => {
@@ -104,10 +121,11 @@ export function RecordingPlayer({
 
   const playing = phase === 'playing' && !recording;
   const toggle = () => {
+    if (anyActive()) return;
     if (playing) {
       player.pause();
       setPhase('paused');
-    } else if (phase === 'paused' || (phase === 'playing' && recording)) {
+    } else if (phase === 'paused' || phase === 'playing') {
       player.play();
       setPhase('playing');
     } else {
@@ -139,6 +157,7 @@ export function RecordingPlayer({
         {t('player.position', { at: clockLabel(positionMs), total: clockLabel(plan.totalMs) })}
         {showParts && plan.parts.length > 1 ? ` · ${t('player.part', { n: part + 1, count: plan.parts.length })}` : ''}
       </AppText>
+      {plan.soundAlongside ? <AppText color="textMuted">{t('player.soundAlongside')}</AppText> : null}
       {showParts && current && current.gapBeforeMs > 1000 && phase !== 'idle' ? (
         <AppText color="textMuted">{t('player.gap', { length: lengthLabel(t, current.gapBeforeMs) })}</AppText>
       ) : null}

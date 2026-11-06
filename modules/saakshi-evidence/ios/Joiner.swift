@@ -47,30 +47,35 @@ enum Joiner {
       let audioTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
     else { throw Failure.cannotExport("no composition tracks") }
 
-    // Where each video stretch sits in the copy, with the turn its file shows it upright with.
+    // Where each video stretch sits in the copy, with the turn its file shows it upright with. Which
+    // stretches were placed is reported, so the copy's record names only those (a video file
+    // recorded without sound, for example, has no sound to place).
     var placed: [(range: CMTimeRange, transform: CGAffineTransform)] = []
+    var placedVideo: [Bool] = []
     for segment in request.video {
-      guard let inserted = try await insert(segment, mediaType: .video, into: videoTrack) else { continue }
-      placed.append(inserted)
+      let inserted = try await insert(segment, mediaType: .video, into: videoTrack)
+      placedVideo.append(inserted != nil)
+      if let inserted { placed.append(inserted) }
     }
     if placed.isEmpty { throw Failure.noVideo }
-    var hasAudio = false
+    var placedAudio: [Bool] = []
     for segment in request.audio {
-      if try await insert(segment, mediaType: .audio, into: audioTrack) != nil { hasAudio = true }
+      placedAudio.append(try await insert(segment, mediaType: .audio, into: audioTrack) != nil)
     }
-    if !hasAudio { composition.removeTrack(audioTrack) }
+    if !placedAudio.contains(true) { composition.removeTrack(audioTrack) }
+    let report: [String: Any] = ["uri": output.absoluteString, "placedVideo": placedVideo, "placedAudio": placedAudio]
 
     let turns = Set(placed.map { "\($0.transform.a),\($0.transform.b),\($0.transform.c),\($0.transform.d)" })
     if turns.count == 1 {
       videoTrack.preferredTransform = placed[0].transform
       do {
         try await export(composition, preset: AVAssetExportPresetPassthrough, videoComposition: nil, to: output)
-        return ["uri": output.absoluteString, "reencoded": false]
+        return report.merging(["reencoded": false]) { $1 }
       } catch {
         NSLog("[Saakshi join] passthrough export failed, re-encoding: %@", error.localizedDescription)
       }
       try await export(composition, preset: AVAssetExportPresetHighestQuality, videoComposition: nil, to: output)
-      return ["uri": output.absoluteString, "reencoded": true]
+      return report.merging(["reencoded": true]) { $1 }
     }
 
     // Clips turned different ways: each is turned upright in a video composition, which needs
@@ -106,7 +111,7 @@ enum Joiner {
     videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
     videoComposition.instructions = instructions
     try await export(composition, preset: AVAssetExportPresetHighestQuality, videoComposition: videoComposition, to: output)
-    return ["uri": output.absoluteString, "reencoded": true]
+    return report.merging(["reencoded": true]) { $1 }
   }
 
   /// Inserts the stretch of the file's first track of this type at its place, after an empty stretch
@@ -118,13 +123,17 @@ enum Joiner {
     let asset = AVURLAsset(url: url)
     guard let source = try await asset.loadTracks(withMediaType: mediaType).first else { return nil }
     let (available, transform) = try await source.load(.timeRange, .preferredTransform)
-    let from = available.start + seconds(segment.from)
+    // `from` is in the file's own time, which its picture and sound share: a track that starts a
+    // little later (sound often does) is placed that much later, so the two stay in step.
+    let wanted = seconds(segment.from)
+    let from = max(wanted, available.start)
     guard from < available.end else { return nil }
-    let length = min(seconds(segment.length), available.end - from)
+    let shift = from - wanted
+    let length = min(seconds(segment.length) - shift, available.end - from)
     guard length > .zero else { return nil }
     // Never before what is already in the track: inserting inside a track shifts what follows.
     let trackEnd = track.timeRange.end.isValid ? track.timeRange.end : .zero
-    var at = seconds(segment.at)
+    var at = seconds(segment.at) + shift
     if at > trackEnd {
       track.insertEmptyTimeRange(CMTimeRange(start: trackEnd, end: at))
     } else {

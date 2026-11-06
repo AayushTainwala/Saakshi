@@ -3,6 +3,7 @@ import { getThumbnailAsync } from 'expo-video-thumbnails';
 import { useEffect, useState } from 'react';
 
 import type { EvidenceItem } from '../types';
+import { whileBusy } from './active';
 import { fileLocker } from './store';
 
 const making = new Map<string, Promise<string | null>>();
@@ -19,11 +20,16 @@ export function thumbnailFor(sessionId: string, item: EvidenceItem): Promise<str
   const key = `${sessionId}/${item.media}`;
   const known = making.get(key);
   if (known) return known;
-  const job = (async () => {
+  const job = whileBusy(sessionId, async () => {
     const target = new File(fileLocker.sessionFileUri(sessionId, `thumbs/${item.media}.jpg`));
     if (target.exists) return target.uri;
     try {
       const made = await getThumbnailAsync(fileLocker.mediaUri(sessionId, item.media), { time: 1000, quality: 0.6 });
+      if (!fileLocker.readSession(sessionId)) {
+        // The record was deleted meanwhile: keep nothing of it.
+        new File(made.uri).delete();
+        return null;
+      }
       const folder = new Directory(fileLocker.sessionFileUri(sessionId, 'thumbs'));
       if (!folder.exists) folder.create({ intermediates: true, idempotent: true });
       new File(made.uri).moveSync(target);
@@ -33,7 +39,7 @@ export function thumbnailFor(sessionId: string, item: EvidenceItem): Promise<str
     } finally {
       making.delete(key);
     }
-  })();
+  });
   making.set(key, job);
   return job;
 }

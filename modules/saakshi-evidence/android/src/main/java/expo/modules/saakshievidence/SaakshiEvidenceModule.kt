@@ -82,8 +82,13 @@ class SaakshiEvidenceModule : Module() {
           }
         val output = request["output"] as? String ?: throw CodedException("ERR_JOIN", "No output", null)
         val target = File(Uri.parse(output).path ?: output)
-        Remuxer.join(segments("video"), segments("audio"), target, (request["rotationDegrees"] as? Number)?.toInt())
-        mapOf("uri" to "file://${target.absolutePath}", "reencoded" to false)
+        val joined = Remuxer.join(segments("video"), segments("audio"), target, (request["rotationDegrees"] as? Number)?.toInt())
+        mapOf(
+          "uri" to "file://${target.absolutePath}",
+          "reencoded" to false,
+          "placedVideo" to joined.placedVideo,
+          "placedAudio" to joined.placedAudio,
+        )
       }
     }
 

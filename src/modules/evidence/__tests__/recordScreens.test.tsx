@@ -193,6 +193,30 @@ describe('the records list and the player (fix round 1, group 3)', () => {
     expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy();
   });
 
+  it('waits, ready, if a recording starts while a file is being got ready', async () => {
+    await render(wrap(<RecordingPlayer sessionId="s1" items={bodyCam} />));
+    const player = lastPlayer!;
+    let release: () => void = () => undefined;
+    player.replaceAsync = async (next) => {
+      player.log.push(`source ${next.uri}`);
+      await new Promise<void>((resolve) => (release = resolve));
+    };
+    await fireEvent.press(screen.getByRole('button', { name: 'Play' }));
+    markActive('bug-mode');
+    try {
+      await act(async () => release());
+      // Loaded, but nothing played.
+      expect(player.log[0]).toBe('source file:///locker/s1/media/3.mp4');
+      expect(player.log.filter((line) => line.startsWith('play'))).toEqual([]);
+      expect(screen.getByText('Playing is off while Saakshi is recording, so the recording doesn’t pick it up.')).toBeTruthy();
+    } finally {
+      await act(async () => markInactive('bug-mode'));
+    }
+    // Ready to carry on from where it was.
+    await fireEvent.press(screen.getByRole('button', { name: 'Play' }));
+    expect(player.log.at(-1)).toBe('play at 0');
+  });
+
   it('starts one sound file at once when asked', async () => {
     const sound = item(4, { kind: 'audio', media: '4.aac', mediaType: 'audio/aac', mode: 'bug' });
     await render(wrap(<RecordingPlayer sessionId="s3" items={[sound]} autoPlay showParts={false} />));

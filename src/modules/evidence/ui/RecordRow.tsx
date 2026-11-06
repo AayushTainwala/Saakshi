@@ -6,7 +6,7 @@ import { AppText, Card } from '@/components';
 import { radius, spacing, useTheme } from '@/theme';
 
 import { isActive } from '../locker/active';
-import { recordModeOf } from '../locker/records';
+import { recordModeOf, recordRotationOf } from '../locker/records';
 import { summarize } from '../locker/summary';
 import { useThumbnail } from '../locker/thumbnails';
 import type { EvidenceItem, SessionState } from '../types';
@@ -19,7 +19,8 @@ const SIZE = 64;
 export function Thumbnail({ sessionId, item, size = SIZE }: { sessionId: string; item: EvidenceItem | null; size?: number }) {
   const { colors } = useTheme();
   const uri = useThumbnail(sessionId, item);
-  const turn = item?.kind === 'video' && item.rotationDegrees ? item.rotationDegrees : 0;
+  // Android .ts videos carry their turn in the record (older items only there).
+  const turn = item?.kind === 'video' ? (item.rotationDegrees ?? recordRotationOf(sessionId, item) ?? 0) : 0;
   return (
     <View style={[styles.thumb, { width: size, height: size, backgroundColor: colors.surfaceRaised }]}>
       {uri ? (
@@ -27,6 +28,8 @@ export function Thumbnail({ sessionId, item, size = SIZE }: { sessionId: string;
           source={{ uri }}
           style={[StyleSheet.absoluteFill, turn ? { transform: [{ rotate: `${turn}deg` }] } : null]}
           contentFit="cover"
+          // Evidence stays in the locker only: no copy in the image cache, which delete wouldn't reach.
+          cachePolicy="none"
           accessibilityIgnoresInvertColors
         />
       ) : null}

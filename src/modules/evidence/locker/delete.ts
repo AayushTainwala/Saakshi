@@ -1,4 +1,4 @@
-import { isActive } from './active';
+import { isActive, isBusy } from './active';
 import type { LockerStore } from './store';
 
 export class SessionBusyError extends Error {}
@@ -9,6 +9,6 @@ export class SessionBusyError extends Error {}
  * exported or sent elsewhere are not touched.
  */
 export function deleteSession(store: LockerStore, id: string): void {
-  if (isActive(id)) throw new SessionBusyError('This session is still being recorded or sealed.');
+  if (isActive(id) || isBusy(id)) throw new SessionBusyError('This session is still being recorded, sealed or copied.');
   store.deleteSession(id);
 }

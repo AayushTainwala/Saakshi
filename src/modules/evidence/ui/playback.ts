@@ -17,7 +17,28 @@ export type PlaybackPlan = {
   parts: PlaybackPart[];
   /** From the first file's start to the last file's end, gaps included. */
   totalMs: number;
+  /**
+   * An older body-cam record (before fix round 1, group 1): its video files have no sound, and the
+   * sound was recorded alongside them in separate files. The plan then plays the sound files.
+   */
+  soundAlongside: boolean;
 };
+
+/** Sound and video files overlapping by more than this ran alongside each other. */
+const ALONGSIDE_MS = 1500;
+
+/**
+ * True for a record whose sound files ran at the same time as its video files (older body-cam
+ * records), not only during the gaps between them (iPhone hand-overs overlap by about half a second).
+ */
+export function soundRanAlongside(items: readonly EvidenceItem[]): boolean {
+  const videos = items.filter((i) => i.kind === 'video');
+  return items
+    .filter((i) => i.kind === 'audio')
+    .some((a) =>
+      videos.some((v) => Math.min(ms(a.endedAt), ms(v.endedAt)) - Math.max(ms(a.startedAt), ms(v.startedAt)) > ALONGSIDE_MS),
+    );
+}
 
 const ms = (iso: string) => Date.parse(iso);
 
@@ -29,10 +50,12 @@ const ms = (iso: string) => Date.parse(iso);
  * inside the ones before) is left out. Photos are not played.
  */
 export function planPlayback(items: readonly EvidenceItem[]): PlaybackPlan {
-  const playable = items
-    .filter((i) => (i.kind === 'video' || i.kind === 'audio') && (i.status === 'sealed' || i.status === 'hashed'))
+  const inLocker = items.filter((i) => (i.kind === 'video' || i.kind === 'audio') && (i.status === 'sealed' || i.status === 'hashed'));
+  const soundAlongside = soundRanAlongside(inLocker);
+  const playable = inLocker
+    .filter((i) => !soundAlongside || i.kind === 'audio')
     .sort((a, b) => ms(a.startedAt) - ms(b.startedAt) || a.sequence - b.sequence);
-  if (!playable.length) return { parts: [], totalMs: 0 };
+  if (!playable.length) return { parts: [], totalMs: 0, soundAlongside };
 
   const first = ms(playable[0].startedAt);
   const parts: PlaybackPart[] = [];
@@ -51,7 +74,7 @@ export function planPlayback(items: readonly EvidenceItem[]): PlaybackPlan {
     });
     playedTo = end;
   }
-  return { parts, totalMs: playedTo - first };
+  return { parts, totalMs: playedTo - first, soundAlongside };
 }
 
 /** Which part holds a moment of the whole recording, and how far into that part it is. */

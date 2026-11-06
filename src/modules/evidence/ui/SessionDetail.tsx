@@ -11,7 +11,7 @@ import { shareBundle } from '../export/bundle';
 import { runCheck } from '../locker/actions';
 import { deleteSession, SessionBusyError } from '../locker/delete';
 import { fileLocker } from '../locker/store';
-import { needsJoinedCopy } from '../export/joinedCopy';
+import { JoinError, needsJoinedCopy } from '../export/joinedCopy';
 import { needsCopy, playVideo, shareJoinedCopy, shareVideo } from '../export/videoActions';
 import { recordModeOf } from '../locker/records';
 import { summarize } from '../locker/summary';
@@ -225,7 +225,8 @@ export function SessionDetail({ id }: { id: string }) {
     try {
       await shareJoinedCopy(id, t('joined.share'));
     } catch (error) {
-      Alert.alert(t('locker.errorTitle'), error instanceof Error ? error.message : String(error));
+      const words = error instanceof JoinError ? t(`joined.error.${error.code}`) : error instanceof Error ? error.message : String(error);
+      Alert.alert(t('locker.errorTitle'), words);
     } finally {
       setJoining(false);
     }

@@ -4,6 +4,7 @@ import type {
   BodyCamOptions,
   FileHashes,
   JoinToMp4Request,
+  JoinToMp4Result,
   KeyAttestation,
   NativeDeviceKey,
   RecorderOptions,
@@ -56,7 +57,7 @@ declare class SaakshiEvidenceModule extends NativeModule<SaakshiEvidenceEvents> 
    * picture at its place, and the sound from the segments given, each stretch once. Android never
    * re-encodes; iPhone re-encodes only if it can't join otherwise, and says so.
    */
-  joinToMp4(request: JoinToMp4Request): Promise<{ uri: string; reencoded: boolean }>;
+  joinToMp4(request: JoinToMp4Request): Promise<JoinToMp4Result>;
   /** Android: MP4 copy of an MPEG-TS file without re-encoding; returns the copy's file:// URI. */
   remuxToMp4(input: string, output: string, rotationDegrees: number | null): Promise<string>;
   /** Starts delivering `onVolumeUp` events and stops the volume buttons changing the volume. */

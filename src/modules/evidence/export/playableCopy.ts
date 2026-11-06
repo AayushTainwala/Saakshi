@@ -2,6 +2,7 @@ import { FORMAT_VERSION } from '../constants';
 import { canonicalize } from '../integrity/canonical';
 import type { AppInfo, DeviceInfo, EvidenceRecord } from '../integrity/record';
 import type { Signer } from '../integrity/seal';
+import { whileBusy } from '../locker/active';
 import type { LockerStore } from '../locker/store';
 import type { FileDigests } from '../types';
 
@@ -56,7 +57,19 @@ export function copyName(mediaName: string): string {
  * and the method. The copy is never in the export bundle or the certificate, and is not part of
  * the session's chain. Made once and then reused. Returns the copy's URI.
  */
-export async function makePlayableCopy(deps: CopyDeps, sessionId: string, sequence: number): Promise<string> {
+export function makePlayableCopy(deps: CopyDeps, sessionId: string, sequence: number): Promise<string> {
+  // One copy of a file at a time: the player and the Share button may ask together.
+  const key = `${sessionId}/${sequence}`;
+  const running = making.get(key);
+  if (running) return running;
+  const job = whileBusy(sessionId, () => makeCopy(deps, sessionId, sequence)).finally(() => making.delete(key));
+  making.set(key, job);
+  return job;
+}
+
+const making = new Map<string, Promise<string>>();
+
+async function makeCopy(deps: CopyDeps, sessionId: string, sequence: number): Promise<string> {
   const session = deps.store.readSession(sessionId);
   if (!session) throw new Error('No such session');
   const existing = session.copies?.[String(sequence)];
@@ -110,15 +123,15 @@ export async function makePlayableCopy(deps: CopyDeps, sessionId: string, sequen
     key: { id: signer.keyId, algorithm: 'ES256' },
   };
   const body = canonicalize(record);
-  deps.store.writeCopyRecord(sessionId, name, body, await signer.sign(body));
-
-  const latest = deps.store.readSession(sessionId) ?? session;
+  const signature = await signer.sign(body);
+  const recordSha256 = await deps.sha256Hex(body);
+  // Read the session last, so nothing written meanwhile is lost; never write back a deleted one.
+  const latest = deps.store.readSession(sessionId);
+  if (!latest) throw new Error('This record was deleted');
+  deps.store.writeCopyRecord(sessionId, name, body, signature);
   deps.store.writeSession({
     ...latest,
-    copies: {
-      ...latest.copies,
-      [String(sequence)]: { file: name, sha256: digests.sha256, recordSha256: await deps.sha256Hex(body), madeAt },
-    },
+    copies: { ...latest.copies, [String(sequence)]: { file: name, sha256: digests.sha256, recordSha256, madeAt } },
   });
   return output;
 }

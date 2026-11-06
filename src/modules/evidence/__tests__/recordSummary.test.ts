@@ -128,6 +128,21 @@ describe('planPlayback (one recording, played end to end)', () => {
   });
 
   it('has nothing to play for photos only', () => {
-    expect(planPlayback([item(0, { kind: 'photo' })])).toEqual({ parts: [], totalMs: 0 });
+    expect(planPlayback([item(0, { kind: 'photo' })])).toEqual({ parts: [], totalMs: 0, soundAlongside: false });
+  });
+
+  it('plays an older body-cam record by its sound, recorded alongside muted video pieces', () => {
+    // Before fix round 1, group 1: one-minute muted video pieces, and overlapping sound pieces.
+    const plan = planPlayback([
+      item(0, { startedAt: at(10), endedAt: at(11) }),
+      item(1, { kind: 'audio', media: '1.m4a', startedAt: at(10, 0, 100), endedAt: at(11, 0, 300) }),
+      item(2, { startedAt: at(11), endedAt: at(12) }),
+      item(3, { kind: 'audio', media: '3.m4a', startedAt: at(11, 0, 200), endedAt: at(12, 0, 100) }),
+    ]);
+    expect(plan.soundAlongside).toBe(true);
+    expect(plan.parts.map((p) => [p.item.sequence, p.startAt])).toEqual([
+      [1, 0],
+      [3, 0.1],
+    ]);
   });
 });

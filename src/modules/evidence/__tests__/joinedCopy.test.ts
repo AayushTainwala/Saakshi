@@ -50,6 +50,24 @@ describe('planJoin', () => {
     expect(plan.parts[1]).toEqual({ track: 'video', source: '0009-clip2-seg0.mp4', atMs: 240_000, fromMs: 0, lengthMs: 360_000 });
   });
 
+  it('takes an older record\'s sound from its sound files, alongside its muted videos', () => {
+    const old = [
+      item(0, { startedAt: at(10), endedAt: at(11) }),
+      item(1, { kind: 'audio', media: '1.m4a', startedAt: at(10, 0, 500), endedAt: at(11, 0, 600) }),
+      item(2, { media: '2.mp4', startedAt: at(11), endedAt: at(12) }),
+      item(3, { kind: 'audio', media: '3.m4a', startedAt: at(11, 0, 500), endedAt: at(12, 0, 400) }),
+    ];
+    const plan = planJoin(old);
+    expect(plan.video.map((s) => [s.item.sequence, s.at])).toEqual([
+      [0, 0],
+      [2, 60],
+    ]);
+    expect(plan.audio.map((s) => [s.item.sequence, s.at, s.from])).toEqual([
+      [1, 0.5, 0],
+      [3, 60.6, 0.1],
+    ]);
+  });
+
   it('uses only sealed files, and asks for a joined copy only with more than one video', () => {
     const unsealed = [items[0], { ...items[2], status: 'failed' as const }];
     expect(planJoin(unsealed).video).toHaveLength(1);
@@ -155,6 +173,51 @@ describe('makeJoinedCopy', () => {
     expect(locker.store.readSession('s')!.joined!.sources).toEqual([3, 5, 9, 11]);
   });
 
+  it('names in its record only what the phone could place', async () => {
+    const { locker, deps } = setup();
+    // The second video file was recorded without sound (for example, during a phone call).
+    await makeJoinedCopy({ ...deps, join: async (r) => ({ uri: r.output, reencoded: false, placedVideo: [true, true], placedAudio: [true, true, false] }) }, 's');
+    const record = JSON.parse(locker.copyRecords.get(`s/${JOINED_COPY_NAME}`)!.body);
+    expect(record.parts.map((p: { track: string; source: string }) => `${p.track} ${p.source}`)).toEqual([
+      'video 0003-clip0-seg0.mp4',
+      'video 0009-clip2-seg0.mp4',
+      'audio 0003-clip0-seg0.mp4',
+      'audio 0005-audio1-seg0.aac',
+    ]);
+    expect(record.sources.map((s: { fileName: string }) => s.fileName)).toEqual(['0003-clip0-seg0.mp4', '0005-audio1-seg0.aac', '0009-clip2-seg0.mp4']);
+  });
+
+  it('refuses to delete the record while the copy is being made, and joins it once', async () => {
+    const { locker, deps } = setup();
+    let finish: () => void = () => undefined;
+    let calls = 0;
+    const slow = {
+      ...deps,
+      join: (r: JoinRequest) => {
+        calls++;
+        return new Promise<{ uri: string; reencoded: boolean }>((resolve) => (finish = () => resolve({ uri: r.output, reencoded: false })));
+      },
+    };
+    const first = makeJoinedCopy(slow, 's');
+    const second = makeJoinedCopy(slow, 's');
+    await Promise.resolve();
+    const { deleteSession, SessionBusyError } = jest.requireActual('../locker/delete');
+    expect(() => deleteSession(locker.store, 's')).toThrow(SessionBusyError);
+    finish();
+    expect(await first).toBe(await second);
+    expect(calls).toBe(1);
+    expect(() => deleteSession(locker.store, 's')).not.toThrow();
+  });
+
+  it('writes nothing back if the record was deleted meanwhile', async () => {
+    const { locker, deps } = setup();
+    await expect(
+      makeJoinedCopy({ ...deps, hash: async () => (locker.store.deleteSession('s'), { size: 1, sha256: 'x', sha1: '', md5: '', crc32: 0 }) }, 's'),
+    ).rejects.toThrow('deleted');
+    expect(locker.store.readSession('s')).toBeNull();
+    expect(locker.copyRecords.size).toBe(0);
+  });
+
   it('says so when the phone had to re-encode', async () => {
     const { locker, deps } = setup();
     await makeJoinedCopy({ ...deps, join: async (r) => ({ uri: r.output, reencoded: true }) }, 's');
@@ -166,6 +229,6 @@ describe('makeJoinedCopy', () => {
 
   it('refuses Android files turned different ways (that would need re-encoding)', async () => {
     const { deps } = setup([90, null, 0]);
-    await expect(makeJoinedCopy(deps, 's')).rejects.toThrow('turned different ways');
+    await expect(makeJoinedCopy(deps, 's')).rejects.toMatchObject({ code: 'turned' });
   });
 });

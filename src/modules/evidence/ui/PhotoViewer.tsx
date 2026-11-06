@@ -28,6 +28,8 @@ export function PhotoViewer({ sessionId, sequence }: { sessionId: string; sequen
           source={{ uri: fileLocker.mediaUri(sessionId, item.media) }}
           style={styles.photo}
           contentFit="contain"
+          // Evidence stays in the locker only: no copy in the image cache, which delete wouldn't reach.
+          cachePolicy="none"
           accessibilityLabel={t('locker.photo')}
           accessibilityIgnoresInvertColors
         />

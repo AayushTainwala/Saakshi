@@ -115,6 +115,9 @@ export type JoinToMp4Request = {
   rotationDegrees: number | null;
 };
 
+/** What `joinToMp4` made: which of the requested stretches it placed (a file may lack that track). */
+export type JoinToMp4Result = { uri: string; reencoded: boolean; placedVideo?: boolean[]; placedAudio?: boolean[] };
+
 /** iPhone bug mode (SoundRecorder.swift): what `soundStart` takes. */
 export type SoundStartOptions = {
   /** Folders (file:// URIs) for the files and their crash-recovery markers. */
