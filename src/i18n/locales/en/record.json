@@ -18,7 +18,13 @@
     "micPermissionTitle": "Microphone access",
     "micPermissionBody": "Videos record sound too, so Saakshi needs your microphone.",
     "allow": "Allow",
-    "openSettings": "Open Settings"
+    "openSettings": "Open Settings",
+    "switchToFront": "Switch to the front camera",
+    "switchToBack": "Switch to the back camera",
+    "switchWhileRecording": "The camera can’t be switched during a video. Stop the video first.",
+    "zoom": "Zoom",
+    "zoomTo": "Zoom {{factor}} times",
+    "zoomNow": "Zoomed {{factor}} times"
   },
   "locker": {
     "heading": "Your records",

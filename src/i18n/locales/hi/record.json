@@ -18,7 +18,13 @@
     "micPermissionTitle": "माइक्रोफ़ोन की अनुमति",
     "micPermissionBody": "वीडियो में आवाज़ भी रिकॉर्ड होती है, इसलिए साक्षी को आपका माइक्रोफ़ोन चाहिए।",
     "allow": "अनुमति दें",
-    "openSettings": "सेटिंग्स खोलें"
+    "openSettings": "सेटिंग्स खोलें",
+    "switchToFront": "सामने वाला कैमरा चुनें",
+    "switchToBack": "पीछे वाला कैमरा चुनें",
+    "switchWhileRecording": "वीडियो के दौरान कैमरा नहीं बदला जा सकता। पहले वीडियो रोकें।",
+    "zoom": "ज़ूम",
+    "zoomTo": "{{factor}} गुना ज़ूम करें",
+    "zoomNow": "{{factor}} गुना ज़ूम है"
   },
   "locker": {
     "heading": "आपके रिकॉर्ड",

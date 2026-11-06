@@ -3,7 +3,16 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import SaakshiEvidence, { RecorderPreview } from '@native/saakshi-evidence';
-import { AppState, BackHandler, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
+import {
+  AppState,
+  BackHandler,
+  type GestureResponderEvent,
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, Button } from '@/components';
@@ -18,6 +27,9 @@ import { createPipelineDeps } from './deps';
 import { CaptureSession } from './pipeline';
 import { useLatestLocation } from './useLocation';
 import { androidVideoController, iosVideoController, type VideoController } from './video';
+import { cameraZoom, clampZoom, touchDistance, ULTRA_WIDE_LENS, type ZoomEngine, zoomLabel, zoomPresets } from './zoom';
+
+type Facing = 'back' | 'front';
 
 /** Android records video with the app's own recorder (MPEG-TS, cut-off safe); iPhone with expo-camera. */
 const OWN_RECORDER = Platform.OS === 'android' && !!SaakshiEvidence?.recorderSupported();
@@ -49,6 +61,66 @@ export function CaptureScreen() {
   const recordingRef = useRef(false);
   const [recordingSince, setRecordingSince] = useState(0);
   const [clock, setClock] = useState(0);
+
+  // Front or back camera, and zoom (fix round 1, group 4). Neither camera can be switched to during
+  // a video; zoom can change while recording, except iPhone's 0.5x, which is a different lens.
+  const [facing, setFacing] = useState<Facing>('back');
+  const [engine, setEngine] = useState<ZoomEngine | null>(null);
+  const [factor, setFactor] = useState(1);
+  const zoomTo = (next: number) => {
+    if (engine) setFactor(clampZoom(engine, next, { recording, current: factor }));
+  };
+  // Two fingers on the picture zoom: the zoom when the fingers came down, times how far they moved apart.
+  const pinch = useRef<{ distance: number; from: number } | null>(null);
+  const twoFingers = (e: GestureResponderEvent) => e.nativeEvent.touches.length >= 2;
+  const onPinchMove = (e: GestureResponderEvent) => {
+    const distance = touchDistance(e.nativeEvent.touches);
+    if (!distance) return;
+    if (!pinch.current) {
+      pinch.current = { distance, from: factor };
+      return;
+    }
+    zoomTo((pinch.current.from * distance) / pinch.current.distance);
+  };
+  const onPinchEnd = () => {
+    pinch.current = null;
+  };
+  const switchCamera = () => {
+    if (recording) return;
+    setReady(false);
+    setEngine(null);
+    setFactor(1);
+    setFacing((f) => (f === 'back' ? 'front' : 'back'));
+  };
+  const chooseMode = (next: MediaKind) => {
+    if (next === mode) return;
+    // Android changes camera between photos (expo-camera) and video (the app's recorder); iPhone
+    // keeps the same one, and its zoom.
+    if (OWN_RECORDER) {
+      setEngine(null);
+      setFactor(1);
+    }
+    setMode(next);
+  };
+
+  /** expo-camera's camera is ready: learn how far it zooms (and, on iPhone, whether there is a 0.5x lens). */
+  const onCameraReady = useCallback(async () => {
+    setReady(true);
+    const native = SaakshiEvidence;
+    if (!native) return;
+    try {
+      if (Platform.OS === 'ios') {
+        const lenses = (await camera.current?.getAvailableLensesAsync()) ?? [];
+        const maxZoom = await native.cameraMaxZoom(facing, null);
+        setEngine({ kind: 'ios', maxZoom, ultraWide: facing === 'back' && lenses.some((l) => l.deviceType === ULTRA_WIDE_LENS) });
+      } else {
+        const range = await native.cameraZoomRange(facing);
+        setEngine({ kind: 'android-photo', maxZoom: range.max });
+      }
+    } catch {
+      // No zoom controls; the camera works as before.
+    }
+  }, [facing]);
 
   useEffect(() => {
     if (!recording) return;
@@ -84,14 +156,25 @@ export function CaptureScreen() {
   useEffect(() => {
     if (!OWN_RECORDER || mode !== 'video' || !SaakshiEvidence) return;
     const native = SaakshiEvidence;
-    const ready = native.addListener('onRecorderReady', () => setReady(true));
-    void native.recorderOpen(720);
+    const ready = native.addListener('onRecorderReady', (event) => {
+      setReady(true);
+      if (typeof event.minZoom === 'number' && typeof event.maxZoom === 'number') {
+        setEngine({ kind: 'android-video', minZoom: event.minZoom, maxZoom: event.maxZoom });
+      }
+    });
+    void native.recorderOpen(720, facing);
     return () => {
       ready.remove();
       setReady(false);
       void native.recorderClose();
     };
-  }, [mode]);
+  }, [mode, facing]);
+
+  const zoom = engine ? cameraZoom(engine, factor) : { lens: undefined, zoom: 0, ratio: 1 };
+  // Android video: the app's recorder takes the ratio itself, recording or not.
+  useEffect(() => {
+    if (OWN_RECORDER && mode === 'video' && engine?.kind === 'android-video') void SaakshiEvidence?.recorderSetZoom(zoom.ratio);
+  }, [mode, engine, zoom.ratio]);
 
   /** One video, one file, from start to stop (spec E1). */
   const startRecording = useCallback(async () => {
@@ -205,10 +288,22 @@ export function CaptureScreen() {
           ref={camera}
           style={StyleSheet.absoluteFill}
           mode={mode === 'photo' ? 'picture' : 'video'}
+          facing={facing}
+          zoom={zoom.zoom}
+          selectedLens={Platform.OS === 'ios' ? zoom.lens : undefined}
           videoQuality="720p"
-          onCameraReady={() => setReady(true)}
+          onCameraReady={() => void onCameraReady()}
         />
       )}
+      {/* Two fingers anywhere on the picture zoom; one finger does nothing here. */}
+      <View
+        style={StyleSheet.absoluteFill}
+        onStartShouldSetResponder={twoFingers}
+        onMoveShouldSetResponder={twoFingers}
+        onResponderMove={onPinchMove}
+        onResponderRelease={onPinchEnd}
+        onResponderTerminate={onPinchEnd}
+      />
       <SafeAreaView style={styles.overlay} pointerEvents="box-none">
         <View style={styles.topBar}>
           <Pressable
@@ -241,6 +336,35 @@ export function CaptureScreen() {
 
         <View style={styles.bottomBar}>
           <RightsOverlay />
+          {engine ? (
+            <View style={styles.zoomRow} accessibilityRole="radiogroup" accessibilityLabel={t('capture.zoom')}>
+              {zoomPresets(engine).map((preset) => {
+                const selected = Math.abs(preset - factor) < 0.05;
+                const unavailable = recording && engine.kind === 'ios' && preset < 1 !== factor < 1;
+                return (
+                  <Pressable
+                    key={preset}
+                    accessibilityRole="radio"
+                    accessibilityLabel={t('capture.zoomTo', { factor: zoomLabel(preset) })}
+                    accessibilityState={{ checked: selected, disabled: unavailable }}
+                    disabled={unavailable}
+                    onPress={() => zoomTo(preset)}
+                    style={[styles.zoomButton, selected && { backgroundColor: colors.surfaceRaised }, unavailable && { opacity: 0.4 }]}>
+                    <AppText variant="label" style={{ color: colors.text }}>
+                      {selected ? `${zoomLabel(factor)}×` : `${zoomLabel(preset)}×`}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+              {zoomPresets(engine).every((preset) => Math.abs(preset - factor) >= 0.05) ? (
+                <View style={[styles.zoomButton, { backgroundColor: colors.surfaceRaised }]} accessible accessibilityLabel={t('capture.zoomNow', { factor: zoomLabel(factor) })}>
+                  <AppText variant="label" style={{ color: colors.text }}>
+                    {zoomLabel(factor)}×
+                  </AppText>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
           <View style={styles.modes} accessibilityRole="radiogroup">
             {(['photo', 'video'] as const).map((value) => (
               <Pressable
@@ -248,7 +372,7 @@ export function CaptureScreen() {
                 accessibilityRole="radio"
                 accessibilityState={{ checked: mode === value, disabled: recording }}
                 disabled={recording}
-                onPress={() => setMode(value)}
+                onPress={() => chooseMode(value)}
                 style={[styles.modeButton, mode === value && { backgroundColor: colors.surfaceRaised }]}>
                 <AppText variant="label" style={{ color: colors.text }}>
                   {t(value === 'photo' ? 'capture.photo' : 'capture.video')}
@@ -256,28 +380,45 @@ export function CaptureScreen() {
               </Pressable>
             ))}
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={
-              mode === 'photo'
-                ? t('capture.takePhoto')
-                : recording
-                  ? t('capture.stopVideo')
-                  : t('capture.startVideo')
-            }
-            disabled={!ready || busy}
-            onPress={mode === 'photo' ? takePhoto : recording ? () => void stopRecording() : startRecording}
-            style={[styles.shutter, { opacity: !ready || busy ? 0.5 : 1 }]}>
-            <View
-              style={
-                mode === 'video'
-                  ? recording
-                    ? styles.shutterStop
-                    : styles.shutterRecord
-                  : styles.shutterPhoto
+          <View style={styles.shutterRow}>
+            <View style={styles.side} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                mode === 'photo'
+                  ? t('capture.takePhoto')
+                  : recording
+                    ? t('capture.stopVideo')
+                    : t('capture.startVideo')
               }
-            />
-          </Pressable>
+              disabled={!ready || busy}
+              onPress={mode === 'photo' ? takePhoto : recording ? () => void stopRecording() : startRecording}
+              style={[styles.shutter, { opacity: !ready || busy ? 0.5 : 1 }]}>
+              <View
+                style={
+                  mode === 'video'
+                    ? recording
+                      ? styles.shutterStop
+                      : styles.shutterRecord
+                    : styles.shutterPhoto
+                }
+              />
+            </Pressable>
+            <View style={styles.side}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={facing === 'back' ? t('capture.switchToFront') : t('capture.switchToBack')}
+                accessibilityHint={recording ? t('capture.switchWhileRecording') : undefined}
+                accessibilityState={{ disabled: recording }}
+                disabled={recording}
+                onPress={switchCamera}
+                style={[styles.roundButton, recording && { opacity: 0.4 }]}>
+                <AppText variant="label" style={{ color: colors.text }}>
+                  ⇄
+                </AppText>
+              </Pressable>
+            </View>
+          </View>
         </View>
       </SafeAreaView>
     </View>
@@ -313,6 +454,23 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   bottomBar: { alignItems: 'center', gap: spacing.md, paddingBottom: spacing.lg },
+  zoomRow: {
+    flexDirection: 'row',
+    backgroundColor: colors.overlay,
+    borderRadius: radius.lg,
+    padding: spacing.xs,
+    gap: spacing.xs,
+  },
+  zoomButton: {
+    minHeight: touchTarget,
+    minWidth: touchTarget,
+    borderRadius: touchTarget / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+  },
+  shutterRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', justifyContent: 'center' },
+  side: { flex: 1, alignItems: 'center' },
   modes: {
     flexDirection: 'row',
     backgroundColor: colors.overlay,

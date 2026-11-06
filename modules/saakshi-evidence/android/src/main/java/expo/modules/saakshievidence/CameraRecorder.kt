@@ -76,6 +76,13 @@ object CameraRecorder {
   private var persistentSurface: Surface? = null
   private var videoSize: Size = Size(1280, 720)
   private var sensorOrientation = 90
+  /** The front camera's picture turns the other way as the phone turns (fix round 1, group 4). */
+  private var front = false
+  /** The zoom asked for, as a ratio of the camera's normal view (1.0), within [minZoom, maxZoom]. */
+  private var zoomRatio = 1f
+  private var minZoom = 1f
+  private var maxZoom = 1f
+  private var activeArray: android.graphics.Rect? = null
   private var deviceDegrees = 0
   private var orientationListener: OrientationEventListener? = null
 
@@ -123,18 +130,44 @@ object CameraRecorder {
 
   // ---- Camera ---------------------------------------------------------------------------------
 
-  /** Opens the back camera. `quality` decides the recording size; the preview, if any, matches it. */
+  /** The first camera facing this way (`"front"` or `"back"`), as the phone lists them. */
+  fun cameraIdFor(manager: CameraManager, facing: String): String {
+    val wanted = if (facing == "front") CameraCharacteristics.LENS_FACING_FRONT else CameraCharacteristics.LENS_FACING_BACK
+    return manager.cameraIdList.firstOrNull { id ->
+      manager.getCameraCharacteristics(id).get(CameraCharacteristics.LENS_FACING) == wanted
+    } ?: manager.cameraIdList.first()
+  }
+
+  /**
+   * How far a camera can zoom, as ratios of its normal view: below 1 on phones whose camera can
+   * switch to a wider lens by itself (Android 11 and later), else from 1 to its digital zoom.
+   */
+  fun zoomRange(characteristics: CameraCharacteristics): Pair<Float, Float> {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      characteristics.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE)?.let { return it.lower to it.upper }
+    }
+    return 1f to (characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM) ?: 1f)
+  }
+
+  /**
+   * Opens the back or front camera. `quality` decides the recording size; the preview, if any,
+   * matches it. The front camera can't be switched to during a recording (close and open again).
+   */
   @SuppressLint("MissingPermission") // The app asks for CAMERA and RECORD_AUDIO before opening.
-  fun open(context: Context, quality: Int) {
+  fun open(context: Context, quality: Int, facing: String = "back") {
     appContext = context.applicationContext
     post {
       if (device != null) return@post
       val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-      val cameraId = manager.cameraIdList.firstOrNull { id ->
-        manager.getCameraCharacteristics(id).get(CameraCharacteristics.LENS_FACING) ==
-          CameraCharacteristics.LENS_FACING_BACK
-      } ?: manager.cameraIdList.first()
+      val cameraId = cameraIdFor(manager, facing)
       val characteristics = manager.getCameraCharacteristics(cameraId)
+      front = characteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT
+      zoomRange(characteristics).let { (low, high) ->
+        minZoom = low
+        maxZoom = high
+      }
+      zoomRatio = 1f.coerceIn(minZoom, maxZoom)
+      activeArray = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
       sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
       val map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
       videoSize = chooseSize(map?.getOutputSizes(MediaRecorder::class.java) ?: emptyArray(), quality)
@@ -151,7 +184,13 @@ object CameraRecorder {
         override fun onOpened(camera: CameraDevice) {
           device = camera
           rebuildSession()
-          emit("onRecorderReady", mapOf("width" to videoSize.width, "height" to videoSize.height))
+          emit("onRecorderReady", mapOf(
+            "width" to videoSize.width,
+            "height" to videoSize.height,
+            "facing" to if (front) "front" else "back",
+            "minZoom" to minZoom.toDouble(),
+            "maxZoom" to maxZoom.toDouble(),
+          ))
         }
 
         override fun onDisconnected(camera: CameraDevice) {
@@ -276,8 +315,33 @@ object CameraRecorder {
       targets.forEach { addTarget(it) }
       set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
       set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+      applyZoom(this)
     }.build()
     s.setRepeatingRequest(request, null, handler)
+  }
+
+  /** Android 11+: the zoom ratio itself. Before: the centre of the sensor, cropped (digital zoom). */
+  private fun applyZoom(builder: CaptureRequest.Builder) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      builder.set(CaptureRequest.CONTROL_ZOOM_RATIO, zoomRatio)
+      return
+    }
+    val area = activeArray ?: return
+    if (zoomRatio <= 1f) return
+    val width = (area.width() / zoomRatio).toInt()
+    val height = (area.height() / zoomRatio).toInt()
+    val left = area.left + (area.width() - width) / 2
+    val top = area.top + (area.height() - height) / 2
+    @Suppress("DEPRECATION")
+    builder.set(CaptureRequest.SCALER_CROP_REGION, android.graphics.Rect(left, top, left + width, top + height))
+  }
+
+  /** Zooms, while previewing or recording; clamped to what the camera can do. */
+  fun setZoom(ratio: Float) {
+    post {
+      zoomRatio = ratio.coerceIn(minZoom, maxZoom)
+      applyRepeatingRequest()
+    }
   }
 
   // ---- Recording ------------------------------------------------------------------------------
@@ -349,8 +413,12 @@ object CameraRecorder {
     return r
   }
 
-  /** Camera2's formula for the back camera: sensor orientation plus the phone's rotation. */
-  private fun rotationHint(): Int = (sensorOrientation + deviceDegrees) % 360
+  /**
+   * Camera2's formula: the sensor's orientation plus the phone's rotation for the back camera, minus
+   * it for the front camera, whose picture turns the other way.
+   */
+  private fun rotationHint(): Int =
+    if (front) (sensorOrientation - deviceDegrees + 360) % 360 else (sensorOrientation + deviceDegrees) % 360
 
   private fun startFile() {
     val cfg = config ?: return

@@ -114,9 +114,21 @@ class SaakshiEvidenceModule : Module() {
     // The app's own recorder (CameraRecorder): MPEG-TS, so a cut-off file stays playable.
     Function("recorderSupported") { true }
 
-    AsyncFunction("recorderOpen") { quality: Int ->
+    AsyncFunction("recorderOpen") { quality: Int, facing: String? ->
       val context = appContext.reactContext ?: throw CodedException("ERR_NO_CONTEXT", "No Android context", null)
-      CameraRecorder.open(context, quality)
+      CameraRecorder.open(context, quality, facing ?: "back")
+    }
+
+    // Zoom, as a ratio of the camera's normal view (fix round 1, group 4).
+    AsyncFunction("recorderSetZoom") { ratio: Double -> CameraRecorder.setZoom(ratio.toFloat()) }
+
+    // How far the camera facing this way can zoom, for expo-camera's photos (its zoom prop runs from
+    // 1x at 0 to this maximum at 1, in a straight line).
+    AsyncFunction("cameraZoomRange") { facing: String ->
+      val context = appContext.reactContext ?: throw CodedException("ERR_NO_CONTEXT", "No Android context", null)
+      val manager = context.getSystemService(android.content.Context.CAMERA_SERVICE) as android.hardware.camera2.CameraManager
+      val (low, high) = CameraRecorder.zoomRange(manager.getCameraCharacteristics(CameraRecorder.cameraIdFor(manager, facing)))
+      mapOf("min" to low.toDouble(), "max" to high.toDouble())
     }
 
     AsyncFunction("recorderClose") { CameraRecorder.close() }
