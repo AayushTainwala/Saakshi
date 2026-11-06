@@ -394,10 +394,16 @@ All three checks came out feasible, so nothing falls back to pieces.
   - **every export failure blamed the folder,** even a missing file in the record. Folder problems and bundle problems now have their own messages;
   - **the iPhone's folder errors were in English only.** They now have codes, which the app says in English or Hindi;
   - **on iPhone, a failed copy could leave half a bundle behind,** and the record could be deleted during the copy. Both are fixed. The folder's name is now the one the Files app shows ("iCloud Drive", not "com~apple~CloudDocs").
+- **A second review of those fixes** found three more ways to get "OK" about a misleading bundle, and a small race. All are fixed:
+  - **the readable names weren't checked.** A video renamed to another start time, with the manifest changed to match, passed. Now the tool works every name out from the signed records (spec section 7 gives the rule exactly) and fails on any difference, so the time in a file's name is as trustworthy as its record. The app names files by the same rule;
+  - **a copy in a look-alike folder passed.** Examples are "ORIGINAL FILES/", a Cyrillic "О" and a trailing space, and on a Mac or Windows PC such a copy can land on the real file when unzipped. Now nothing may sit outside the bundle's one layout (except `key.pem`, which the README's steps make), and names a computer would treat as one fail;
+  - **a ZIP holding a name twice passed,** because unzip tools differ on which copy they keep. That now fails, as does a ZIP entry whose local header gives another name;
+  - **every export shared one cache folder,** so sharing one record during another's long copy could remove the file being copied. Each record now has its own.
+  - Seven new tests make such bundles; each passed the earlier tool and fails now.
 - **Left as they are:**
   - on Android, if the app is killed while it writes, a cut-short ZIP can stay in the folder under the bundle's name. expo-file-system can't rename a file in such a folder, so it can't be written under a temporary name first. No ZIP tool or the checking tool will accept it;
   - on iPhone, the bundle is made in the cache, then copied in, so it needs about twice its size free for a moment.
-- Typecheck, lint and 386 tests pass.
+- Typecheck, lint and 392 tests pass.
 
 **Built so, for you to confirm** (also in "Owner questions"):
 - A sound-only record (bug mode) has **"Share sound"**.

@@ -83,9 +83,14 @@ async function write(id: string, open: (fileName: string) => BundleOutput | Prom
   return plan.fileName;
 }
 
+/** Where a session's bundle is made in the cache: its own folder, so one export never removes another's. */
+export function exportCacheFor(id: string): Directory {
+  return new Directory(Paths.cache, 'exports', id);
+}
+
 /** Writes a session's bundle to the cache; returns its URI and its file name. */
 export async function writeBundle(id: string): Promise<{ uri: string; fileName: string }> {
-  const exports = new Directory(Paths.cache, 'exports');
+  const exports = exportCacheFor(id);
   if (exports.exists) exports.delete();
   exports.create({ intermediates: true });
   let uri = '';

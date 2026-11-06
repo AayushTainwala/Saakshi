@@ -234,7 +234,9 @@ describe('evidence bundle', () => {
     cleanup.push(folder);
     const { code, out } = runVerifier(folder);
     expect(code).toBe(1);
-    expect(out).toContain('FAIL Original files/2026-10-20 14-32-03 IST video 2.mp4: size differs from its record');
+    expect(out).toContain(
+      'FAIL Signed records/0001 video 1.json: manifest.json names its file "Original files/2026-10-20 14-32-03 IST video 2.mp4", but from the signed record it is "Original files/2026-10-20 14-32-03 IST video 1.mp4"',
+    );
   });
 
   describe('a file put where a record\'s file should be (format 0.8)', () => {
@@ -260,7 +262,9 @@ describe('evidence bundle', () => {
       cleanup.push(folder);
       const { code, out } = runVerifier(folder);
       expect(code).toBe(1);
-      expect(out).toContain(`FAIL ${name}: no signed record in this bundle vouches for this file`);
+      // The file at the readable name is the one checked, whatever the manifest says.
+      expect(out).toMatch(new RegExp(`FAIL ${name}: SHA-256 [0-9a-f]{64} differs from its record`));
+      expect(out).toContain('FAIL Original files/genuine.bin: no signed record in this bundle vouches for this file');
     });
 
     it('catches a manifest that names a file outside the bundle, or in another folder', async () => {
@@ -276,11 +280,12 @@ describe('evidence bundle', () => {
         cleanup.push(dir, join(dir, '..', 'outside-genuine.bin'));
         const { code, out } = runVerifier(dir);
         expect(code).toBe(1);
-        expect(out).toContain(`FAIL Signed records/0001 video 1.json: its file is named ${JSON.stringify(media)}, which is not a file in "Original files/"`);
+        expect(out).toContain(`FAIL Signed records/0001 video 1.json: manifest.json names its file ${JSON.stringify(media)}, but from the signed record it is "${name}"`);
+        expect(out).toMatch(new RegExp(`FAIL ${name}: SHA-256 [0-9a-f]{64} differs from its record`));
       }
     });
 
-    it('catches a record left out of the manifest, and one file claimed twice', async () => {
+    it('catches a record left out of the manifest, and one file named for two records', async () => {
       const { files } = await bundleFiles();
       const missing = new Map(files);
       edit(missing, (m) => void (m.records = m.records.filter((r) => r.record !== 'Signed records/0001 video 1.json')));
@@ -290,7 +295,78 @@ describe('evidence bundle', () => {
       const b = writeFolder(twice);
       cleanup.push(a, b);
       expect(runVerifier(a).out).toContain('FAIL Signed records/0001 video 1.json: manifest.json doesn\'t say which file in "Original files/" is this record\'s');
-      expect(runVerifier(b).out).toContain(`FAIL ${name}: claimed by Signed records/0001 video 1.json and by Signed records/0002 video 2.json`);
+      expect(runVerifier(b).out).toContain(`FAIL Signed records/0002 video 2.json: manifest.json names its file "${name}"`);
+    });
+
+    it('catches a readable name that the signed record doesn\'t give, even with the manifest changed to match', async () => {
+      const { files } = await bundleFiles();
+      const renamed = 'Original files/2026-10-20 09-00-00 IST video 1.mp4';
+      files.set(renamed, files.get(name)!);
+      files.delete(name);
+      edit(files, (m) => void (m.records[1].media = renamed));
+      const folder = writeFolder(files);
+      cleanup.push(folder);
+      const { code, out } = runVerifier(folder);
+      expect(code).toBe(1);
+      expect(out).toContain(`FAIL Signed records/0001 video 1.json: manifest.json names its file "${renamed}", but from the signed record it is "${name}"`);
+      expect(out).toContain(`FAIL ${renamed}: no signed record in this bundle vouches for this file`);
+
+      // A record's own name is checked the same way.
+      const { files: again } = await bundleFiles();
+      again.set('Signed records/0001 video 3.json', again.get('Signed records/0001 video 1.json')!);
+      again.set('Signed records/0001 video 3.json.sig', again.get('Signed records/0001 video 1.json.sig')!);
+      again.delete('Signed records/0001 video 1.json');
+      again.delete('Signed records/0001 video 1.json.sig');
+      const dir = writeFolder(again);
+      cleanup.push(dir);
+      expect(runVerifier(dir).out).toContain('FAIL Signed records/0001 video 3.json: from its signed contents its name should be "Signed records/0001 video 1.json"');
+    });
+
+    it('catches a copy outside the folders, in a look-alike folder or at the top', async () => {
+      for (const where of ['ORIGINAL FILES/x.mp4', '\u041eriginal files/x.mp4', 'Original files /x.mp4', 'Original\u00a0files/x.mp4', 'video 1.mp4', 'Original files/sub/x.mp4']) {
+        const { files } = await bundleFiles();
+        const copy = files.get(name)!.slice();
+        copy[100] ^= 1;
+        files.set(where, copy);
+        const zip = await writeZipFile(files);
+        cleanup.push(zip.dir);
+        const { code, out } = runVerifier(zip.path);
+        expect(code).toBe(1);
+        expect(out).toContain(`FAIL ${where}: not part of a Saakshi bundle`);
+      }
+    });
+
+    it('catches names a computer would treat as one, and a name in the ZIP twice', async () => {
+      const { files } = await bundleFiles();
+      const doctored = files.get(name)!.slice();
+      doctored[100] ^= 1;
+      // On a Mac or Windows PC these land on the same file.
+      files.set(name.replace('video 1', 'VIDEO 1'), doctored);
+      const zip = await writeZipFile(files);
+      cleanup.push(zip.dir);
+      expect(runVerifier(zip.path).out).toContain('a computer may treat these names as the same');
+
+      // The writer is asked for the doctored copy first and the genuine one last.
+      const { files: clean } = await bundleFiles();
+      const dir = mkdtempSync(join(tmpdir(), 'saakshi-twice-'));
+      const path = join(dir, 'twice.zip');
+      cleanup.push(dir);
+      const fd = openSync(path, 'w');
+      const modified = new Date(2026, 9, 20, 15, 45);
+      const entries = [...clean].map(([n, b]) => bytesEntry(n, b, modified));
+      await writeZip({ write: async (b) => void writeSync(fd, b) }, [bytesEntry(name, doctored, modified), ...entries]);
+      closeSync(fd);
+      const { code, out } = runVerifier(path);
+      expect(code).toBe(1);
+      expect(out).toContain(`FAIL ${name}: in the ZIP twice`);
+    });
+
+    it('lets the reader keep key.pem in the folder, as the README asks', async () => {
+      const { files, deviceKey } = await bundleFiles();
+      files.set('key.pem', new TextEncoder().encode(deviceKey.publicKeyPem));
+      const folder = writeFolder(files);
+      cleanup.push(folder);
+      expect(runVerifier(folder).code).toBe(0);
     });
 
     it('catches a stray record, and ignores what a computer adds when unzipping', async () => {

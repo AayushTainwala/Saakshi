@@ -23,7 +23,58 @@ const RECORD_PATH = /^(records|Signed records)\/[^/]+\.json$/;
 // Where the originals are: media/ up to 0.7, "Original files/" from 0.8.
 const NEW_RECORDS = 'Signed records/';
 const NEW_MEDIA = 'Original files/';
-const MEDIA_FOLDERS = ['media/', NEW_MEDIA];
+
+// The files at the top of a bundle, besides the two folders. key.pem is the file README.txt's
+// step 1 asks the reader to make.
+const NEW_TOP = ['README.txt', 'Hash report.txt', 'Certificate Part A.pdf', 'manifest.json', 'device-key.json', 'key.pem'];
+const OLD_TOP = ['README.txt', 'hash-report.txt', 'certificate-part-a.pdf', 'manifest.json', 'device-key.json', 'key.pem'];
+
+const two = (n) => String(n).padStart(2, '0');
+
+/** "2026-11-05 10-40-12", India Standard Time (UTC+05:30), as in file names from 0.8. */
+function stampIST(iso) {
+  const d = new Date(Date.parse(iso) + 330 * 60 * 1000);
+  return `${d.getUTCFullYear()}-${two(d.getUTCMonth() + 1)}-${two(d.getUTCDate())} ${two(d.getUTCHours())}-${two(d.getUTCMinutes())}-${two(d.getUTCSeconds())}`;
+}
+
+/** The word a 0.8 name uses for a file's kind, from its media type. */
+function kindWord(mediaType) {
+  if (typeof mediaType !== 'string') return null;
+  if (mediaType.startsWith('image/')) return 'photo';
+  if (mediaType.startsWith('audio/')) return 'sound';
+  if (mediaType.startsWith('video/')) return 'video';
+  return null;
+}
+
+/**
+ * The names a 0.8 bundle must give each record and file, worked out from the signed records alone
+ * (docs/spec/evidence-bundle.md, section 7): so a name a person reads, such as the time a video
+ * started, is as trustworthy as the record. `records` are in chain order.
+ */
+function expectedNames(records) {
+  const counts = new Map();
+  const labelOf = new Map();
+  const names = new Map();
+  for (const { name, record } of records) {
+    if (!record || record.type !== RECORD_TYPE) continue;
+    const word = kindWord(record.file?.mediaType);
+    if (!word || typeof record.capture?.startedAt !== 'string' || Number.isNaN(Date.parse(record.capture.startedAt))) continue;
+    counts.set(word, (counts.get(word) ?? 0) + 1);
+    const label = `${word} ${counts.get(word)}`;
+    const extension = /\.[^./]+$/.exec(record.file?.name ?? '')?.[0] ?? '';
+    names.set(name, {
+      record: `${NEW_RECORDS}${String(record.sequence).padStart(4, '0')} ${label}.json`,
+      media: `${NEW_MEDIA}${stampIST(record.capture.startedAt)} IST ${label}${extension}`,
+    });
+    if (record.recording) labelOf.set(record.recording, label);
+  }
+  for (const { name, record } of records) {
+    if (!record || record.type !== CHECKPOINT_TYPE) continue;
+    const label = labelOf.get(record.recording);
+    names.set(name, { record: `${NEW_RECORDS}${String(record.sequence).padStart(4, '0')} ${label ? `${label} ` : ''}checkpoint ${record.checkpoint}.json` });
+  }
+  return names;
+}
 
 /** Files a computer adds when a bundle is unzipped or opened (macOS .DS_Store, ._ and __MACOSX). */
 function ignored(name) {
@@ -43,6 +94,7 @@ function folderSource(dir) {
   return {
     has: (name) => existsSync(join(dir, name)),
     names: () => listFolder(dir, ''),
+    repeated: () => [],
     read: (name) => readFileSync(join(dir, name)),
     sha256: (name) => hashStream(createReadStream(join(dir, name))),
     stream: (name) => createReadStream(join(dir, name)),
@@ -90,6 +142,8 @@ function zipSource(path) {
 
   const dir = read(dirOffset, dirSize);
   const entries = new Map();
+  // A name in the ZIP twice: unzip tools differ on which copy they keep.
+  const repeated = new Set();
   let at = 0;
   for (let i = 0; i < count; i++) {
     if (dir.readUInt32LE(at) !== 0x02014b50) throw new Error('Bad central directory');
@@ -114,13 +168,17 @@ function zipSource(path) {
       }
       e += 4 + length;
     }
-    entries.set(name, { method, size, localOffset });
+    if (entries.has(name)) repeated.add(name);
+    entries.set(name, { name, method, size, localOffset });
     at += 46 + nameLength + extraLength + commentLength;
   }
 
   const dataOffset = (entry) => {
     const header = read(entry.localOffset, 30);
     if (header.readUInt32LE(0) !== 0x04034b50) throw new Error('Bad local header');
+    // Tools that read the ZIP front to back use this name, not the central directory's.
+    const localName = read(entry.localOffset + 30, header.readUInt16LE(26)).toString('utf8');
+    if (localName !== entry.name) throw new Error(`${entry.name}: its local header names it ${JSON.stringify(localName)}`);
     return entry.localOffset + 30 + header.readUInt16LE(26) + header.readUInt16LE(28);
   };
   const entry = (name) => {
@@ -133,6 +191,7 @@ function zipSource(path) {
   return {
     has: (name) => entries.has(name),
     names: () => [...entries.keys()],
+    repeated: () => [...repeated],
     read: (name) => {
       const e = entry(name);
       return read(dataOffset(e), e.size);
@@ -238,6 +297,27 @@ export async function verifyBundle(path) {
       if (typeof entry.record === 'string' && !source.has(entry.record)) fail(`manifest.json lists ${entry.record}, which is not in the bundle`);
     }
 
+    // One layout per bundle, and nothing outside it: a file in a look-alike folder ("ORIGINAL
+    // FILES/", a Cyrillic "О") or at the top could be taken for evidence without being checked.
+    const names = source.names().filter((name) => !ignored(name) && !name.endsWith('/'));
+    for (const name of source.repeated()) fail(`${name}: in the ZIP twice; unzip tools differ on which copy they keep`);
+    const layout = names.some((name) => name.startsWith(NEW_RECORDS)) ? 'new' : 'old';
+    const folders = layout === 'new' ? [NEW_MEDIA, NEW_RECORDS] : ['media/', 'records/'];
+    const top = layout === 'new' ? NEW_TOP : OLD_TOP;
+    for (const name of names) {
+      if (!top.includes(name) && !folders.some((folder) => name.startsWith(folder) && !name.slice(folder.length).includes('/'))) {
+        fail(`${name}: not part of a Saakshi bundle${layout === 'new' && (name.startsWith('media/') || name.startsWith('records/')) ? ' from 0.8 (a bundle has one layout)' : ''}`);
+      }
+    }
+    // Names a computer may treat as one (case, or the same letter written two ways), so that one
+    // file lands on the other when the bundle is unzipped.
+    const seen = new Map();
+    for (const name of names) {
+      const key = name.normalize('NFC').toLowerCase();
+      if (seen.has(key)) fail(`${seen.get(key)} and ${name}: a computer may treat these names as the same, and put one over the other`);
+      else seen.set(key, name);
+    }
+
     // Every record in the bundle, in chain order (its "sequence"; from 0.8 the names start with it).
     const loaded = source
       .names()
@@ -254,6 +334,7 @@ export async function verifyBundle(path) {
       })
       .sort((a, b) => (a.record?.sequence ?? Infinity) - (b.record?.sequence ?? Infinity) || (a.name < b.name ? -1 : 1));
     if (loaded.length === 0) fail('No records in the bundle');
+    const namesFromRecords = layout === 'new' ? expectedNames(loaded) : new Map();
 
     let previous = null;
     let lastBodyHash = null;
@@ -282,6 +363,10 @@ export async function verifyBundle(path) {
       if (!SUPPORTED_VERSIONS.includes(record.version)) fail(`${label}: unknown version ${record.version}`);
       if (record.key?.id !== keyFile.keyId) fail(`${label}: signed by a different key (${record.key?.id})`);
       if (record.sequence !== index) fail(`${label}: sequence ${record.sequence}, expected ${index} (a record is missing or out of order)`);
+      const named = namesFromRecords.get(name);
+      if (layout === 'new' && named?.record !== name) {
+        fail(named ? `${label}: from its signed contents its name should be "${named.record}"` : `${label}: its signed contents don't say what it should be called`);
+      }
 
       if (isCheckpoint) {
         // Checked against its file when the file's record comes.
@@ -289,12 +374,21 @@ export async function verifyBundle(path) {
         if (!pending.has(record.recording)) pending.set(record.recording, []);
         pending.get(record.recording).push({ label, record });
       } else {
-        const folder = name.startsWith(NEW_RECORDS) ? NEW_MEDIA : 'media/';
-        const media = folder === NEW_MEDIA ? mediaOf.get(name) : `media/${record.file?.name}`;
+        // From 0.8, the name the file must have, from its signed record; the manifest must agree.
+        // Up to 0.7, the name the record signed.
+        const folder = layout === 'new' ? NEW_MEDIA : 'media/';
+        const media = layout === 'new' ? named?.media : `media/${record.file?.name}`;
         const checkpoints = record.recording ? (pending.get(record.recording) ?? []) : [];
         if (record.recording) pending.delete(record.recording);
+        if (layout === 'new' && mediaOf.get(name) !== media) {
+          fail(
+            mediaOf.has(name)
+              ? `${label}: manifest.json names its file ${JSON.stringify(mediaOf.get(name))}, but from the signed record it is "${media}"`
+              : `${label}: manifest.json doesn't say which file in "${NEW_MEDIA}" is this record's`,
+          );
+        }
         if (media === undefined) {
-          fail(`${label}: manifest.json doesn't say which file in "${NEW_MEDIA}" is this record's`);
+          fail(`${label}: its signed contents don't say what its file should be called`);
         } else if (!plainPath(media) || ignored(media) || !media.startsWith(folder) || media.slice(folder.length).includes('/')) {
           fail(`${label}: its file is named ${JSON.stringify(media)}, which is not a file in "${folder}"`);
         } else if (claimed.has(media)) {
@@ -356,10 +450,10 @@ export async function verifyBundle(path) {
     for (const name of source.names()) {
       // Folder entries (a bundle zipped again), and what a computer adds, are skipped.
       if (ignored(name) || name.endsWith('/')) continue;
-      if (MEDIA_FOLDERS.some((folder) => name.startsWith(folder)) && !claimed.has(name)) {
+      if (name.startsWith(folders[0]) && !claimed.has(name)) {
         fail(`${name}: no signed record in this bundle vouches for this file`);
       }
-      if (name.startsWith(NEW_RECORDS) || name.startsWith('records/')) {
+      if (name.startsWith(folders[1])) {
         const recordName = name.endsWith('.sig') ? name.slice(0, -4) : name;
         if (!recordNames.has(recordName)) fail(`${name}: not a record of this bundle, or its signature`);
       }

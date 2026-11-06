@@ -245,7 +245,13 @@ Apple's attestation object (CBOR, with a certificate chain to Apple's App Attest
 
 A ZIP file named `Saakshi <record name>.zip`, for example `Saakshi 2026-11-05 10-40 IST Body-cam.zip`: when the record's first file started (IST) and what recorded it (`Body-cam`, `Bug mode`, `Photo`, `Photos`, `Video`, `Videos` or `Camera`), as the app and the witness message (section 9) name it. Entries are stored without compression (method 0). ZIP64 is used when an entry or the archive passes 4 GiB.
 
-From 0.8 the folders and files have names a person can read (fix round 1, group 9). Each original is named by when it started (IST, to the second) and which file of its kind it is, in the record's chain order (`video 1`, `sound 1`, `photo 2`, counting only sealed files, as in the witness message). Each record is named by its `sequence`, four digits, so the folder lists the records in chain order, and by the file it belongs to; a checkpoint record also by its `checkpoint` number. The app's own names stay in each signed record (`file.name`) and in the manifest.
+From 0.8 the folders and files have names a person can read (fix round 1, group 9), and every part of each name comes from a signed record, so a reader can work it out and check it:
+- **an original:** `Original files/<capture.startedAt in IST, YYYY-MM-DD HH-MM-SS> IST <label><extension of file.name>`;
+- **a file's record:** `Signed records/<sequence, four digits> <label>.json`, and its signature the same plus `.sig`;
+- **a checkpoint record:** `Signed records/<sequence, four digits> <label of the file with the same recording> checkpoint <checkpoint>.json` (without the label if that file's record is not in the bundle);
+- **the label:** the kind, from `file.mediaType` (`image/…` "photo", `audio/…` "sound", `video/…` "video"), and the file's number among the bundle's files of that kind in chain order, from 1: `video 1`, `sound 1`, `photo 2`. The witness message numbers the files the same way, with the kind in the app's language.
+
+The four-digit `sequence` makes a folder list the records in chain order. The app's own names stay in each signed record (`file.name`) and in the manifest.
 
 ```
 README.txt                                          (English and Hindi, for a lay reader)
@@ -291,7 +297,7 @@ Up to 0.7 the layout was `manifest.json`, `device-key.json`, `media/<file.name>`
 ```
 
 - `name` (from 0.8) is the record's name, as in the bundle's file name.
-- `records` lists the files' records: where each record, its signature and its original are in the bundle, and (from 0.8) the record's `id` and the app's name for the file (`fileName`, the record's `file.name`). A reader finds a record's original through this list; up to 0.7 it is `media/<file.name>`. Because the manifest is not signed, a reader must check that each `media` is a file directly in `Original files/`, that no file is claimed by two records, and that every file in `Original files/` is claimed by one: then the file at each readable name is the one checked against a signed record.
+- `records` lists the files' records: where each record, its signature and its original are in the bundle, and (from 0.8) the record's `id` and the app's name for the file (`fileName`, the record's `file.name`). A reader finds a record's original through this list; up to 0.7 it is `media/<file.name>`. Because the manifest is not signed, a reader works each name out from the signed record (above) rather than trusting it, and checks that every file in `Original files/` is some record's: then the file at each readable name is the one checked against a signed record.
 - `checkpoints` (from 0.5) lists the checkpoint records. Both kinds are in the records folder, numbered by `sequence`.
 - `witness` lists every witness message the app opened for the user (section 9), including ones the user cancelled. `recipients` is how many recipients the app filled in; 0 means the user chose them in the SMS app. `result` is what the phone reported: `"sent"`, `"cancelled"` or `"unknown"` (Android always reports "unknown").
 - `certificate` is null when no certificate has been made.
@@ -356,14 +362,20 @@ With standard tools (`unzip`, `sha256sum`, `openssl`):
 1. Unzip the bundle.
 2. **Public key:** save the `publicKeyPem` value from `device-key.json` as `key.pem`. Check that `openssl pkey -pubin -in key.pem -outform DER | sha256sum` equals `keyId`, and equals `key.id` in every record.
 3. **Signatures:** for each record, run `openssl dgst -sha256 -verify key.pem -signature "Signed records/0000 video 1 checkpoint 0.json.sig" "Signed records/0000 video 1 checkpoint 0.json"` (up to 0.7: `records/0000.json`). It must print `Verified OK`.
-4. **Files:** for each file's record, find its original: the manifest's `media` for that record (the hash report gives it too; up to 0.7, `media/<file.name>`). Its `sha256sum` must equal `file.sha256`, and its size `file.size`. From 0.8, every file in `Original files/` must be some record's original, and no file two records': otherwise a file at a readable name could go unchecked.
+4. **Files:** for each file's record, find its original: from 0.8 at the name section 7 gives from the record, which the manifest's `media` and the hash report also give; up to 0.7, `media/<file.name>`. Its `sha256sum` must equal `file.sha256`, and its size `file.size`. From 0.8, every file in `Original files/` must be some record's original, and each record's own name must be the one section 7 gives: otherwise a name a person reads, such as when a video started, could be wrong.
 4a. **Checkpoints (from 0.5):** for each checkpoint record, find the file's record with the same `recording`, and that file's original as in step 4. `head -c <file.size of the checkpoint> "<original>" | sha256sum` must equal the checkpoint's `file.sha256`. The checkpoints of one file have rising numbers (a number may be missing, if that checkpoint could not be signed), each covers more bytes than the last, and all come before the file's record in the chain.
 5. **Chain:** sort all records, files' and checkpoints', by `sequence` (from 0.8 their names start with it), from 0 with no gaps. Record 0 has `previous` null. Each later record's `previous.recordSha256` must equal `sha256sum` of the previous record file, and its `previous.fileSha256` the previous record's `file.sha256`. The `sha256sum` of the last record file is the chain head; compare it with `chainHead` in the manifest and with any witness message.
 6. **Attestation:**
    - Android: verify the certificate chain up to a Google hardware attestation root, check the leaf's public key equals the device key, and read the attestation extension (package name `in.aayushtainwala.saakshi`, the app's signing-certificate digest published with each release, security level, verified-boot state). Also check Google's attestation revocation list.
    - iPhone: verify the App Attest object as Apple documents for servers ("Validating apps that connect to your server"), with App ID `<Team ID>.in.aayushtainwala.saakshi` and `clientDataHash` equal to SHA-256 of the device key's DER public key.
 
-`tools/verify-bundle.mjs` in the Saakshi repository runs steps 2–5 with Node.js and no other dependencies, step 4a included (it reads each file once and takes the SHA-256 of every checkpointed prefix on the way). The tool reads versions 0.1 to 0.8 (it finds each record's original through the manifest, or in `media/` for a bundle from before 0.8, and fails on a file in the originals' or records' folder that no record accounts for; it skips what a computer adds when unzipping, such as `.DS_Store` and `__MACOSX/`), lists each file it checked, and does not yet check attestation chains (step 6).
+`tools/verify-bundle.mjs` in the Saakshi repository runs steps 2–5 with Node.js and no other dependencies, step 4a included (it reads each file once and takes the SHA-256 of every checkpointed prefix on the way). The tool reads versions 0.1 to 0.8, lists each file it checked, and does not yet check attestation chains (step 6). For a 0.8 bundle it works out every name from the signed records and fails on any that differ, in the folders or in the manifest. For any bundle it fails on:
+- a file that is not part of the bundle's one layout (for example a copy in a look-alike folder, or at the top);
+- a file in the originals' or records' folder that no record accounts for;
+- names a computer may treat as the same (they differ only in case, or in how a letter is written);
+- a name in the ZIP twice, or a ZIP entry whose local header names another file.
+
+It skips what a computer adds when unzipping (`.DS_Store`, `._` files, `__MACOSX/`), and allows `key.pem`, which README.txt's steps make.
 
 The chain shows a record changed, added or taken out of the middle. Records taken off the end show only against a chain head held elsewhere, such as in a witness message: neither the tool nor the manifest's `chainHead` (which is not signed) can show it.
 

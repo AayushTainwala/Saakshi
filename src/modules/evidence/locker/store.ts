@@ -132,8 +132,8 @@ export const fileLocker: LockerStore = {
   deleteSession(id) {
     const dir = sessionDir(id);
     if (dir.exists) dir.delete();
-    // The last export may hold this session's files.
-    const exports = new Directory(Paths.cache, 'exports');
+    // Its last export, if one is still in the cache (export/bundle.ts, exportCacheFor).
+    const exports = new Directory(Paths.cache, 'exports', id);
     if (exports.exists) exports.delete();
     notifyLockerChanged();
   },

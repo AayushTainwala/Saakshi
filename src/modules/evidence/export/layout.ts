@@ -1,5 +1,5 @@
 import { fileLabels, stampIST } from '../naming';
-import type { CheckpointItem, EvidenceItem } from '../types';
+import type { CheckpointItem, EvidenceItem, MediaKind } from '../types';
 
 /**
  * Names inside a bundle (format 0.8, fix round 1, group 9): folders and files a person can read.
@@ -13,6 +13,17 @@ export const CERTIFICATE_NAME = 'Certificate Part A.pdf';
 export const README_NAME = 'README.txt';
 
 const extension = (name: string) => /\.[^./]+$/.exec(name)?.[0] ?? '';
+
+/**
+ * A file's kind as its media type says it, which is what a reader of the signed record sees
+ * (tools/verify-bundle.mjs works the names out the same way). The app's own kind is the fallback.
+ */
+export function kindOfMediaType(mediaType: string): MediaKind | null {
+  if (mediaType.startsWith('image/')) return 'photo';
+  if (mediaType.startsWith('audio/')) return 'audio';
+  if (mediaType.startsWith('video/')) return 'video';
+  return null;
+}
 const number = (sequence: number) => String(sequence).padStart(4, '0');
 
 export type BundlePaths = {
@@ -32,10 +43,10 @@ export type BundlePaths = {
  * the file it belongs to and its number in that file.
  */
 export function bundlePaths(
-  files: readonly Pick<EvidenceItem, 'sequence' | 'kind' | 'media' | 'startedAt' | 'recording'>[],
+  files: readonly Pick<EvidenceItem, 'sequence' | 'kind' | 'mediaType' | 'media' | 'startedAt' | 'recording'>[],
   checkpoints: readonly Pick<CheckpointItem, 'sequence' | 'recording' | 'index'>[],
 ): BundlePaths {
-  const labels = fileLabels(files);
+  const labels = fileLabels(files.map((file) => ({ sequence: file.sequence, kind: kindOfMediaType(file.mediaType) ?? file.kind })));
   const media = new Map<number, string>();
   const records = new Map<number, string>();
   const labelOfRecording = new Map<string, string>();
