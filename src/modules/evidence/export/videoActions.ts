@@ -31,7 +31,8 @@ export function needsCopy(item: EvidenceItem): boolean {
   return item.mediaType === 'video/mp2t';
 }
 
-async function playableUri(sessionId: string, item: EvidenceItem): Promise<{ uri: string; mimeType: string }> {
+/** The file to play: the original, or (Android .ts videos) its MP4 copy, made the first time. */
+export async function playableUri(sessionId: string, item: EvidenceItem): Promise<{ uri: string; mimeType: string }> {
   if (needsCopy(item)) return { uri: await makePlayableCopy(copyDeps, sessionId, item.sequence), mimeType: 'video/mp4' };
   return { uri: fileLocker.mediaUri(sessionId, item.media), mimeType: item.mediaType };
 }

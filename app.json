@@ -71,6 +71,13 @@
           "enableBackgroundPlayback": false
         }
       ],
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": false,
+          "supportsPictureInPicture": false
+        }
+      ],
       "./modules/saakshi-sos/app.plugin.js",
       "@bacons/apple-targets"
     ],

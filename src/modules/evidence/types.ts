@@ -79,6 +79,8 @@ export type CheckpointInput = {
 export type CheckpointItem = {
   sequence: number;
   recording: string;
+  /** What is recording (body-cam or bug mode), kept here for the records list. */
+  mode?: CaptureMode;
   index: number;
   bytes: number;
   sha256: string;
@@ -121,6 +123,10 @@ export type EvidenceItem = {
   recording?: string;
   /** Set when the file as hashed differs from what the recorder wrote (it should never happen). */
   writtenMismatch?: boolean;
+  /** What recorded it (the signed record's `capture.mode`), kept here for the records list. */
+  mode?: CaptureMode;
+  /** Degrees to turn the picture upright (MPEG-TS), as in the signed record. */
+  rotationDegrees?: number | null;
 };
 
 export type WitnessEntry = {

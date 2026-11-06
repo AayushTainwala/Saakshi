@@ -213,5 +213,43 @@
     "shareCopy": "Share the MP4 copy",
     "shareOriginal": "Share the original (.ts)",
     "copyMade": "MP4 copy for playing (not the original). SHA-256 {{sha256}}"
+  },
+  "list": {
+    "bodyCam": "Body-cam",
+    "bug": "Bug mode",
+    "photos_one": "Photo",
+    "photos_other": "{{count}} photos",
+    "videos_one": "Video",
+    "videos_other": "{{count}} videos",
+    "mixed": "{{videos}} and {{photos}}",
+    "nothing": "Nothing saved yet",
+    "recording": "Recording now",
+    "lengthHours": "{{h}} h {{m}} min",
+    "lengthMinutes": "{{m}} min {{s}} s",
+    "lengthSeconds": "{{s}} s",
+    "summary": "{{kind}}, {{length}}",
+    "started": "Started {{time}}"
+  },
+  "player": {
+    "heading": "The whole recording",
+    "help": "Plays every file of this record, one after the other, with its sound.",
+    "play": "Play",
+    "pause": "Pause",
+    "again": "Play again from the start",
+    "fullscreen": "Full screen",
+    "position": "{{at}} of {{total}}",
+    "part": "File {{n}} of {{count}}",
+    "soundOnly": "Sound only: video could not record here, for example while you were away from Saakshi.",
+    "gap": "Nothing was recorded for {{length}} before this file, for example during a phone call.",
+    "busy": "Playing is off while Saakshi is recording, so the recording doesn’t pick it up.",
+    "preparing": "Getting it ready…",
+    "error": "This file could not be played: {{detail}}",
+    "playSound": "Play this sound file",
+    "closeSound": "Stop playing"
+  },
+  "photo": {
+    "open": "View the photo",
+    "close": "Close",
+    "missing": "This photo is no longer on your phone."
   }
 }

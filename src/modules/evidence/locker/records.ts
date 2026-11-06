@@ -1,7 +1,7 @@
 import type { BundledCheckpoint, BundledRecord } from '../export/contents';
 import type { CheckpointRecord, EvidenceRecord } from '../integrity/record';
-import type { CheckpointItem, EvidenceItem } from '../types';
-import type { LockerStore } from './store';
+import type { CaptureMode, CheckpointItem, EvidenceItem } from '../types';
+import { fileLocker, type LockerStore } from './store';
 
 export type SealedEntry = { item: EvidenceItem; body: string; bundled: BundledRecord };
 
@@ -46,4 +46,24 @@ export function loadCheckpoints(store: LockerStore, sessionId: string): SealedCh
         },
       };
     });
+}
+
+const modes = new Map<string, CaptureMode | null>();
+
+/**
+ * What recorded a file, from its signed record (`capture.mode`), for sessions whose bookkeeping
+ * predates `mode`. Read once per file and remembered; null if it can't be read.
+ */
+export function recordModeOf(sessionId: string, item: EvidenceItem, store: LockerStore = fileLocker): CaptureMode | null {
+  if (!item.record) return null;
+  const key = `${sessionId}/${item.record.file}`;
+  if (!modes.has(key)) {
+    try {
+      const record = JSON.parse(store.readRecordText(sessionId, item.record.file)) as EvidenceRecord;
+      modes.set(key, record.capture.mode ?? null);
+    } catch {
+      modes.set(key, null);
+    }
+  }
+  return modes.get(key) ?? null;
 }
