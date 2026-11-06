@@ -17,14 +17,14 @@ declare class SaakshiSosModule extends NativeModule<SaakshiSosEvents> {
   /** Android only: sends the message to each number through SmsManager. Needs SEND_SMS granted. */
   sendDirect(phones: string[], message: string): Promise<DirectSmsResult[]>;
 
-  /** Android: the ongoing notification that opens the code pad (spec S4); kept across restarts. */
+  /** Android: the ongoing notification that opens the SOS screen (SPEC 5.1); kept across restarts. */
   quickNotificationShow(title: string, text: string, action: string): void;
   quickNotificationHide(): void;
   quickNotificationEnabled(): boolean;
-  /** iPhone: true once if a control, the Action Button or a Shortcut asked for the code pad. */
-  consumeCodePadRequest(): boolean;
+  /** iPhone: true once if a control, the Action Button or a Shortcut asked for the SOS screen. */
+  consumeSosRequest(): boolean;
 
-  /** Android: bug mode's recorder in a microphone foreground service (spec E8): one file, with checkpoints. */
+  /** Android: Pocket recording's recorder (bug mode until round 2) in a microphone foreground service (spec E8): one file, with checkpoints. */
   bugRecorderStart(options: BugRecorderOptions): Promise<void>;
   bugRecorderStop(): Promise<void>;
   bugRecorderRunning(): boolean;
@@ -35,7 +35,7 @@ declare class SaakshiSosModule extends NativeModule<SaakshiSosEvents> {
    */
   setExcludedFromBackup(uri: string, excluded: boolean): Promise<number>;
 
-  /** iPhone: bug mode's Live Activity. Resolves false where Live Activities are off. */
+  /** iPhone: Pocket recording's Live Activity. Resolves false where Live Activities are off. */
   liveActivityStart(title: string, detail: string): Promise<boolean>;
   liveActivityUpdate(detail: string): Promise<void>;
   liveActivityEnd(): Promise<void>;

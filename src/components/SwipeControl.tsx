@@ -1,0 +1,191 @@
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { type AccessibilityActionEvent, Animated, Modal, PanResponder, StyleSheet, View } from 'react-native';
+
+import { spacing, useTheme } from '@/theme';
+
+import { AppText } from './AppText';
+import { Button } from './Button';
+import { Card } from './Card';
+import { isFullSwipe, swipePosition, swipeTravel } from './swipe';
+
+export type SwipeTone = 'danger' | 'primary' | 'secondary';
+
+const THUMB = 64;
+const PAD = 6;
+
+export type SwipeControlProps = {
+  /** What the swipe does, on the track: "Call 112". */
+  label: string;
+  /** A line under it: "Alerts your trusted contacts". */
+  detail?: string;
+  tone: SwipeTone;
+  /** The plain confirmation a screen-reader user gets in place of the swipe. */
+  confirm: { title: string; body: string; action: string };
+  onConfirm: () => void;
+  disabled?: boolean;
+  testID?: string;
+};
+
+/**
+ * One swipe's gesture: follows the finger along the track; a full swipe confirms, anything less
+ * springs back. Made once per control, so a re-render in the middle of a swipe can't hand the
+ * finger to a new responder.
+ */
+class SwipeGesture {
+  readonly position = new Animated.Value(0);
+  private travel = 0;
+  private locked = false;
+  private onConfirm: () => void = () => undefined;
+  private disabled = false;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+
+  readonly responder = PanResponder.create({
+    onStartShouldSetPanResponder: () => !this.disabled && !this.locked,
+    onMoveShouldSetPanResponder: () => !this.disabled && !this.locked,
+    // Keep the swipe once it has started, even if the page would like to scroll.
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderMove: (_event, move) => this.position.setValue(swipePosition(move.dx, this.travel)),
+    onPanResponderRelease: (_event, move) => {
+      if (isFullSwipe(move.dx, this.travel)) {
+        this.locked = true;
+        this.position.setValue(this.travel);
+        this.onConfirm();
+        this.timer = setTimeout(() => this.springBack(), 700);
+      } else {
+        this.springBack();
+      }
+    },
+    onPanResponderTerminate: () => this.springBack(),
+  });
+
+  update(onConfirm: () => void, disabled: boolean): void {
+    this.onConfirm = onConfirm;
+    this.disabled = disabled;
+  }
+
+  measure(trackWidth: number): void {
+    this.travel = swipeTravel(trackWidth, THUMB, PAD);
+  }
+
+  /** The control has gone: nothing may move it any more. */
+  dispose(): void {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    this.position.stopAnimation();
+  }
+
+  private springBack(): void {
+    this.timer = null;
+    Animated.spring(this.position, { toValue: 0, useNativeDriver: true, bounciness: 6 }).start(() => {
+      this.locked = false;
+    });
+  }
+}
+
+/**
+ * Slide to confirm (SPEC 5.1). A full swipe is needed; a partial one springs back. With a screen
+ * reader on, the control is one button: a double tap opens a plain confirmation sheet, so a person
+ * who can't swipe isn't shut out.
+ */
+export function SwipeControl({ label, detail, tone, confirm, onConfirm, disabled = false, testID }: SwipeControlProps) {
+  const { t } = useTranslation('common');
+  const { colors } = useTheme();
+  const [confirming, setConfirming] = useState(false);
+  const [gesture] = useState(() => new SwipeGesture());
+  useEffect(() => {
+    gesture.update(onConfirm, disabled);
+  }, [gesture, onConfirm, disabled]);
+  useEffect(() => () => gesture.dispose(), [gesture]);
+
+  const background = tone === 'danger' ? colors.danger : tone === 'primary' ? colors.primary : colors.surface;
+  const foreground = tone === 'danger' ? colors.onDanger : tone === 'primary' ? colors.onPrimary : colors.text;
+  const thumbColor = tone === 'secondary' ? colors.danger : foreground;
+  const arrowColor = tone === 'secondary' ? colors.onDanger : background;
+
+  const onAccessibilityAction = (event: AccessibilityActionEvent) => {
+    if (event.nativeEvent.actionName === 'activate' && !disabled) setConfirming(true);
+  };
+
+  return (
+    <>
+      <View
+        testID={testID}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={detail ? `${label}. ${detail}` : label}
+        accessibilityHint={t('swipe.a11yHint')}
+        accessibilityState={{ disabled }}
+        accessibilityActions={[{ name: 'activate', label }]}
+        onAccessibilityAction={onAccessibilityAction}
+        onLayout={(event) => gesture.measure(event.nativeEvent.layout.width)}
+        style={[
+          styles.track,
+          { backgroundColor: background, borderColor: tone === 'secondary' ? colors.border : background, opacity: disabled ? 0.5 : 1 },
+        ]}>
+        <View style={styles.text} pointerEvents="none">
+          <AppText variant="label" style={{ color: foreground, textAlign: 'center' }}>
+            {label}
+          </AppText>
+          <AppText variant="small" style={{ color: foreground, textAlign: 'center' }}>
+            {detail ? `${detail} · ${t('swipe.hint')}` : t('swipe.hint')}
+          </AppText>
+        </View>
+        <Animated.View
+          testID={testID ? `${testID}-handle` : undefined}
+          {...gesture.responder.panHandlers}
+          style={[styles.thumb, { backgroundColor: thumbColor, transform: [{ translateX: gesture.position }] }]}>
+          <AppText variant="title" style={{ color: arrowColor }}>
+            →
+          </AppText>
+        </Animated.View>
+      </View>
+
+      <Modal visible={confirming} transparent animationType="slide" onRequestClose={() => setConfirming(false)}>
+        <View style={[styles.sheetBackdrop, { backgroundColor: colors.overlay }]}>
+          <Card>
+            <AppText variant="heading" accessibilityRole="header">
+              {confirm.title}
+            </AppText>
+            <AppText>{confirm.body}</AppText>
+            <Button
+              variant={tone === 'primary' ? 'primary' : 'danger'}
+              label={confirm.action}
+              onPress={() => {
+                setConfirming(false);
+                onConfirm();
+              }}
+            />
+            <Button variant="secondary" label={t('actions.cancel')} onPress={() => setConfirming(false)} />
+          </Card>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  track: {
+    minHeight: THUMB + PAD * 2,
+    borderRadius: (THUMB + PAD * 2) / 2,
+    borderWidth: 2,
+    justifyContent: 'center',
+    padding: PAD,
+  },
+  text: {
+    paddingLeft: THUMB + spacing.sm,
+    paddingRight: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  thumb: {
+    position: 'absolute',
+    left: PAD,
+    width: THUMB,
+    height: THUMB,
+    borderRadius: THUMB / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetBackdrop: { flex: 1, justifyContent: 'flex-end', padding: spacing.md },
+});
+

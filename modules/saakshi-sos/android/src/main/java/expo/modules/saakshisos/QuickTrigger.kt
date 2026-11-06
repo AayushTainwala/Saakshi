@@ -14,9 +14,9 @@ import android.os.Build
 import android.widget.RemoteViews
 
 /**
- * Quick trigger (spec S4) on Android: a home-screen widget and an optional ongoing notification,
- * both opening the app's code pad (saakshi://codepad). Android asks the user to unlock first when
- * the phone is locked.
+ * Quick trigger (SPEC 5.1) on Android: a home-screen widget and an optional ongoing notification,
+ * both opening the app's SOS screen with its three swipes (saakshi://sos; round 2, in place of the
+ * code pad). Android asks the user to unlock first when the phone is locked.
  */
 object QuickTrigger {
   private const val PREFS = "saakshi_sos"
@@ -27,8 +27,8 @@ object QuickTrigger {
   private const val CHANNEL = "saakshi_quick"
   private const val NOTIFICATION_ID = 7112
 
-  fun codePadIntent(context: Context, requestCode: Int = 0): PendingIntent {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("saakshi://codepad"))
+  fun sosIntent(context: Context, requestCode: Int = 0): PendingIntent {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("saakshi://sos"))
       .setPackage(context.packageName)
       .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
     return PendingIntent.getActivity(
@@ -88,8 +88,8 @@ object QuickTrigger {
       .setSmallIcon(R.drawable.saakshi_quick_notification)
       .setContentTitle(title)
       .setContentText(text)
-      .setContentIntent(codePadIntent(context, 1))
-      .addAction(Notification.Action.Builder(null as android.graphics.drawable.Icon?, action, codePadIntent(context, 2)).build())
+      .setContentIntent(sosIntent(context, 1))
+      .addAction(Notification.Action.Builder(null as android.graphics.drawable.Icon?, action, sosIntent(context, 2)).build())
       .setOngoing(true)
       .setOnlyAlertOnce(true)
       .setShowWhen(false)
@@ -108,7 +108,7 @@ class QuickWidgetProvider : AppWidgetProvider() {
   override fun onUpdate(context: Context, manager: AppWidgetManager, widgetIds: IntArray) {
     for (id in widgetIds) {
       val views = RemoteViews(context.packageName, R.layout.saakshi_quick_widget)
-      views.setOnClickPendingIntent(R.id.saakshi_quick_widget_root, QuickTrigger.codePadIntent(context, 3))
+      views.setOnClickPendingIntent(R.id.saakshi_quick_widget_root, QuickTrigger.sosIntent(context, 3))
       manager.updateAppWidget(id, views)
     }
   }

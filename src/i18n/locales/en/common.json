@@ -18,5 +18,9 @@
   "notFound": {
     "title": "Page not found",
     "back": "Go to Record"
+  },
+  "swipe": {
+    "hint": "Slide right to the end",
+    "a11yHint": "Double-tap, then confirm."
   }
 }

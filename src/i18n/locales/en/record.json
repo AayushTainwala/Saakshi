@@ -225,7 +225,7 @@
   },
   "list": {
     "bodyCam": "Body-cam",
-    "bug": "Bug mode",
+    "bug": "Pocket recording",
     "photos_one": "Photo",
     "photos_other": "{{count}} photos",
     "videos_one": "Video",
@@ -337,5 +337,9 @@
       "busy": "A folder picker is already open.",
       "unavailable": "The phone couldn’t show its folder picker."
     }
+  },
+  "pocket": {
+    "open": "Pocket recording",
+    "openHint": "Sound only, like a body-cam for sound, with the phone in your pocket or bag."
   }
 }

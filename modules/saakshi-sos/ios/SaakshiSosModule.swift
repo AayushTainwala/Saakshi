@@ -5,35 +5,35 @@ import ExpoModulesCore
 
 public class SaakshiSosModule: Module {
   private var picker: PhonePicker?
-  private var codePadObserver: NSObjectProtocol?
+  private var sosObserver: NSObjectProtocol?
 
   public func definition() -> ModuleDefinition {
     Name("SaakshiSos")
 
     // Sent when the Action Button, a Control Center or Lock Screen control, or a Shortcut asks for
-    // the code pad (targets/widget/_shared/OpenCodePadIntent.swift).
-    Events("onOpenCodePad")
+    // the SOS screen (targets/widget/_shared/OpenCodePadIntent.swift).
+    Events("onOpenSos")
 
     OnStartObserving {
-      self.codePadObserver = NotificationCenter.default.addObserver(
-        forName: CodePadRequest.notification, object: nil, queue: .main
+      self.sosObserver = NotificationCenter.default.addObserver(
+        forName: SosRequest.notification, object: nil, queue: .main
       ) { [weak self] _ in
-        if CodePadRequest.consume() { self?.sendEvent("onOpenCodePad") }
+        if SosRequest.consume() { self?.sendEvent("onOpenSos") }
       }
     }
 
     OnStopObserving {
-      if let observer = self.codePadObserver { NotificationCenter.default.removeObserver(observer) }
-      self.codePadObserver = nil
+      if let observer = self.sosObserver { NotificationCenter.default.removeObserver(observer) }
+      self.sosObserver = nil
     }
 
-    // True once if a trigger asked for the code pad in the last minute (for a cold start, before
+    // True once if a trigger asked for the SOS screen in the last minute (for a cold start, before
     // anything was listening).
-    Function("consumeCodePadRequest") { () -> Bool in
-      CodePadRequest.consume()
+    Function("consumeSosRequest") { () -> Bool in
+      SosRequest.consume()
     }
 
-    // Bug mode's Live Activity on the Lock Screen and in the Dynamic Island (spec E8).
+    // Pocket recording's Live Activity on the Lock Screen and in the Dynamic Island (spec E8).
     AsyncFunction("liveActivityStart") { (title: String, detail: String) throws -> Bool in
       try BugModeActivity.start(title: title, detail: detail)
     }

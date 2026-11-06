@@ -66,8 +66,8 @@ export type BugRecorderOptions = {
 };
 
 export type SaakshiSosEvents = {
-  /** iPhone: a control, the Action Button or a Shortcut asked for the code pad. */
-  onOpenCodePad: () => void;
+  /** iPhone: a control, the Action Button or a Shortcut asked for the SOS screen. */
+  onOpenSos: () => void;
   onBugPieceClosed: (event: BugPieceClosedEvent) => void;
   onBugCheckpoint: (event: BugCheckpointEvent) => void;
   onBugRecorderError: (event: { message: string }) => void;

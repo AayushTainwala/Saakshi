@@ -4,7 +4,7 @@ The pickup file for build sessions. Each stream keeps its own section current: s
 
 ## Where things stand (21 Oct 2026; fix round 1 from 5 Nov; round 2 decided 6 Nov)
 
-- **Round 2 (6 Nov 2026):** Part 1 under way (groups 1.1 and 1.2 built): see "Round 2" below.
+- **Round 2 (6 Nov 2026):** Part 1 under way (groups 1.1, 1.2 and 1.3A built): see "Round 2" below.
 - **Merged into `main`:** #1–#9. That is R1 and R2 as planned, apart from E3 and E7, plus the law checks against the Gazette of India (#9). Since then: the owner's docs and briefs (#10–#15), and fix round 1, groups 1, 2 and 2a (#16–#18; see "Fix round 1" below). Typecheck, lint, all tests and both native builds pass on `main`.
 - **Pace:** no 24-hour deadline (owner, 21 Oct). The next goal is a beta for about 50 testers on iPhone and Android; see BUILD_PLAN.md, section 1, "Road to the beta".
 - **First Release run (21 Oct, iOS only):** the owner set up iOS credentials and the App Store Connect API key with EAS (role App Manager). The EAS build succeeded; the **Submit to TestFlight step failed**. Its log is visible only to someone signed in to GitHub, so the cause isn't known yet. The owner is submitting that build from his Mac with `eas submit --platform ios --latest`. **Stream D:** find the cause and fix the workflow.
@@ -18,8 +18,8 @@ The owner's decisions after his SOS test are in `docs/SPEC.md` (sections 4, 5, 6
 | Part and group | State |
 |---|---|
 | 1.1 Contacts keyboard bug | Built: https://github.com/AayushTainwala/Saakshi/pull/31. Not yet run on a phone. |
-| 1.2 Secret code, Settings | Built: branch `round-2/1-2-secret-code`, on top of 1.1. Not yet run on a phone. |
-| 1.3 SOS swipes, Pocket recording, "My phone is being taken" | Not started |
+| 1.2 Secret code, Settings | Built: https://github.com/AayushTainwala/Saakshi/pull/32 (on top of 1.1). Not yet run on a phone. |
+| 1.3 SOS swipes, Pocket recording, "My phone is being taken" | Split in two, as the brief allows. **A** (the page, the move, the quick trigger): built, branch `round-2/1-3a-sos-page`, on top of 1.2. **B** ("My phone is being taken", Stop gating): next. Not yet run on a phone. |
 | 1.4 Alerts (both links, battery level, calm Share my location) | Not started |
 | 1.5 Low battery at 5%, bundle format 0.9 | Not started |
 | 2.1–2.3 E7, Google Drive | Not started (needs the owner's Google Cloud project; owner's guide "Round 2 setup guide" is in his vault) |
@@ -88,6 +88,32 @@ Questions for the owner from this round go in "Owner questions" as `- [ ] (Round
 **Not verified:** nothing has run on a phone. The native builds run on the pull request (the two new Expo modules add native code). Most important to try: set a code, close the app fully, open it, and check the code is still asked for; five wrong tries, then restart the phone, and check the wait is still there; the reset with the phone's passcode, and with Face ID or a fingerprint if set up.
 
 **NEEDS OWNER REVIEW:** the new wording: `secretcode.json` (all of it), the new parts of `settings.json` (`contacts`, `live`, `trigger`), `sos.json` (`contacts.method*`, `live.length`), and the Face ID permission text (`app.json`, `src/i18n/native/*.json`), in English and Hindi.
+
+### Group 1.3A: the SOS page, Pocket recording, the quick trigger
+
+**What was built:**
+- **The SOS page** (SPEC 5.1): **Call 112** and **I need help** as swipes, then **Share my location** as a plain button, then only what is running (the alert's progress, live location) and **Quick trigger setup** (to Settings). The third swipe, **My phone is being taken**, comes with group 1.3B. The contacts card and the old alert button are gone; the contacts are in Settings (group 1.2).
+- **The swipe control** (`src/components/SwipeControl.tsx`): slide the handle all the way to the end. Let go anywhere short of the end (more than 6 points short) and it springs back; nothing happens. A second swipe while it springs back is ignored. Once a swipe has started, the page doesn't scroll it away. **With a screen reader on** (VoiceOver, TalkBack) the control is one button: double-tap opens a plain confirmation sheet, and only its confirm button acts.
+  - **Call 112** dials 112.
+  - **I need help** sends the alert as before, to the people ticked for SOS alerts (group 1.4 adds the battery level, both links and live location). The confirmation sheet says that Saakshi is not an emergency service.
+  - **Share my location** starts live location for the Settings length and texts the link to the people ticked for live location (group 1.4 makes the message calm, with the battery level). If nobody is ticked for live location, it says so and links to the contacts.
+- **Pocket recording** (SPEC E8): bug mode is now called Pocket recording everywhere the user sees it: its screen, the records list, the Android notification, the Live Activity, the microphone permission text, and Hindi ("पॉकेट रिकॉर्डिंग"). It moved to the **Record** page, beside body-cam (`/record/pocket`), described as "Sound only, like a body-cam for sound". The module (`src/modules/bugmode`) and the stored `capture.mode: "bug"` are unchanged. Bundle names, the witness message's Record line and the automatic witness text keep "Bug mode" until group 1.5 (bundle format 0.9).
+- **The quick trigger** opens the SOS screen (`saakshi://sos`); no code is typed:
+  - iPhone: the App Intent (Control Center, Lock Screen, Action Button, Shortcuts for Back Tap) is now "Open Saakshi SOS"; the widget opens `saakshi://sos`. The intent's Swift type keeps its old name, `OpenCodePadIntent`, so that a Shortcut already made with it (for Back Tap) keeps working. Pocket recording's Live Activity opens `saakshi://record/pocket`.
+  - Android: the home-screen widget and the quick notification open `saakshi://sos`.
+  - Settings → Quick trigger now has the setup steps only, and says that a locked iPhone may ask for the passcode first.
+- **Removed:** the 3-digit code pad (`/codepad`), its setting, the refused-codes list, and confiscation mode (`trigger/confiscation.ts`, `ConfiscationCard`). The old setting's file, which held the 3-digit code in plain text, is deleted when the app starts (`removeOldCodePadSetting`); contacts and every other setting stay. The `trigger` module now holds only the quick-trigger plumbing.
+- **App Review notes:** updated for the swipes, Pocket recording on the Record tab, and the quick trigger.
+
+**Built so, please confirm:**
+- After a full swipe of **I need help**, the alert goes at once. On the Android APK there is no 3-second countdown any more: the old alert button had one with Cancel, but a full swipe is already deliberate, as the code pad was.
+- How close to the end counts as a full swipe: 6 points.
+
+**Tests (15 new; the code pad's and confiscation mode's tests went with them; 445 in all):** the swipe rule; the swipe control driven by a finger (a partial swipe does nothing; a full one acts once; no second swipe while it springs back) and by a screen reader (the sheet, Cancel and Confirm); the SOS page (what is on it at rest, Call 112, "I need help" with nobody to alert, Share my location with nobody ticked); the quick trigger opening `/sos` on iPhone from a cold start and while running; the native sources using `saakshi://sos` and no code-pad names; the code pad and confiscation mode gone from the trigger module; the old setting deleted once.
+
+**Not verified:** nothing has run on a phone. The Swift and Kotlin changes compile only in the Native build workflow. Most important: how the swipe feels (on a small and a large phone, and with a thumb in a hurry), VoiceOver and TalkBack, the Action Button and Back Tap opening the SOS screen, and from a locked iPhone. A Back Tap Shortcut made before this change should still run; its action's name in Shortcuts now reads "Open Saakshi SOS".
+
+**NEEDS OWNER REVIEW:** the new and changed wording: `sos.json` (`home`, `trigger`, `bug`), `record.json` (`pocket`, `list.bug`), `common.json` (`swipe`), the widget's and intent's strings (`targets/widget/*.lproj`), the Android widget description, and the microphone permission text, in English and Hindi.
 
 ## Fix round 1 (iPhone test round 1, A–C)
 
