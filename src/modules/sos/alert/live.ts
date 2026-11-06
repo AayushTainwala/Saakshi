@@ -10,17 +10,19 @@ export function liveInvite(share: LiveShare): string {
 }
 
 /**
- * Starts live location (S3) and, unless `sendLink` is false (confiscation mode puts the link in
- * the SOS text instead), texts the link to every trusted contact.
+ * Starts live location (S3) and, unless `sendLink` is false ("My phone is being taken" puts the link
+ * in the SOS text instead), texts the link to the people ticked for live location. With
+ * `persistent`, the share has no fixed end (SPEC 5.4).
  */
 export async function startLiveLocation(
   hours: number,
-  options: { sendLink?: boolean; directOnly?: boolean } = {},
+  options: { sendLink?: boolean; directOnly?: boolean; persistent?: boolean } = {},
 ): Promise<{ share: LiveShare; sent: TextOutcome | null }> {
-  const share = await liveShare.start(hours, {
-    title: i18n.t('sos:live.noticeTitle'),
-    body: i18n.t('sos:live.noticeBody'),
-  });
+  const share = await liveShare.start(
+    hours,
+    { title: i18n.t('sos:live.noticeTitle'), body: i18n.t('sos:live.noticeBody') },
+    { persistent: options.persistent },
+  );
   const sent =
     options.sendLink === false ? null : await textTrustedContacts(liveInvite(share), { use: 'live', directOnly: options.directOnly });
   return { share, sent };

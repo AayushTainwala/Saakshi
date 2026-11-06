@@ -112,7 +112,7 @@ function folders(common: Common): { outputDir: string; pendingDir: string } {
  * it closes, its marker stays and it is sealed when the app next opens.
  */
 export function androidBodyCam(
-  common: Common & { notificationTitle: string; notificationText: string; notificationStop: string },
+  common: Common & { notificationTitle: string; notificationText: string },
   nativeModule: NativeBodyCam | null = SaakshiEvidence,
 ): BodyCamEngine {
   const native = requireNative(nativeModule);
@@ -139,7 +139,6 @@ export function androidBodyCam(
         mode: 'body-cam',
         notificationTitle: common.notificationTitle,
         notificationText: common.notificationText,
-        notificationStop: common.notificationStop,
       });
     },
     async stop(reason = 'stopped') {
@@ -209,7 +208,6 @@ export function iosBodyCam(
           mode: 'body-cam',
           notificationTitle: '',
           notificationText: '',
-          notificationStop: '',
         });
       } catch (error) {
         unsubscribe();

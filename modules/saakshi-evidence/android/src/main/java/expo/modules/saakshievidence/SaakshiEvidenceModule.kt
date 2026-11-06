@@ -18,7 +18,7 @@ class SaakshiEvidenceModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("SaakshiEvidence")
 
-    Events("onRecorderReady", "onRecordingStarted", "onRecordingClosed", "onRecorderError", "onVolumeUp", "onBodyCamStopped", "onCheckpoint")
+    Events("onRecorderReady", "onRecordingStarted", "onRecordingClosed", "onRecorderError", "onVolumeUp", "onCheckpoint")
 
     OnCreate {
       CameraRecorder.listener = { name, body -> sendEvent(name, body) }
@@ -44,7 +44,6 @@ class SaakshiEvidenceModule : Module() {
         putExtra(BodyCamService.EXTRA_CLIP, config.clip)
         putExtra(BodyCamService.EXTRA_TITLE, options["notificationTitle"] as? String)
         putExtra(BodyCamService.EXTRA_TEXT, options["notificationText"] as? String)
-        putExtra(BodyCamService.EXTRA_STOP_LABEL, options["notificationStop"] as? String)
       }
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
     }

@@ -211,7 +211,7 @@ describe('iosBodyCam', () => {
 describe('androidBodyCam', () => {
   it('seals pieces as they close and waits for the last one on stop', async () => {
     const { native, common, session, locker, file } = setup();
-    const engine = androidBodyCam({ ...common, notificationTitle: 't', notificationText: 'x', notificationStop: 's' }, native);
+    const engine = androidBodyCam({ ...common, notificationTitle: 't', notificationText: 'x' }, native);
     await engine.start();
     native.fire('onRecordingClosed', closed({ uri: file('file:///p0.ts'), endReason: 'piece-complete', rotationDegrees: 90 }));
     const stopping = engine.stop();
@@ -284,7 +284,7 @@ describe('checkpoints (format 0.5)', () => {
     const parts: UploadPart[] = [];
     setBodyCamPartListener((part) => parts.push(part));
     const { native, common, file, session } = setup();
-    const engine = androidBodyCam({ ...common, partSeconds: 20, notificationTitle: 't', notificationText: 'x', notificationStop: 's' }, native);
+    const engine = androidBodyCam({ ...common, partSeconds: 20, notificationTitle: 't', notificationText: 'x' }, native);
     await engine.start();
     native.fire('onCheckpoint', checkpointEvent('rec-b', 0, 1000, '2026-11-05T05:10:10.000Z'));
     native.fire('onCheckpoint', checkpointEvent('rec-b', 1, 2000, '2026-11-05T05:10:20.000Z'));
