@@ -33,7 +33,7 @@ export function SosHome({ children }: { children?: ReactNode }) {
         <Card>
           <AppText variant="heading">{t('setup.heading')}</AppText>
           <AppText>{t('setup.body')}</AppText>
-          <Button label={t('setup.add')} onPress={() => router.push('/sos/contacts')} />
+          <Button label={t('setup.add')} onPress={() => router.push('/settings/contacts')} />
         </Card>
       ) : (
         <AlertPanel controller={alertController} state={state} contacts={contacts} />
@@ -50,7 +50,7 @@ export function SosHome({ children }: { children?: ReactNode }) {
               names: contacts.map((c) => c.name ?? c.phone).join(', '),
             })}
           </AppText>
-          <Button variant="secondary" label={t('contacts.manage')} onPress={() => router.push('/sos/contacts')} />
+          <Button variant="secondary" label={t('contacts.manage')} onPress={() => router.push('/settings/contacts')} />
         </Card>
       ) : null}
 

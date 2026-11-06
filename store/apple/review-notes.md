@@ -64,3 +64,10 @@ R2 FEATURES
 - Bug mode (SOS tab): records sound as one file, fingerprinted and signed every 10 seconds, until stopped. Background audio mode with a Live Activity; the orange indicator shows.
 - Quick trigger: a Control Center, Lock Screen and Action Button control (App Intent) opens a code pad; the right code opens Messages with the SOS, which the user sends.
 ```
+
+## Optional: secret code (round 2, if the build has it)
+
+```text
+SECRET CODE
+- Face ID: only to reset a forgotten Saakshi secret code, with the system prompt (passcode, or Face ID if set up), offered only while nothing records or shares. The code is asked for before recording or sharing stops.
+```

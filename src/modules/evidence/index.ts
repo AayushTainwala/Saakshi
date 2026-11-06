@@ -14,6 +14,8 @@ export { useLowBattery } from './battery/useLowBattery';
 export { BodyCamScreen } from './bodycam/BodyCamScreen';
 /** For E7: body-cam upload parts, each a byte range ending on a signed checkpoint. */
 export { setBodyCamPartListener, type UploadPart } from './bodycam/parts';
+/** For the secret code's reset, offered only while nothing runs. */
+export { isBodyCamRunning } from './bodycam/running';
 export { CaptureScreen } from './capture/CaptureScreen';
 export { createEvidenceSession } from './capture/deps';
 /** Bug mode (E8): one continuous, checkpointed sound file per recording. */

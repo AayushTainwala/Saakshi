@@ -8,6 +8,14 @@ import { normalizePhone } from './phone';
 export type ContactUse = 'sos' | 'live' | 'witness';
 export const CONTACT_USES: readonly ContactUse[] = ['sos', 'live', 'witness'];
 
+/**
+ * How a contact is reached (owner, 6 Nov 2026; SPEC 5.5): SMS, the default, which works without
+ * data. The Saakshi app joins in round 2, group 3.3; Telegram and email after round 2.
+ */
+export type ContactMethod = 'sms';
+export const CONTACT_METHODS: readonly ContactMethod[] = ['sms'];
+export const DEFAULT_METHOD: ContactMethod = 'sms';
+
 /** Someone the user trusts to receive their alerts. Kept only in a file on the phone. */
 export type TrustedContact = {
   id: string;
@@ -16,6 +24,8 @@ export type TrustedContact = {
   phone: string;
   /** What they get. All are ticked for someone new, and for anyone saved before the ticks existed. */
   uses: Record<ContactUse, boolean>;
+  /** How they are reached. SMS for everyone saved before round 2. */
+  method: ContactMethod;
 };
 
 const ALL_USES: Record<ContactUse, boolean> = { sos: true, live: true, witness: true };
@@ -39,11 +49,11 @@ export function sanitizeContacts(raw: unknown): TrustedContact[] {
   const out: TrustedContact[] = [];
   for (const entry of list) {
     if (typeof entry !== 'object' || entry === null) continue;
-    const { id, name, phone, uses } = entry as Record<string, unknown>;
+    const { id, name, phone, uses, method } = entry as Record<string, unknown>;
     if (typeof id !== 'string' || typeof phone !== 'string') continue;
     const normalized = normalizePhone(phone);
     if (!normalized || out.some((c) => c.phone === normalized)) continue;
-    out.push({ id, name: cleanName(name), phone: normalized, uses: cleanUses(uses) });
+    out.push({ id, name: cleanName(name), phone: normalized, uses: cleanUses(uses), method: cleanMethod(method) });
     if (out.length === MAX_CONTACTS) break;
   }
   return out;
@@ -53,6 +63,11 @@ export function sanitizeContacts(raw: unknown): TrustedContact[] {
 function cleanUses(uses: unknown): Record<ContactUse, boolean> {
   const given = typeof uses === 'object' && uses !== null ? (uses as Record<string, unknown>) : {};
   return { sos: given.sos !== false, live: given.live !== false, witness: given.witness !== false };
+}
+
+/** Lists saved before round 2 have no method: those people are reached by SMS, as they were. */
+function cleanMethod(method: unknown): ContactMethod {
+  return CONTACT_METHODS.includes(method as ContactMethod) ? (method as ContactMethod) : DEFAULT_METHOD;
 }
 
 function cleanName(name: unknown): string | null {
@@ -95,7 +110,13 @@ export class ContactsStore {
     const current = this.list();
     if (current.some((c) => c.phone === phone)) return { ok: false, error: 'duplicate' };
     if (current.length >= MAX_CONTACTS) return { ok: false, error: 'full' };
-    const contact: TrustedContact = { id: this.newId(), name: cleanName(input.name), phone, uses: { ...ALL_USES } };
+    const contact: TrustedContact = {
+      id: this.newId(),
+      name: cleanName(input.name),
+      phone,
+      uses: { ...ALL_USES },
+      method: DEFAULT_METHOD,
+    };
     this.save([...current, contact]);
     return { ok: true, contact };
   }
@@ -103,6 +124,12 @@ export class ContactsStore {
   /** Ticks or unticks one use for one contact. */
   setUse(id: string, use: ContactUse, on: boolean): void {
     this.save(this.list().map((c) => (c.id === id ? { ...c, uses: { ...c.uses, [use]: on } } : c)));
+  }
+
+  /** Changes how one contact is reached. */
+  setMethod(id: string, method: ContactMethod): void {
+    if (!CONTACT_METHODS.includes(method)) return;
+    this.save(this.list().map((c) => (c.id === id ? { ...c, method } : c)));
   }
 
   remove(id: string): void {
@@ -115,7 +142,7 @@ export class ContactsStore {
   };
 
   private save(contacts: TrustedContact[]): void {
-    this.storage.write(JSON.stringify({ version: 2, contacts }));
+    this.storage.write(JSON.stringify({ version: 3, contacts }));
     this.contacts = contacts;
     for (const listener of this.listeners) listener();
   }

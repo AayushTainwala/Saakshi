@@ -79,6 +79,7 @@ describe('App Review notes', () => {
       NSLocationWhenInUseUsageDescription: 'Location When In Use',
       NSContactsUsageDescription: 'Contacts',
       NSLocationAlwaysAndWhenInUseUsageDescription: 'Location Always',
+      NSFaceIDUsageDescription: 'Face ID',
     };
     for (const key of Object.keys(plist).filter((k) => k.endsWith('UsageDescription'))) {
       expect(named[key]).toBeDefined();

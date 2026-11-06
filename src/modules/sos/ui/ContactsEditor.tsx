@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, StyleSheet, View } from 'react-native';
 
-import { AppText, Button, Card, CheckboxGroup, KeyboardGroup, Screen, TextField } from '@/components';
+import { AppText, Button, Card, CheckboxGroup, KeyboardGroup, OptionGroup, Screen, TextField } from '@/components';
 import {
   getLocationPermission,
   type LocationPermission,
@@ -14,7 +14,7 @@ import { spacing } from '@/theme';
 import { phoneChannels, pickPhoneNumber, requestDirectSms } from '../alert/channels';
 import { contactsStore, useTrustedContacts } from '../contacts/fileStore';
 import { formatPhone } from '../contacts/phone';
-import { type AddError, CONTACT_USES, type ContactUse, MAX_CONTACTS } from '../contacts/store';
+import { type AddError, CONTACT_METHODS, CONTACT_USES, type ContactMethod, type ContactUse, MAX_CONTACTS } from '../contacts/store';
 
 /** Adding and removing trusted contacts, and the permissions an alert works best with. */
 export function ContactsEditor() {
@@ -49,6 +49,8 @@ export function ContactsEditor() {
 
   const full = contacts.length >= MAX_CONTACTS;
   const useOptions = CONTACT_USES.map((use) => ({ value: use, label: t(`contacts.uses.${use}`) }));
+  // Only SMS for now; the Saakshi app joins in round 2, group 3.3 (SPEC 5.5).
+  const methodOptions = CONTACT_METHODS.map((method) => ({ value: method, label: t(`contacts.methods.${method}`) }));
 
   return (
     <Screen>
@@ -84,6 +86,13 @@ export function ContactsEditor() {
               }}
             />
             {ticked.length === 0 ? <AppText color="warning">{t('contacts.usesNone')}</AppText> : null}
+            <AppText variant="label">{t('contacts.methodHeading')}</AppText>
+            <OptionGroup<ContactMethod>
+              label={t('contacts.methodLabel', { name: shown })}
+              options={methodOptions}
+              value={contact.method}
+              onChange={(method) => contactsStore.setMethod(contact.id, method)}
+            />
           </Card>
         );
       })}
