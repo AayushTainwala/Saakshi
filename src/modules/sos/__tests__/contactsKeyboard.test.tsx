@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Keyboard, type KeyboardEventName, Platform, ScrollView, TextInput } from 'react-native';
 
 import * as keyboardModule from '@/components/keyboard';
-import { initI18n } from '@/i18n';
+import i18n, { initI18n } from '@/i18n';
 import { PreferencesProvider } from '@/preferences/PreferencesProvider';
 
 import { contactsStore } from '../contacts/fileStore';
@@ -174,22 +174,24 @@ describe('trusted contacts with the keyboard up', () => {
   });
 
   it('keeps the form above the keyboard in Hindi too', async () => {
-    initI18n('hi');
+    await act(() => i18n.changeLanguage('hi'));
     try {
       await render(
         <PreferencesProvider initial={{ language: 'hi', theme: 'light' }}>
           <ContactsEditor />
         </PreferencesProvider>,
       );
+      // The Hindi number field, with its longer label and hint.
+      await fireEvent(screen.getByLabelText('फ़ोन नंबर'), 'focus');
       await act(async () => {
         handlers.keyboardWillShow?.(keyboard);
         handlers.keyboardDidShow?.(keyboard);
       });
       await settle();
       expect(bottomPadding()).toBe(16 + 167);
-      expect(scrollTo).toHaveBeenCalled();
+      expect(scrollTo).toHaveBeenLastCalledWith({ y: form.y + form.height + 16 - (keyboard.endCoordinates.screenY - page.y), animated: true });
     } finally {
-      initI18n('en');
+      await act(() => i18n.changeLanguage('en'));
     }
   });
 });
