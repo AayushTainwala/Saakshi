@@ -38,6 +38,8 @@ A free, open-source phone app that helps people in India protect themselves and 
 - **Android videos (decided 22 Oct).** On Android the original is an MPEG-TS file (`.ts`), exactly as it came from the camera, and it stays the evidence: the export bundle and the certificate always use it. When the user plays or shares an Android video, the app offers an MP4 copy made without re-encoding (a remux), labelled in the app as a copy. The copy has its own signed record naming the original's SHA-256 and the method;
 - while recording (evidence camera and body-cam mode), the app warns at 10% and 5% battery, and at 3% stops and saves the recording itself, so a dying battery never cuts a file off (decided 21 Oct). Nothing is done while the phone is charging, since the battery isn't running down (decided 22 Oct).
 
+- **Front and back camera, and zoom (owner, 5 Nov 2026, test round 1).** A switch for the front and back camera, for photos and video (not during a video). Pinch to zoom, and quick buttons for 0.5×, 1× and 2× where the phone has those lenses or reaches that zoom. Switching camera during a video, and recording front and back at once, are researched and await the owner's decision (BUILD_HANDOFF.md, group 4).
+
 Physical damage to the phone during a recording is not solved for in v1.
 
 In v1.1, C2PA Content Credentials and motion, compass and network readings are added. The aim is to make a claim that a recording is AI-generated implausible and to put the burden on whoever makes it; nothing makes a recording unquestionable.
