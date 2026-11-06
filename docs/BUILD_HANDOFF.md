@@ -25,7 +25,8 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 | 5. Why a recording ended (B8) | Built: https://github.com/AayushTainwala/Saakshi/pull/23 (branch `claude/fix-round-1-group-5`, stacked on #22). Not yet run on a phone. |
 | 6. Trusted contacts, three ticks per person (B5) | Built: https://github.com/AayushTainwala/Saakshi/pull/24 (branch `claude/fix-round-1-group-6`, stacked on #23). Not yet run on a phone. |
 | 7. Witness message (B5) | Built: https://github.com/AayushTainwala/Saakshi/pull/25 (branch `claude/fix-round-1-group-7`, stacked on #24). Not yet run on a phone. |
-| 8–9 | Not started |
+| 8. Certificate: one profile (B7) | Built: https://github.com/AayushTainwala/Saakshi/pull/26 (branch `claude/fix-round-1-group-8`, stacked on #25). Not yet run on a phone. |
+| 9 | Not started |
 
 ### Where fix round 1 stands, and what's next (6 Nov 2026)
 
@@ -346,6 +347,20 @@ All three checks came out feasible, so nothing falls back to pieces.
 - **Bug mode's automatic texts** keep their own short form ("Saakshi bug mode: recording since 10:40 IST, signed up to 10:50 IST. SHA-256: …"), which the spec now describes. They are still not noted in the session's `witness` list.
 
 **Not verified:** on a phone, how Messages shows a six-part message, and whether it splits it.
+
+### Group 8: certificate, one profile (#26)
+
+**What was built** (your decision of 5 Nov; SPEC E4):
+- **Settings → Certificates → "Your details for certificates"**: the phone's one profile.
+  - The fields: name; son, daughter or spouse of, and that person's name; residing or employed at, and the address; IMEI(s) with the `*#06#` help; colour; serial number; the ownership boxes.
+  - It is saved on the phone as it is typed, in the same file the form used, so details typed before carry over.
+  - It says it is of the person who owns, maintains, manages or operates the phone, and that anyone else changes it first.
+- **Making a certificate shows no form.**
+  - If the profile is incomplete: "Your details for certificates aren't complete yet. Part A needs them", and a button to fill them in.
+  - If it is complete: "Part A will be made for Asha Rao, who owns and operates this phone (IMEI 356938035643809)", and **Make certificate**, plus "Change your details".
+- **Unchanged:** existing certificates, and the form's wording (`certificate/html.ts`).
+
+**NEEDS OWNER REVIEW:** the new strings (`profile` in `record.json`, `certificates` in `settings.json`, English and Hindi). The Settings line refers to "section 63(4)(c) of the Bharatiya Sakshya Adhiniyam, 2023", as the existing certificate screen does (law.md 1A).
 
 ## Owner questions
 

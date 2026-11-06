@@ -27,6 +27,7 @@ export {
   startSoundRecording,
 } from './sound/recording';
 export { CertificateForm } from './ui/CertificateForm';
+export { CertificateProfile } from './ui/CertificateProfile';
 export { PhotoViewer } from './ui/PhotoViewer';
 export { RecordHome } from './ui/RecordHome';
 export { SessionDetail } from './ui/SessionDetail';

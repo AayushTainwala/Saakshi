@@ -295,5 +295,23 @@
     "videoResumed": "Ended when video started again.",
     "interrupted": "Cut off: the app closed or the phone switched off. It plays up to the cut, and was sealed when the app next opened.",
     "error": "Ended because the file could not be written."
+  },
+  "profile": {
+    "title": "Your details for certificates",
+    "intro": "These are the details of the person who owns, maintains, manages or operates this phone. Every certificate made on this phone uses them. If someone else is to sign a certificate, change these details first.",
+    "onlyHere": "They are kept only on this phone, and saved as you type.",
+    "complete": "Complete: certificates can be made.",
+    "incomplete": "Your details for certificates aren’t complete yet. Part A needs them.",
+    "open": "Fill in your details",
+    "change": "Change your details",
+    "madeFor": "Part A will be made for {{name}}, who {{roles}} this phone (IMEI {{imei}}).",
+    "someoneElse": "If someone else is to sign it, change your details first.",
+    "and": "{{first}} and {{last}}",
+    "role": {
+      "owned": "owns",
+      "maintained": "maintains",
+      "managed": "manages",
+      "operated": "operates"
+    }
   }
 }

@@ -1,40 +1,30 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert } from 'react-native';
 
-import { AppText, Button, Card, CheckboxGroup, OptionGroup, Screen, TextField } from '@/components';
+import { AppText, Button, Card, Screen } from '@/components';
 
-import { loadDetails, makeCertificate, saveDetails, shareCertificate } from '../certificate/generate';
-import { type CertificateDetails, type Connection, detailsComplete, type Ownership, type Relation } from '../certificate/html';
+import { loadDetails, makeCertificate, shareCertificate } from '../certificate/generate';
+import { type CertificateDetails, detailsComplete, type Ownership } from '../certificate/html';
 
+const ROLE_ORDER: readonly Ownership[] = ['owned', 'maintained', 'managed', 'operated'];
+
+/**
+ * Making a certificate (fix round 1, group 8): no form. Part A is made from "Your details for
+ * certificates", the phone's one profile. If it is incomplete, the screen says so and opens it;
+ * if it is complete, a short line says whom Part A is for, and one button makes it.
+ */
 export function CertificateForm({ sessionId }: { sessionId: string }) {
   const { t } = useTranslation('record');
   const [details, setDetails] = useState<CertificateDetails>(loadDetails);
   const [busy, setBusy] = useState(false);
-  const set = <K extends keyof CertificateDetails>(key: K) => (value: CertificateDetails[K]) =>
-    setDetails((current) => ({ ...current, [key]: value }));
-
-  const relations: { value: Relation; label: string }[] = [
-    { value: 'son', label: t('certificate.son') },
-    { value: 'daughter', label: t('certificate.daughter') },
-    { value: 'spouse', label: t('certificate.spouse') },
-  ];
-  const connections: { value: Connection; label: string }[] = [
-    { value: 'residing', label: t('certificate.residing') },
-    { value: 'employed', label: t('certificate.employed') },
-  ];
-  const ownership: { value: Ownership; label: string }[] = [
-    { value: 'owned', label: t('certificate.owned') },
-    { value: 'maintained', label: t('certificate.maintained') },
-    { value: 'managed', label: t('certificate.managed') },
-    { value: 'operated', label: t('certificate.operated') },
-  ];
+  // The profile may have been changed meanwhile.
+  useFocusEffect(useCallback(() => setDetails(loadDetails()), []));
 
   const make = async () => {
     setBusy(true);
     try {
-      saveDetails(details);
       await makeCertificate(sessionId, details);
       Alert.alert(t('certificate.madeTitle'), t('certificate.madeBody'), [
         { text: t('certificate.share'), onPress: () => shareCertificate(sessionId, t('certificate.share')) },
@@ -47,6 +37,11 @@ export function CertificateForm({ sessionId }: { sessionId: string }) {
     }
   };
 
+  const complete = detailsComplete(details);
+  const roles = ROLE_ORDER.filter((role) => details.ownership.includes(role)).map((role) => t(`profile.role.${role}`));
+  const joined =
+    roles.length <= 1 ? (roles[0] ?? '') : t('profile.and', { first: roles.slice(0, -1).join(', '), last: roles[roles.length - 1] });
+
   return (
     <Screen>
       <Card>
@@ -54,28 +49,21 @@ export function CertificateForm({ sessionId }: { sessionId: string }) {
         <AppText color="textMuted">{t('certificate.partB')}</AppText>
       </Card>
 
-      <TextField label={t('certificate.name')} value={details.name} onChangeText={set('name')} autoComplete="name" />
-      <AppText variant="label">{t('certificate.relation')}</AppText>
-      <OptionGroup label={t('certificate.relation')} options={relations} value={details.relation} onChange={set('relation')} />
-      <TextField label={t('certificate.relativeName')} value={details.relativeName} onChangeText={set('relativeName')} />
-      <OptionGroup label={t('certificate.connection')} options={connections} value={details.connection} onChange={set('connection')} />
-      <TextField label={t('certificate.address')} value={details.address} onChangeText={set('address')} multiline />
-      <TextField
-        label={t('certificate.imei')}
-        hint={t('certificate.imeiHint')}
-        value={details.imei}
-        onChangeText={set('imei')}
-        keyboardType="numbers-and-punctuation"
-      />
-      <AppText variant="label">{t('certificate.ownership')}</AppText>
-      <CheckboxGroup label={t('certificate.ownership')} options={ownership} values={details.ownership} onChange={set('ownership')} />
-      <TextField label={t('certificate.color')} value={details.color} onChangeText={set('color')} />
-      <TextField label={t('certificate.serialNumber')} hint={t('certificate.serialHint')} value={details.serialNumber} onChangeText={set('serialNumber')} />
-      <TextField label={t('certificate.otherInfo')} value={details.otherInfo} onChangeText={set('otherInfo')} multiline />
-
-      <AppText color="textMuted">{t('certificate.signByHand')}</AppText>
-      <Button label={t('certificate.make')} busy={busy} disabled={!detailsComplete(details)} onPress={make} />
-      {!detailsComplete(details) ? <AppText color="textMuted">{t('certificate.required')}</AppText> : null}
+      {complete ? (
+        <>
+          <AppText variant="label">{t('profile.madeFor', { name: details.name.trim(), roles: joined, imei: details.imei.trim() })}</AppText>
+          <AppText color="textMuted">{t('profile.someoneElse')}</AppText>
+          <AppText color="textMuted">{t('certificate.signByHand')}</AppText>
+          <Button label={t('certificate.make')} busy={busy} onPress={make} />
+          <Button variant="secondary" label={t('profile.change')} onPress={() => router.push('/record/certificate-profile')} />
+        </>
+      ) : (
+        <>
+          <AppText>{t('profile.incomplete')}</AppText>
+          <AppText color="textMuted">{t('certificate.required')}</AppText>
+          <Button label={t('profile.open')} onPress={() => router.push('/record/certificate-profile')} />
+        </>
+      )}
     </Screen>
   );
 }
