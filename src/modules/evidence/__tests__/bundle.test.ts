@@ -393,6 +393,16 @@ describe('evidence bundle', () => {
       });
       expect(shadow.code).toBe(1);
       expect(shadow.out).toContain(`FAIL ${decoy}: its local header names it ${JSON.stringify(name)}`);
+
+      // An entry marked as a Unix symbolic link (made by Unix, mode 0120777).
+      const link = await zipOf([], (bytes) => {
+        const at = bytes.lastIndexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
+        bytes.writeUInt8(3, at + 5);
+        bytes.writeUInt32LE((0o120777 << 16) >>> 0, at + 38);
+        return bytes;
+      });
+      expect(link.code).toBe(1);
+      expect(link.out).toContain('a symbolic link, which a Saakshi bundle never holds');
     });
 
     it('refuses the Unicode Path extra field, which some unzip tools take as the name', async () => {

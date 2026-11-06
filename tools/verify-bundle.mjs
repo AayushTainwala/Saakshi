@@ -197,6 +197,10 @@ function zipSource(path) {
       if (!HARMLESS_EXTRA.has(id)) problems.push(`${name}: has an extra field (0x${id.toString(16).padStart(4, '0')}) that some unzip tools read as another name`);
     }
     if (!plainPath(name.endsWith('/') ? name.slice(0, -1) : name)) problems.push(`${JSON.stringify(name)}: not a plain name inside the bundle`);
+    // A symbolic link, which unzip tools make as a link to wherever its contents say (Unix mode).
+    if (dir.readUInt8(at + 5) === 3 && ((dir.readUInt32LE(at + 38) >>> 16) & 0o170000) === 0o120000) {
+      problems.push(`${name}: a symbolic link, which a Saakshi bundle never holds`);
+    }
     if (entries.has(name)) problems.push(`${name}: in the ZIP twice; unzip tools differ on which copy they keep`);
     const entry = { name, flags, method, crc, compressed, size, localOffset };
     entries.set(name, entry);
