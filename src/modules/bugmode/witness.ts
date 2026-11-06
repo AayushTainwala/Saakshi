@@ -1,8 +1,8 @@
 /**
  * Bug mode's witness texts are rationed so they can't use up the SMS the user may need for an SOS:
- * - at most one witness message every 10 minutes (spec E8). A piece whose witness is skipped is
- *   still covered: each record carries the previous record's hash, so the next chain head sent
- *   vouches for every piece before it;
+ * - at most one witness message every 10 minutes (spec E8). Each carries the newest chain head
+ *   (usually the latest checkpoint's record), and each record carries the previous record's hash,
+ *   so it vouches for everything recorded before it;
  * - at most 20 texts in any 30 minutes. Android asks the user to confirm once an app sends more
  *   than 30 in 30 minutes, so this leaves room for an SOS alert.
  */
@@ -12,6 +12,12 @@ export class WitnessThrottle {
   private sent: { at: number; texts: number }[] = [];
 
   constructor(private readonly budget = WITNESS_BUDGET) {}
+
+  /** False while the last message is less than the minimum interval old (nothing is counted). */
+  due(now: number): boolean {
+    const last = this.sent[this.sent.length - 1];
+    return !last || now - last.at >= this.budget.minIntervalMs;
+  }
 
   /** True, and the texts counted, if a message of `texts` texts may go at `now`. */
   allow(texts: number, now: number): boolean {

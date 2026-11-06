@@ -265,8 +265,10 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
       engine.inputNode.removeTap(onBus: 0)
       engine.stop()
     }
-    // Let other apps' sound resume.
-    try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    // Let other apps' sound resume, unless bug mode is still using the microphone.
+    if !SoundRecorder.shared.isRunning {
+      try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
     queue.sync {
       self.capture = nil
       self.videoOutput = nil

@@ -19,6 +19,7 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 | 1. Body-cam: back swipe, and sound in the video (C2, C6) | Merged: https://github.com/AayushTainwala/Saakshi/pull/16. Not yet run on a phone. |
 | 2. Body-cam: other fixes (C1–C3) | Merged: https://github.com/AayushTainwala/Saakshi/pull/17. Not yet run on a phone. |
 | 2a. Body-cam: one continuous file, with checkpoints | Merged: https://github.com/AayushTainwala/Saakshi/pull/18. Not yet run on a phone. |
+| 2b. Bug mode: one continuous file, with checkpoints (owner said yes, 6 Nov) | Built: https://github.com/AayushTainwala/Saakshi/pull/20 (branch `claude/keen-rubin-urautd`, from `main` after #19). Not yet run on a phone. |
 | 3. Records list and playback (B1, C6) | **Next.** Not started. |
 | 4–9 | Not started |
 
@@ -27,23 +28,25 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 For the session that takes over. Read the brief, then this section, then CLAUDE.md as usual.
 
 - **Finished:** groups 1, 2 and 2a are merged into `main` (#16, #17, #18). Each pull request has plain test steps for the owner. Typecheck, lint and all 307 tests pass, and both native builds pass on every one.
+- **Built since:** bug mode as one continuous file with checkpoints (#20, "Bug mode: one continuous file" below). With it, typecheck, lint and 320 tests pass (three tests of the old iPhone pieces went with them).
 - **Not yet tested:** nothing from fix round 1 has run on a phone. The owner's next TestFlight round should follow the test steps in #16, #17 and #18. Step C of #18, a forced restart while recording, is the genuine cut-off test that round 1 couldn't do.
 - **Next: group 3** (records list and playback), on a new branch from the latest `main` (for example `claude/fix-round-1-group-3`), then groups 4 to 9 in the brief's order, one pull request each. The owner merges each pull request; when asked, stack the next group on the previous branch instead, as group 2 was.
 - **What group 3 starts from:**
   - **Body-cam files now:** one file per clip. iPhone video is fragmented MP4 (`.mp4`), and each file's timeline starts at 0. iPhone sound-only files are ADTS (`.aac`). Android is MPEG-TS (`.ts`), with its existing MP4 copy (`Remuxer.kt`).
-  - **Bug mode is unchanged:** pieces, `.m4a` on iPhone and `.aac` on Android.
+  - **Bug mode (from #20):** one continuous ADTS AAC file (`.aac`) per recording on both phones, with checkpoints; a follow-on file of the same clip only after the microphone was lost (a call) or a file failed.
   - **Group 3's joined MP4 copy:** it needs a multi-file record, which now happens only when an iPhone user left the app. Its "copy" record can follow `export/playableCopy.ts` and spec section 11.
   - **Sessions now hold `checkpoints`** beside `items`. Any list of a session's records must count both; `lastLink()` in `capture/pipeline.ts` gives the chain head.
-- **Bundle format:** 0.5 now. Groups 3 and 9 each need a new version (0.6, …). Update `FORMAT_VERSION`, the record-version strings in `seal.test.ts`, `playableCopy.test.ts` and `deviceKey.test.ts`, `SUPPORTED_VERSIONS` in `tools/verify-bundle.mjs`, and spec section 12.
+- **Bundle format:** 0.6 with #20 (bug mode). Groups 3 and 9 each need a new version (0.7, …). Update `FORMAT_VERSION`, the record-version strings in `seal.test.ts`, `playableCopy.test.ts` and `deviceKey.test.ts`, `SUPPORTED_VERSIONS` in `tools/verify-bundle.mjs`, and spec section 12.
 - **Left on purpose for later groups:**
-  - putting the latest checkpoint in the witness message (group 7);
+  - putting the latest checkpoint in the witness message (group 7). Bug mode's automatic texts already carry it (#20); the message the user sends from a record does not yet. Bug mode's automatic texts are also not noted in the session's `witness` list (they never were); group 7 could add that;
   - telling "phone locked" from "left Saakshi", and showing end reasons in plain words on the record screen (group 5);
   - in-app playback of sound files (group 3).
 - **Owner's decisions so far (all in SPEC.md, body-cam mode):** one record from Start to Stop; video and sound in the same file; unlock with volume-up twice, after a practice step; video stops only when iOS stops the camera; one continuous file with signed checkpoints; upload parts for E7, whose size is a setting.
-- **Open owner question:** bug mode continuous too? See "Owner questions", "(Fix round 1)".
+- **Owner's decision on bug mode (6 Nov):** one continuous file with checkpoints, like body-cam (SPEC E8). Open question from it: the 3% auto-save (see "Owner questions", "(Fix round 1)").
 - **How this was built, for the next builder:**
   - Swift and Kotlin compile only in the "Native build" workflow, which runs on pull requests that touch `modules/**`. Its status can be read without signing in from `https://api.github.com/repos/AayushTainwala/Saakshi/actions/runs?branch=<branch>`.
   - `ffmpeg` is installed in the cloud container. `modules/saakshi-evidence/verify/checkpoint-parts.sh` and `cutoff-formats.sh` check the containers with it.
+  - There is no Kotlin compiler in the container, but JetBrains' command-line compiler downloads from GitHub releases (`https://github.com/JetBrains/kotlin/releases/download/v2.1.21/kotlin-compiler-2.1.21.zip`) and runs plain Kotlin on the JVM: `modules/saakshi-sos/verify/adts-checkpoints.sh` uses it (`KOTLINC=<path>/kotlinc/bin/kotlinc`). Code that uses Android's classes still compiles only in CI.
   - Apple's documentation reads well as JSON (`https://developer.apple.com/tutorials/data/documentation/<path>.json`). Android source wasn't reachable from Google's hosts, but the LineageOS copy on raw.githubusercontent.com was.
   - Twice, an independent review of the new native code, by a separate agent before merging, found real bugs that the compiler couldn't. Worth repeating for native changes.
 
@@ -147,6 +150,45 @@ All three checks came out feasible, so nothing falls back to pieces.
 - Apple doesn't document that an asset writer hands over its last segment before `finishWriting` reports done. If it didn't, the last few seconds would be missing and the app would show a recording problem.
 - AAC's start-up delay (about 44 ms) isn't marked in the `.mp4` (Apple's HLS profile writes no edit list), so sound may run that much behind the picture.
 
+### Bug mode: one continuous file, with checkpoints (#20)
+
+**The owner said yes (6 Nov):** bug mode records like body-cam, one continuous file with checkpoints; on iPhone with the cut-off-safe AAC writer; its witness texts, at most every 10 minutes, carry the latest checkpoint. Recorded in SPEC E8.
+
+**Checked before building:**
+- *Android: reading the file while MediaRecorder writes it.* Bug mode already wrote ADTS AAC (`MediaRecorder.OutputFormat.AAC_ADTS`). In the Android 15 source (LineageOS 22.1 copy of AOSP), `StagefrightRecorder::setupAACRecording` makes an `AACWriter` for that format ([`StagefrightRecorder.cpp`](https://raw.githubusercontent.com/LineageOS/android_frameworks_av/lineage-22.1/media/libmediaplayerservice/StagefrightRecorder.cpp), line 1478). [`AACWriter.cpp`](https://raw.githubusercontent.com/LineageOS/android_frameworks_av/lineage-22.1/media/libstagefright/AACWriter.cpp) writes each frame as a 7-byte header, one byte at a time (`writeAdtsHeader`), and then the frame's data (`threadFunc`), each with `write()` on its own descriptor, with no seek or truncate anywhere. So the bytes on disk only grow, and a checkpoint may find the file ending part-way through a header. Phone makers can change this code; the checkpointer stops checkpointing (and says so once) if the bytes aren't ADTS, and recording carries on.
+- *That checkpoints never split a frame.* `modules/saakshi-sos/verify/adts-checkpoints.sh` makes a 40-second ffmpeg AAC file at the recorder's settings (mono, 44.1 kHz, 64 kbit/s), and runs the real `AdtsCheckpointer.kt`, compiled for the JVM, on a copy that grows the way `AACWriter` writes it. Result: 80 checkpoints, every one on a frame boundary, each SHA-256 equal to the prefix re-read; every checkpointed prefix decodes with ffmpeg with no errors; parts ending on checkpoints join into the file byte for byte; bytes that aren't ADTS give one error and no more checkpoints; a file shorter than its checkpoints is refused.
+- *iPhone:* nothing is read back. The app encodes and writes every byte itself (`AdtsWriter` and `CheckpointedFile`, body-cam's sound-only writer from group 2a), so the running hash is over exactly what was written.
+- *Cost.* Sound is about 8 KB a second on Android (64 kbit/s) and 16 KB on iPhone (128 kbit/s). Each checkpoint reads about 80 KB once on Android, and on both phones flushes the file, signs one record and rewrites `session.json`. That last step grows with the recording: the session's bookkeeping lists every checkpoint, so after an hour `session.json` is about 135 KB (24 MB written in all), after 8 hours about 1.1 MB (about 1.5 GB written in all, 1 MB every 10 seconds by then). My estimate is that this is small next to the microphone and the screen-off phone's own drain (perhaps 1–2% of the battery over 8 hours), but it isn't measured. If the owner's test shows it matters, the fix is to keep checkpoints in an append-only file beside `session.json` (body-cam would gain too); I haven't built it.
+
+**What was built:**
+- **Android** (`modules/saakshi-sos`): `BugRecorder` records one `.aac` file from Start to Stop; `AdtsCheckpointer` reads only the new bytes up to the last whole ADTS frame, every 10 seconds, on the recorder's own thread, so a checkpoint always comes before its file's close and never after. A new file starts only if MediaRecorder reports an error (then the old file ends with `"error"`, and a new one starts, retried every 5 seconds until it does). The service now says when Stop has closed the last file (`onBugRecorderStopped`).
+- **iPhone** (`modules/saakshi-evidence/ios/SoundRecorder.swift`): replaces expo-audio's 2-minute `.m4a` pieces. `AVAudioEngine`'s microphone, started on screen, goes into `AdtsWriter`, with a checkpoint about every 10 seconds of sound. A new file starts only when the microphone stops and comes back (a phone call, a route change, a media-services reset; the old file ends with `"audio-interrupted"`) or a file can't be written. The microphone is retried every 10 seconds while it is off, as body-cam's is. Start fails, with the reason on screen, if the microphone can't start at all.
+- **One JavaScript path for both** (`startSoundRecording` in `@/modules/evidence`): each checkpoint is signed into the session's chain as it comes; each file is hashed, moved and sealed when it closes, and compared with the recorder's own fingerprint. Upload parts for E7 come through `setBugModePartListener` from `@/modules/bugmode` (it replaces `setPieceUploader`), with the same part-size setting as body-cam. If nothing was recorded because the microphone couldn't start, no empty session is left in the Record tab.
+- **Witness texts:** after a new signed record, if 10 minutes have passed since the last text, the newest chain head goes to trusted contacts (where the phone can send with no tap): "Saakshi bug mode: recording since 10:40 IST, signed up to 10:50 IST. SHA-256: …". The 20-texts-in-30-minutes cap stays.
+- **Screens:** the bug-mode screen shows how many checkpoints are signed and the time of the last; the iPhone Live Activity shows "Signed up to 10:50 IST", updated at most once a minute. The text explains one file and checkpoints in place of pieces, in English and Hindi.
+- **Location:** each record takes the latest fix, now asked for at most once a minute (it was once per piece).
+- **Bundle format 0.6** (`docs/spec/evidence-bundle.md`): bug mode's files, checkpoints and follow-on files as above; no record member was added or removed. `tools/verify-bundle.mjs` reads 0.1 to 0.6. A test makes a real signed bug-mode bundle (two files after a call, four checkpoints) and the checker passes it.
+- The App Review note on bug mode (`store/apple/review-notes.md`) now says one file, signed every 10 seconds.
+- **An independent review** of the new code (by a separate agent, before the pull request was ready) found no compile errors and no case where a checkpoint could disagree with its file or come after its file's close. It found ten problems in how failures are handled, all fixed in #20:
+  - Android: if MediaRecorder stops writing (AOSP's `AACWriter` stops on a write or microphone error without telling anyone, for example when the phone is full), nothing noticed. Now a file that hasn't grown for 30 seconds ends as `"error"` and a new one starts. A failure while closing a file can no longer crash the app, and the service always says when Stop is done.
+  - Android: a recorder could be left running if its marker couldn't be written. The marker is now written before the recorder starts.
+  - Recorder problems never reached the screen, and an Android start that never recorded looked like success. Now the bug-mode screen shows the latest problem, and on Android Start waits (up to 8 seconds) until the first file is recording, or fails with the reason.
+  - iPhone: a microphone whose first sound took more than 2 seconds could loop without ever recording, silently. Late first sound is now kept; an engine with no sound after 5 seconds is started afresh; 10 seconds without sound is reported on screen.
+  - Android: file end times were taken after the final fingerprint (up to a second late); now right after the recorder stops.
+  - A stop taking more than 5 seconds could let the old file's late events reach the next recording. Each recording now takes only events for files in its own session folder, and a Start while the last recording is still stopping fails with a message.
+  - iPhone: bug mode now leaves the sound session as it is while body-cam runs, sets it only when it differs, and restarts its microphone at most once a second, so the two can't make each other restart in a loop.
+  - iPhone: the stall and retry timers now use the uptime clock, which a clock change doesn't move.
+  - Upload parts could end on a checkpoint that wasn't signed. Parts are now cut only from signed checkpoints, and the last part from the file as sealed. Body-cam had the same pattern (group 2a) and is fixed the same way here.
+  - Android: the service released its wake lock before the last file was closed and fingerprinted; now it waits.
+- **Compiled before CI:** `BugRecorder.kt` and `AdtsCheckpointer.kt` compile with the JetBrains compiler against small Java stand-ins for the Android classes they use (signatures copied from the Android API). The rest of the Kotlin and all Swift compile only in the Native build workflow.
+
+**Not verified:**
+- Nothing has run on a phone, and the Swift and Android Kotlin compile only in the Native build workflow.
+- Most important to test: an iPhone recording with the phone locked for 30 minutes or more (that sound keeps coming, and checkpoints keep being signed); a phone call during bug mode on both phones; a forced restart while recording (the file should play up to the cut and be sealed as interrupted when the app opens, with its checkpoints); Android with the screen off for an hour on a Samsung and a Xiaomi, Oppo or Vivo.
+- As before for iPhone, after a call that ends while Saakshi is in the background, sound may not restart until the user returns to the app (iOS may refuse to start a recording from the background; the recorder then tries it as non-mixable).
+- If body-cam and bug mode ever ran together on iPhone (for example, confiscation mode started from the code pad over body-cam), both would use the microphone at once; neither switches the sound session off or changes it under the other, but this hasn't been tried.
+- Found by the review, not changed (it was so before #20): the crash-recovery check at app start trusts that a session not marked active in the running JavaScript is finished. If the app's JavaScript ever restarted while Android's service kept recording, the file being written could be sealed early as interrupted. Nothing calls `bugRecorderRunning()` yet.
+
 ## Owner questions
 
 Streams add questions here as `- [ ] (Stream X) question`.
@@ -171,7 +213,8 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [x] (Stream B) **Supabase plan for live location.** `saakshi-live` is in the "AT's Desk" organisation. Supabase pauses inactive projects on its free plan, which would break live links without warning. *Answered (owner's review of R2):* free while testing; the plan must be reviewed before R2 goes public. On the release checklist below.
 - [x] (Stream B, for Stream D) **Apple Team ID.** The widget extension needs `ios.appleTeamId` in `app.json`. *Answered (owner's review of R2):* `5NYAUT5C56` (not secret); set in `app.json`.
 - [x] (Fix round 1) **Camera picture on the iPhone body-cam screen.** *Withdrawn 5 Nov:* the old iPhone body-cam drew the camera's live picture under its controls, but behind an 85%-black layer, so it couldn't really be seen (the owner never noticed it). The new recorder draws no picture, as Android never did. Nothing changes for the user.
-- [ ] (Fix round 1) **Bug mode, continuous too?** The brief left bug mode unchanged until you decide. Group 2a built what it would need: on iPhone, the app's own ADTS AAC writer (cut-off safe, unlike bug mode's `.m4a` pieces), and checkpoints on both platforms. Should bug mode also become one continuous file with checkpoints, its witness texts carrying the latest checkpoint?
+- [x] (Fix round 1) **Bug mode, continuous too?** *Answered 6 Nov:* yes, like body-cam (iPhone: the cut-off-safe AAC writer; witness texts, at most every 10 minutes, carry the latest checkpoint). Built in #20; SPEC E8.
+- [ ] (Fix round 1) **Bug mode and the 3% auto-save.** You decided on 22 Oct that bug mode has no 3% auto-save, because its pieces were short and a dying battery lost at most the piece being recorded. With one file, a dying battery now leaves that one file cut off: it still plays up to the cut, its checkpoints prove all but about the last 10 seconds, and it is sealed as interrupted when the app next opens. Keep it so, or add the 3% stop-and-save that body-cam has (which would end bug mode cleanly at 3%, before the phone dies)? I've kept your 22 Oct decision until you answer.
 - [ ] (Stream C) **Helpline list updates.** The Help tab fetches `helplines/helplines.json` from raw.githubusercontent.com each time it opens (a plain GET; nothing of the user's is sent, but GitHub sees the phone's IP address). Keep it automatic, or only on a "Check for updates" tap? And should the list be signed, so that a compromised `main` branch can't change numbers on every phone? Today it is only schema-checked.
 - [ ] (Stream C) **Lawyers and medics list.** The schema (`src/modules/helplines/schema.ts`, `helplines/README.md`) shows name, phone, city, state and languages, and records the registration number, consent date and an expiry (`listedUntil`) in the public file. Is publishing the registration number right, or should it be checked and kept off GitHub? Who collects the written consent, and where is it kept?
 - [ ] (Stream C) **"What police may ask of a phone"** (SPEC G5) is left out of the guide: `docs/research/law.md` has nothing on demands to unlock a phone or give a passcode. It needs its own research from statutes and judgments first. Shall I do that next?
@@ -373,7 +416,7 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
   - Settings at SOS → Quick trigger: set the code, and choose what it does (SOS alert, or confiscation mode).
   - **Android:** a home-screen widget and an optional ongoing notification ("Open code pad"), both opening `saakshi://codepad`. The notification comes back after a restart and in the current language when the app opens.
   - **iPhone:** a widget extension (`targets/widget`, built by `@bacons/apple-targets`, MIT) with a Control Center, Lock Screen and Action Button control and a Lock Screen widget. An App Intent, "Open Saakshi code pad", is built into the app too, so it also appears in Shortcuts for Back Tap. It hands the request to the app through `modules/saakshi-sos` (`onOpenCodePad`, `consumeCodePadRequest`).
-- **E8, bug mode.** New module `@/modules/bugmode`; SOS → Bug mode.
+- **E8, bug mode.** New module `@/modules/bugmode`; SOS → Bug mode. *Since fix round 1 (#20) bug mode records one continuous file with checkpoints, on iPhone with its own recorder in place of `AudioPieces`, and its E7 hook is `setBugModePartListener()`; see "Bug mode: one continuous file, with checkpoints" under fix round 1. The pieces described here are how R2 built it.*
   - Pieces are 2 minutes long, recorded until stopped or the battery runs out, with the screen locked. Each is sealed through Stream A's pipeline with `capture.mode: "bug"` (spec 0.2).
   - **Android:** the app's own recorder in a microphone foreground service (`BugModeService`). It writes cut-off-safe AAC (`.aac`, ADTS), so a piece cut off by a dead battery plays up to the cut. It uses Stream A's crash-recovery markers, so a piece the app didn't seal (killed, phone off) is sealed when the app next opens.
   - **iPhone:** Stream A's `AudioPieces` (expo-audio background recording, two overlapping recorders, no silence between pieces), now taking a capture mode. There is also a Live Activity (Lock Screen and Dynamic Island) with a timer and the number of pieces saved.
@@ -392,7 +435,7 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
 - `src/modules/evidence` changes in this pull request:
   - `AudioPieces` takes a `mode` (default `body-cam`).
   - The public API gains `startAudioPieces()`, `piecePaths()`, and the `CaptureMode` and `EndReason` types.
-- **E7:** call `setPieceUploader()` from `@/modules/bugmode` with the Drive upload. Bug mode then uploads each piece the moment it is sealed.
+- **E7:** call `setBugModePartListener()` from `@/modules/bugmode` with the Drive upload (it replaced `setPieceUploader()` in fix round 1). Bug mode then uploads each part, a byte range of its one file ending on a signed checkpoint, as soon as it exists.
 
 **For Stream D:**
 - **SMS flag:** `app.config.ts` and `modules/saakshi-sos/app.plugin.js` agree. Both use `SAAKSHI_SMS_AUTOSEND=1` and remove SEND_SMS otherwise. The app decides at run time from the built manifest, which comes to the same thing as `extra.smsAutoSend`.
@@ -439,7 +482,7 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
   - Controls need iOS 18; the extension targets iOS 18.0, so phones on iOS 16 or 17 get no widget, control or Live Activity, though everything in the app works.
   - The orange microphone dot and the Live Activity are visible to anyone holding the phone (spec E8 accepts this).
   - iOS ends a Live Activity after 8 hours; recording carries on.
-- **iPhone, background:** if the app is force-quit, iOS stops both bug mode and live location. A phone call takes the microphone; `AudioPieces` keeps the current piece and retries a piece later.
+- **iPhone, background:** if the app is force-quit, iOS stops both bug mode and live location. A phone call takes the microphone; since fix round 1 the file ends there (`"audio-interrupted"`) and a new one starts when the microphone comes back.
 - **Android, foreground services:**
   - Bug mode and live location must start while Saakshi is on screen (Android 14 forbids starting microphone and location services from the background). The code pad and confiscation mode are on screen, so they can; the widget alone can't start recording.
   - Without notification permission (Android 13+), the recording and sharing notifications show only in the Task Manager.
@@ -463,7 +506,7 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
 
 **Next:**
 - Phone testing of R1 and R2; fix what it finds.
-- After E7 lands, check the Drive upload through `setPieceUploader()`.
+- After E7 lands, check the Drive upload through `setBugModePartListener()`.
 - v1.1: WhatsApp, Signal and Telegram for alerts and live links.
 
 **Start prompt** (model Opus, effort high):

@@ -1,30 +1,53 @@
 import SaakshiSos, { type BugPieceClosedEvent } from '@native/saakshi-sos';
-import { AudioModule, RecordingPresets, requestRecordingPermissionsAsync } from 'expo-audio';
+import { requestRecordingPermissionsAsync } from 'expo-audio';
 import { PermissionsAndroid, Platform } from 'react-native';
 
-import { createEvidenceSession, type EndReason, type LocationSnapshot, piecePaths, startAudioPieces } from '@/modules/evidence';
+import {
+  type LocationSnapshot,
+  type SoundClosed,
+  type SoundRecorderNative,
+  soundRecorder,
+  startSoundRecording,
+  type UploadPart,
+} from '@/modules/evidence';
 import { getCurrentFix } from '@/modules/location';
 
-import { BUG_PIECE_SECONDS, type BugEngine } from './controller';
+import type { BugEngine } from './controller';
 
 export class MicrophoneDeniedError extends Error {}
 
+/** Checkpoints come every 10 seconds; the place is asked for at most this often, to save battery. */
+const LOCATION_REFRESH_MS = 60_000;
+
 /**
- * The place each piece's record carries: the latest fix, refreshed in the background while
- * recording, so sealing a piece never waits for the phone's location.
+ * The place each record carries: the latest fix, refreshed in the background while recording
+ * (at most once a minute, as records are made), so sealing never waits for the phone's location.
  */
-function locationTracker(): { snapshot: () => LocationSnapshot; refresh: () => void } {
+function locationTracker(): () => LocationSnapshot {
   let current: LocationSnapshot = { status: 'unavailable', fix: null };
+  let refreshing = false;
+  let lastAsked = 0;
   const refresh = () => {
-    void getCurrentFix({ ask: false, timeoutMs: 10_000 }).then((result) => {
-      current =
-        result.status === 'fixed'
-          ? { status: 'fixed', fix: { ...result.fix, altitudeMeters: null } }
-          : { status: result.status, fix: null };
-    });
+    if (refreshing || Date.now() - lastAsked < LOCATION_REFRESH_MS) return;
+    refreshing = true;
+    lastAsked = Date.now();
+    void getCurrentFix({ ask: false, timeoutMs: 10_000 })
+      .then((result) => {
+        current =
+          result.status === 'fixed'
+            ? { status: 'fixed', fix: { ...result.fix, altitudeMeters: null } }
+            : { status: result.status, fix: null };
+      })
+      .finally(() => {
+        refreshing = false;
+      });
   };
   refresh();
-  return { snapshot: () => current, refresh };
+  return () => {
+    const snapshot = current;
+    refresh();
+    return snapshot;
+  };
 }
 
 async function ensureMicrophone(): Promise<void> {
@@ -32,114 +55,107 @@ async function ensureMicrophone(): Promise<void> {
   if (!granted) throw new MicrophoneDeniedError('Microphone permission was not granted');
 }
 
-/**
- * Android: the app's own recorder in a microphone foreground service (modules/saakshi-sos),
- * writing cut-off-safe AAC pieces and crash-recovery markers into the evidence session. A piece
- * that closes while the app's JavaScript isn't running keeps its marker and is sealed when the app
- * next opens.
- */
-async function androidEngine(notice: { title: string; text: string }): Promise<BugEngine> {
-  const native = SaakshiSos;
-  if (!native) throw new Error('Bug mode is not built into this app');
-  await ensureMicrophone();
-  if (Platform.OS === 'android' && Number(Platform.Version) >= 33) {
-    // Only so the recording notification shows; recording works without it.
-    await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS).catch(() => undefined);
-  }
-
-  const session = createEvidenceSession();
-  const location = locationTracker();
-  let stopReason: EndReason | null = null;
-  let onFinal: (() => void) | null = null;
-  const subscription = native.addListener('onBugPieceClosed', (event: BugPieceClosedEvent) => {
-    const reason: EndReason = event.endReason === 'stopped' && stopReason ? stopReason : event.endReason;
-    void session.add({
-      uri: event.uri,
-      kind: 'audio',
-      segment: { clip: event.clip, index: event.index },
-      startedAt: new Date(event.startedAt),
-      endedAt: new Date(event.endedAt),
-      location: location.snapshot(),
-      mode: 'bug',
-      endReason: reason,
-      gapBeforeMs: event.gapBeforeMs,
-      pendingMarker: event.marker,
-    });
-    location.refresh();
-    if (event.endReason !== 'piece-complete') onFinal?.();
-  });
-
-  const { incomingDir, pendingDir } = piecePaths(session);
-  try {
-    await native.bugRecorderStart({
-      outputDir: incomingDir,
-      pendingDir,
-      pieceSeconds: BUG_PIECE_SECONDS,
-      clip: session.nextClip(),
-      notificationTitle: notice.title,
-      notificationText: notice.text,
-    });
-  } catch (error) {
-    subscription.remove();
-    await session.finish();
-    throw error;
-  }
-
+function fromAndroid(event: BugPieceClosedEvent): SoundClosed {
   return {
-    session,
-    async stop(reason = 'stopped') {
-      stopReason = reason;
-      const closed = new Promise<void>((resolve) => {
-        onFinal = resolve;
-        setTimeout(resolve, 5000);
+    uri: event.uri,
+    clip: event.clip,
+    index: event.index,
+    startedAt: event.startedAt,
+    endedAt: event.endedAt,
+    endReason: event.endReason,
+    gapBeforeMs: event.gapBeforeMs,
+    recording: event.recording ?? null,
+    finalSize: event.finalSize ?? null,
+    finalSha256: event.finalSha256 ?? null,
+  };
+}
+
+type AndroidNative = Pick<NonNullable<typeof SaakshiSos>, 'addListener' | 'bugRecorderStart' | 'bugRecorderStop'>;
+
+/** How long Start waits for the Android recorder to say its first file is recording. */
+const START_TIMEOUT_MS = 8000;
+
+/**
+ * Android: the app's own recorder in a microphone foreground service (modules/saakshi-sos), writing
+ * one cut-off-safe AAC file with checkpoints and its crash-recovery marker into the evidence
+ * session. Stop resolves once the service says the last file has closed (or after 5 seconds).
+ */
+export function androidRecorder(
+  notice: { title: string; text: string },
+  native: AndroidNative | null | undefined = SaakshiSos,
+): SoundRecorderNative {
+  if (!native) throw new Error('Bug mode is not built into this app');
+  let stopped: (() => void) | null = null;
+  return {
+    listen(handlers) {
+      const subscriptions = [
+        native.addListener('onBugCheckpoint', (event) => handlers.checkpoint(event)),
+        native.addListener('onBugPieceClosed', (event) => handlers.closed(fromAndroid(event))),
+        native.addListener('onBugRecorderError', (event) => handlers.error(event.message)),
+        native.addListener('onBugRecorderStopped', () => stopped?.()),
+      ];
+      return { remove: () => subscriptions.forEach((s) => s.remove()) };
+    },
+    // The service starts at once; the recorder in it may not. Resolves once the first file is
+    // recording, or rejects with the recorder's reason (and stops the service).
+    start: (options) =>
+      new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const settle = (error?: Error) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          started.remove();
+          failed.remove();
+          if (!error) return resolve();
+          void native.bugRecorderStop().catch(() => undefined);
+          reject(error);
+        };
+        const started = native.addListener('onBugRecorderStarted', () => settle());
+        const failed = native.addListener('onBugRecorderError', (event) => settle(new Error(event.message)));
+        const timer = setTimeout(() => settle(new Error('Recording did not start')), START_TIMEOUT_MS);
+        native
+          .bugRecorderStart({ ...options, notificationTitle: notice.title, notificationText: notice.text })
+          .catch((error: unknown) => settle(error instanceof Error ? error : new Error(String(error))));
+      }),
+    async stop() {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const done = new Promise<void>((resolve) => {
+        stopped = resolve;
+        timer = setTimeout(resolve, 5000);
       });
       await native.bugRecorderStop();
-      await closed;
-      subscription.remove();
-      await session.finish();
+      await done;
+      clearTimeout(timer);
+      stopped = null;
+      // The files came as events.
+      return [];
     },
   };
 }
 
-/**
- * iPhone: expo-audio with background recording, through the evidence module's AudioPieces (the
- * same pipeline as body-cam sound). iOS shows the orange microphone dot; the Live Activity is
- * started by the controller.
- */
-async function iosEngine(): Promise<BugEngine> {
-  await ensureMicrophone();
-  const preset = RecordingPresets.HIGH_QUALITY;
-  const options = {
-    extension: preset.extension,
-    sampleRate: preset.sampleRate,
-    numberOfChannels: preset.numberOfChannels,
-    bitRate: preset.bitRate,
-    isMeteringEnabled: false,
-    ...preset.ios,
-  };
-  // Created outside React (unlike useAudioRecorder) so recording outlives any one screen.
-  // eslint-disable-next-line import/namespace -- AudioModule is an object, not an ES namespace.
-  const Recorder = AudioModule.AudioRecorder;
-  const recorders = [new Recorder(options), new Recorder(options)] as const;
-  const location = locationTracker();
-  const handle = await startAudioPieces({
-    mode: 'bug',
-    recorders,
-    location: () => {
-      location.refresh();
-      return location.snapshot();
-    },
-    pieceSeconds: BUG_PIECE_SECONDS,
-  });
-  return {
-    session: handle.session,
-    async stop(reason) {
-      await handle.stop(reason);
-      for (const recorder of recorders) recorder.release();
-    },
-  };
-}
-
-export function startBugEngine(notice: { title: string; text: string }): Promise<BugEngine> {
-  return Platform.OS === 'android' ? androidEngine(notice) : iosEngine();
+export function startBugEngine(
+  notice: { title: string; text: string },
+  onPart: (part: UploadPart) => void,
+  onProblem: (message: string) => void,
+): Promise<BugEngine> {
+  return (async () => {
+    await ensureMicrophone();
+    let native: SoundRecorderNative;
+    if (Platform.OS === 'android') {
+      if (Number(Platform.Version) >= 33) {
+        // Only so the recording notification shows; recording works without it.
+        await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS).catch(() => undefined);
+      }
+      native = androidRecorder(notice);
+    } else {
+      // iPhone: the evidence module's recorder (SoundRecorder.swift). iOS shows the orange
+      // microphone dot; the Live Activity is started by the controller.
+      const ios = soundRecorder();
+      if (!ios) throw new Error('Bug mode is not built into this app');
+      native = ios;
+    }
+    const handle = await startSoundRecording({ mode: 'bug', native, location: locationTracker(), onPart, onProblem });
+    return { session: handle.session, stop: (reason) => handle.stop(reason) };
+  })();
 }

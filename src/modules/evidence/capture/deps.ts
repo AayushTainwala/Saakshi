@@ -30,7 +30,7 @@ export function createPipelineDeps(): PipelineDeps {
 
 /**
  * Starts a new evidence session for files recorded outside the evidence camera: body-cam files,
- * and bug mode's audio pieces (E8). Hand each file to `add()` as soon as it closes: it is hashed,
+ * and bug mode's sound files (E8). Hand each file to `add()` as soon as it closes: it is hashed,
  * moved into the locker, and a signed, chained record is written. Checkpoints of a file still being
  * written go to `addCheckpoint()`. The session appears in the Record tab. Call `finish()` when
  * recording is over.

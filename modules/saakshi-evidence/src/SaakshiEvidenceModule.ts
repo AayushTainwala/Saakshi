@@ -8,6 +8,8 @@ import type {
   RecorderOptions,
   RecordingClosedEvent,
   SaakshiEvidenceEvents,
+  SoundClosedEvent,
+  SoundStartOptions,
 } from './SaakshiEvidence.types';
 
 declare class SaakshiEvidenceModule extends NativeModule<SaakshiEvidenceEvents> {
@@ -40,6 +42,14 @@ declare class SaakshiEvidenceModule extends NativeModule<SaakshiEvidenceEvents> 
    */
   bodyCamStop(): Promise<RecordingClosedEvent[] | null | undefined>;
   bodyCamRunning(): boolean;
+  /**
+   * iPhone only: bug mode's sound recorder (SoundRecorder.swift), one continuous ADTS AAC file with
+   * checkpoints. Rejects if the microphone can't start. (Android bug mode records in SaakshiSos.)
+   */
+  soundStart(options: SoundStartOptions): Promise<void>;
+  /** iPhone only: resolves once the file is closed, with the `onSoundClosed` events of the files the stop closed. */
+  soundStop(): Promise<SoundClosedEvent[] | null | undefined>;
+  soundRunning(): boolean;
   /** Android: MP4 copy of an MPEG-TS file without re-encoding; returns the copy's file:// URI. */
   remuxToMp4(input: string, output: string, rotationDegrees: number | null): Promise<string>;
   /** Starts delivering `onVolumeUp` events and stops the volume buttons changing the volume. */

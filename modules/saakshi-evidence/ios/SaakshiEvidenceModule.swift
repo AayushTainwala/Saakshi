@@ -8,11 +8,17 @@ public class SaakshiEvidenceModule: Module {
     // already writes movie fragments every 10 seconds, so its files survive a cut-off.
     Function("recorderSupported") { false }
 
-    Events("onVolumeUp", "onRecordingClosed", "onRecorderError", "onCheckpoint")
+    Events(
+      "onVolumeUp", "onRecordingClosed", "onRecorderError", "onCheckpoint", "onSoundCheckpoint", "onSoundClosed",
+      "onSoundError"
+    )
 
     OnCreate {
       VolumeButtons.shared.onVolumeUp = { [weak self] in self?.sendEvent("onVolumeUp", [:]) }
       BodyCamRecorder.shared.emit = { [weak self] name, body in
+        self?.sendEvent(name, body.mapValues { $0 as Any? })
+      }
+      SoundRecorder.shared.emit = { [weak self] name, body in
         self?.sendEvent(name, body.mapValues { $0 as Any? })
       }
     }
@@ -74,6 +80,39 @@ public class SaakshiEvidenceModule: Module {
       BodyCamRecorder.shared.stop { events in promise.resolve(events as Any) }
     }
 
+    // Bug mode on iPhone (spec E8): one continuous, checkpointed sound file (SoundRecorder.swift).
+    // On Android bug mode records in the SaakshiSos module.
+    Function("soundRunning") { SoundRecorder.shared.isRunning }
+
+    AsyncFunction("soundStart") { (options: SoundStartOptions, promise: Promise) in
+      guard let outputDir = URL(string: options.outputDir), outputDir.isFileURL,
+        let pendingDir = URL(string: options.pendingDir), pendingDir.isFileURL
+      else {
+        promise.reject("ERR_SOUND_OPTIONS", "outputDir and pendingDir must be file:// URIs")
+        return
+      }
+      let config = SoundRecorder.Config(
+        outputDir: outputDir,
+        pendingDir: pendingDir,
+        checkpointSeconds: max(options.checkpointSeconds, 2),
+        clip: options.clip,
+        mode: options.mode
+      )
+      SoundRecorder.shared.start(config) { error in
+        if let error {
+          promise.reject("ERR_SOUND_START", error.localizedDescription)
+        } else {
+          promise.resolve()
+        }
+      }
+    }
+
+    // Resolves once the file is closed, with the onSoundClosed events of the files the stop closed
+    // (they are also sent as events).
+    AsyncFunction("soundStop") { (promise: Promise) in
+      SoundRecorder.shared.stop { events in promise.resolve(events as Any) }
+    }
+
     // iPhone recordings are already QuickTime files that play everywhere; no copy is made.
     AsyncFunction("remuxToMp4") { (_: String, _: String, _: Int?) -> String in
       throw Exception(name: "ERR_UNSUPPORTED", description: "Remuxing is only needed for Android recordings")
@@ -129,4 +168,13 @@ struct BodyCamStartOptions: Record {
   @Field var quality: Int = 720
   @Field var clip: Int = 0
   @Field var mode: String = "body-cam"
+}
+
+/// What JavaScript passes to `soundStart` (SoundStartOptions in SaakshiEvidence.types.ts).
+struct SoundStartOptions: Record {
+  @Field var outputDir: String = ""
+  @Field var pendingDir: String = ""
+  @Field var checkpointSeconds: Double = 10
+  @Field var clip: Int = 0
+  @Field var mode: String = "bug"
 }
