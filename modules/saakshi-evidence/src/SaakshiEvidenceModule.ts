@@ -28,7 +28,14 @@ declare class SaakshiEvidenceModule extends NativeModule<SaakshiEvidenceEvents> 
 
   /** True on Android, where the app records video itself (CameraRecorder). */
   recorderSupported(): boolean;
-  recorderOpen(quality: number): Promise<void>;
+  /** Android: opens the back camera, or the front one (fix round 1, group 4). */
+  recorderOpen(quality: number, facing?: 'back' | 'front'): Promise<void>;
+  /** Android: zoom, as a ratio of the camera's normal view, clamped to what it can do. */
+  recorderSetZoom(ratio: number): Promise<void>;
+  /** Android: how far the camera facing this way can zoom (for expo-camera's photos). */
+  cameraZoomRange(facing: 'back' | 'front'): Promise<{ min: number; max: number }>;
+  /** iPhone: the most the lens in use can zoom in its current format (for expo-camera's `zoom`). */
+  cameraMaxZoom(position: 'back' | 'front', deviceType: string | null): Promise<number>;
   recorderClose(): Promise<void>;
   recorderStart(options: RecorderOptions): Promise<void>;
   recorderStop(): Promise<void>;

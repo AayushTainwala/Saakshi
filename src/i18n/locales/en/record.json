@@ -18,7 +18,13 @@
     "micPermissionTitle": "Microphone access",
     "micPermissionBody": "Videos record sound too, so Saakshi needs your microphone.",
     "allow": "Allow",
-    "openSettings": "Open Settings"
+    "openSettings": "Open Settings",
+    "switchToFront": "Switch to the front camera",
+    "switchToBack": "Switch to the back camera",
+    "switchWhileRecording": "The camera can’t be switched during a video. Stop the video first.",
+    "zoom": "Zoom",
+    "zoomTo": "Zoom {{factor}} times",
+    "zoomNow": "Zoomed {{factor}} times"
   },
   "locker": {
     "heading": "Your records",
@@ -260,7 +266,7 @@
     "made": "Joined MP4 copy for sharing (not the original). SHA-256 {{sha256}}",
     "madeReencoded": "Joined MP4 copy for sharing (not the original; the phone had to re-encode it). SHA-256 {{sha256}}",
     "error": {
-      "turned": "These video files were filmed turned different ways, so this phone can’t join them without re-encoding. Share each video on its own instead.",
+      "turned": "These video files were filmed with different cameras (front and back) or turned different ways, so this phone can’t join them without re-encoding. Share each video on its own instead.",
       "one-video": "This record has only one video file; share it on its own.",
       "unsealed": "Not every file of this record is sealed yet. Try again in a moment."
     }

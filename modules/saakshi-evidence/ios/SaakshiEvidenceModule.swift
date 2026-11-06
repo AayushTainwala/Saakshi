@@ -1,3 +1,4 @@
+import AVFoundation
 import ExpoModulesCore
 
 public class SaakshiEvidenceModule: Module {
@@ -111,6 +112,17 @@ public class SaakshiEvidenceModule: Module {
     // (they are also sent as events).
     AsyncFunction("soundStop") { (promise: Promise) in
       SoundRecorder.shared.stop { events in promise.resolve(events as Any) }
+    }
+
+    // The evidence camera's zoom (fix round 1, group 4): the most the lens expo-camera is using can
+    // zoom, in its current format. expo-camera's `zoom` prop runs from 1x at 0 to this at 1, rising
+    // exponentially (CameraSessionManager.updateZoom). AVCaptureDevice objects are shared, so after the
+    // camera is ready this reads the format expo-camera chose.
+    AsyncFunction("cameraMaxZoom") { (position: String, deviceType: String?) -> Double in
+      let side: AVCaptureDevice.Position = position == "front" ? .front : .back
+      let type = deviceType.map { AVCaptureDevice.DeviceType(rawValue: $0) } ?? .builtInWideAngleCamera
+      guard let device = AVCaptureDevice.default(type, for: .video, position: side) else { return 1 }
+      return Double(device.activeFormat.videoMaxZoomFactor)
     }
 
     // A record's files joined into one MP4 copy for sharing (Joiner.swift; fix round 1, group 3).

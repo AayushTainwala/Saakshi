@@ -21,7 +21,8 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 | 2a. Body-cam: one continuous file, with checkpoints | Merged: https://github.com/AayushTainwala/Saakshi/pull/18. Not yet run on a phone. |
 | 2b. Bug mode: one continuous file, with checkpoints (owner said yes, 6 Nov) | Built: https://github.com/AayushTainwala/Saakshi/pull/20 (branch `claude/keen-rubin-urautd`, from `main` after #19). Not yet run on a phone. |
 | 3. Records list and playback (B1, C6) | Built: https://github.com/AayushTainwala/Saakshi/pull/21 (branch `claude/fix-round-1-group-3`, stacked on #20). Not yet run on a phone. |
-| 4–9 | Not started |
+| 4. Evidence camera: front and back, zoom (B2) | Built: https://github.com/AayushTainwala/Saakshi/pull/22 (branch `claude/fix-round-1-group-4`, stacked on #21). Research items reported below, not built. Not yet run on a phone. |
+| 5–9 | Not started |
 
 ### Where fix round 1 stands, and what's next (6 Nov 2026)
 
@@ -231,6 +232,64 @@ All three checks came out feasible, so nothing falls back to pieces.
 - Whether AVPlayer and ExoPlayer play every file as expected: fragmented `.mp4` with no edit list, ADTS `.aac`, older `.m4a`.
 - Android video frames from MPEG-TS for thumbnails (`MediaMetadataRetriever`).
 
+### Group 4: evidence camera, front and back, and zoom (#22)
+
+**What was built:**
+- **Front and back camera:** a switch button (⇄) beside the shutter, for photos and video. It is off during a video (see the research below).
+  - Android video uses the app's own recorder, which now opens the front camera too, with Camera2's front-camera rotation for the file.
+- **Zoom:** pinch with two fingers anywhere on the picture, plus quick buttons:
+  - **0.5×** where the phone has a wider lens. On iPhone that is the ultra-wide lens, chosen with expo-camera's `selectedLens`. On Android video it is the camera's own zoom below 1×, on phones that offer it (Android 11+); the button then shows its real value, for example "0.6×".
+  - **1×**, and **2×** where the camera reaches it. The current zoom shows on the selected button, for example "1.4×".
+  - Zoom can change while recording, except iPhone's 0.5×, which is a different lens: expo-camera changes lens by changing the camera, and that would end the file.
+  - Android photos (expo-camera, CameraX) can't go below 1×.
+  - `capture/zoom.ts` turns the zoom into what each camera needs, and is tested:
+    - iPhone expo-camera: `zoom` 0..1 rises exponentially to the lens's maximum, which the native module reads from the device's current format;
+    - Android expo-camera: the ratio over the camera's maximum;
+    - Android video: `CONTROL_ZOOM_RATIO`, or a sensor crop before Android 11.
+- **Leaving the camera:** unchanged (group 5 records why).
+- **An independent review** found and I fixed:
+  - on iPhone, one tap on ⇄ left the shutter off until the camera was closed. expo-camera says it is ready only once per view, so the camera view is now made afresh for each camera and each mode;
+  - on Android video, the preview froze after a switch, while recording used the new camera (the preview view is now made afresh too);
+  - a double tap on ⇄ that could leave a camera open (⇄ is off until the camera is ready, and the recorder closes a camera that opens after a newer open or a close);
+  - zoom left wrong after changing between photo and video on iPhone (learnt again);
+  - a lens change racing a recording's start (the shutter waits for the new lens);
+  - iPhone lenses changing back and forth while pinching (they change only when the fingers lift);
+  - a pinch jumping after one finger lifted;
+  - Android zoom updates sent faster than the camera needs (now at most about 30 a second);
+  - the digital-zoom crop before Android 11 being slightly off centre.
+- **Joining front and back videos (Android):** a record with both front- and back-camera videos can't be joined, because their turns differ. The app now says it was filmed with different cameras. On iPhone the joiner re-encodes such a record and says so.
+
+**Research (brief item 3), not built; your decision:**
+1. **Switching camera during a video, keeping one file.**
+   - **iPhone with expo-camera: not possible.** Changing `facing` makes expo-camera swap the camera input inside a configuration change (`CameraSessionManager.swift`, `addDevice`), with no check for a recording.
+     - Apple has an error for this case: "Recording stopped because the configuration of media sources and destinations changed" ([AVError.Code.sessionConfigurationChanged](https://developer.apple.com/documentation/avfoundation/averror-swift.struct/code/sessionconfigurationchanged)).
+     - Apple's AVCamManual sample disables the camera button "until recording finishes" ([listing](https://developer.apple.com/library/archive/samplecode/AVCamManual/Listings/AVCamManual_AVCamManualCameraViewController_m.html)).
+     - An Apple media engineer advises a video data output into `AVAssetWriter` instead ([forum](https://developer.apple.com/forums/thread/101833)).
+   - **iPhone with the app's own recorder:** possible.
+     - It is the body-cam recorder's design (`BodyCamRecorder.swift`) plus a preview and the switch, with both cameras set to the same size: "ensure that sample buffers you append are of the specified format" ([AVAssetWriterInput](https://developer.apple.com/documentation/avfoundation/avassetwriterinput/init(mediatype:outputsettings:sourceformathint:))).
+     - The file's turn can't change once writing starts ("You can't set this value after writing starts", [transform](https://developer.apple.com/documentation/avfoundation/avassetwriterinput/transform)), so the front camera's frames would need turning one by one.
+     - My estimate: 400–700 lines of Swift, medium risk.
+   - **Android, the app's recorder:** not documented either way.
+     - A persistent surface "can be reused by subsequent MediaCodec or MediaRecorder instances" ([MediaCodec](https://developer.android.com/reference/android/media/MediaCodec#createPersistentInputSurface())), but nothing says a second camera may feed it while MediaRecorder runs.
+     - The size and the rotation are fixed before `prepare()` ([setOrientationHint](https://developer.android.com/reference/android/media/MediaRecorder#setOrientationHint(int))), and two cameras' timestamps may not be comparable ([SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN](https://developer.android.com/reference/android/hardware/camera2/CameraMetadata#SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN)).
+     - A safe version needs a GPU step that scales, turns and re-times frames. The file's rotation would also vary within one file, which MPEG-TS can't hold and our records would need (a bundle-format change).
+     - My estimate: 150–250 lines of Kotlin, high risk until tried on phones; 600–1,000 more with the GPU step.
+2. **Dual capture (front and back at once, picture-in-picture).**
+   - **iPhone:** `AVCaptureMultiCamSession`, iOS 13 and later, on "an iPhone with an A12 or later processor" ([Apple's sample](https://developer.apple.com/documentation/avfoundation/avmulticampip-capturing-from-multiple-cameras)), which is iPhone XS, XS Max and XR onwards (WWDC 2019).
+     - The app must check `isMultiCamSupported` on the phone. A configuration whose `hardwareCost` is over 1.0 won't run ([docs](https://developer.apple.com/documentation/avfoundation/avcapturemulticamsession/hardwarecost)).
+     - Under heat, the system pressure state can stop capture ([docs](https://developer.apple.com/documentation/avfoundation/avcapturedevice/systempressurestate-swift.class)). WWDC 2019 session 249 gives "up to 15 minutes" at moderate pressure.
+   - **Android:** concurrent cameras from Android 11 (`CameraManager.getConcurrentCameraIds`). Only on phones that declare `FEATURE_CAMERA_CONCURRENT`: "The device's main front and back cameras can stream concurrently" ([PackageManager](https://developer.android.com/reference/android/content/pm/PackageManager#FEATURE_CAMERA_CONCURRENT)).
+     - The guaranteed sizes are small, 720p plus 1440p at most ([CameraDevice](https://developer.android.com/reference/android/hardware/camera2/CameraDevice)).
+     - Google publishes no list of phones. I couldn't read the Android CDD's wording (source.android.com isn't reachable from here).
+   - **Cost:** both platforms need the two pictures combined on the GPU into one encoder. My estimate: 1,000–1,500 lines of Swift and 1,200–2,000 of Kotlin, high risk, with battery and heat to be measured. CameraX 1.5+ can do picture-in-picture recording, but only to MP4, which isn't cut-off safe.
+
+**Not verified:**
+- Nothing has run on a phone. Most important:
+  - that 0.5× and 2× match the phone's own Camera app;
+  - that zoom during a video doesn't end the file;
+  - that front-camera video on Android plays upright.
+- Whether expo-camera calls `onCameraReady` again after a lens change. The zoom controls are learnt there, and stay as they were if it doesn't.
+
 ## Owner questions
 
 Streams add questions here as `- [ ] (Stream X) question`.
@@ -256,6 +315,7 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [x] (Stream B, for Stream D) **Apple Team ID.** The widget extension needs `ios.appleTeamId` in `app.json`. *Answered (owner's review of R2):* `5NYAUT5C56` (not secret); set in `app.json`.
 - [x] (Fix round 1) **Camera picture on the iPhone body-cam screen.** *Withdrawn 5 Nov:* the old iPhone body-cam drew the camera's live picture under its controls, but behind an 85%-black layer, so it couldn't really be seen (the owner never noticed it). The new recorder draws no picture, as Android never did. Nothing changes for the user.
 - [x] (Fix round 1) **Bug mode, continuous too?** *Answered 6 Nov:* yes, like body-cam (iPhone: the cut-off-safe AAC writer; witness texts, at most every 10 minutes, carry the latest checkpoint). Built in #20; SPEC E8.
+- [ ] (Fix round 1) **Camera research (group 4).** Switching between front and back during one video needs the app's own iPhone recorder (about 400–700 lines of Swift, medium risk) and, on Android, either an undocumented hand-over (high risk) or a GPU step (600–1,000 more lines). Dual capture is a larger separate feature (1,000–2,000 lines per platform, high risk, newer phones only). Build either, and when? Details in "Group 4" above.
 - [ ] (Fix round 1) **No playback while recording.** Group 3 lets nothing play while Saakshi is recording (for example, bug mode in the background), so the recording doesn't pick the playback up, and iPhone doesn't take the microphone from the recorder. The player says so. Is that right, or should playback be allowed (on Android, where the microphone isn't taken)?
 - [ ] (Fix round 1) **Bug mode and the 3% auto-save.** You decided on 22 Oct that bug mode has no 3% auto-save, because its pieces were short and a dying battery lost at most the piece being recorded. With one file, a dying battery now leaves that one file cut off: it still plays up to the cut, its checkpoints prove all but about the last 10 seconds, and it is sealed as interrupted when the app next opens. Keep it so, or add the 3% stop-and-save that body-cam has (which would end bug mode cleanly at 3%, before the phone dies)? I've kept your 22 Oct decision until you answer.
 - [ ] (Stream C) **Helpline list updates.** The Help tab fetches `helplines/helplines.json` from raw.githubusercontent.com each time it opens (a plain GET; nothing of the user's is sent, but GitHub sees the phone's IP address). Keep it automatic, or only on a "Check for updates" tap? And should the list be signed, so that a compromised `main` branch can't change numbers on every phone? Today it is only schema-checked.

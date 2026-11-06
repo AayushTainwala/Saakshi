@@ -145,7 +145,8 @@ export type SoundClosedEvent = {
 };
 
 export type SaakshiEvidenceEvents = {
-  onRecorderReady: (event: { width: number; height: number }) => void;
+  /** Android recorder: the camera is open. `minZoom`/`maxZoom`: ratios of its normal view (fix round 1, group 4). */
+  onRecorderReady: (event: { width: number; height: number; facing?: 'back' | 'front'; minZoom?: number; maxZoom?: number }) => void;
   onRecordingStarted: (event: RecordingStartedEvent) => void;
   onRecordingClosed: (event: RecordingClosedEvent) => void;
   onCheckpoint: (event: CheckpointEvent) => void;
