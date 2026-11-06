@@ -205,7 +205,7 @@ describe('evidence bundle', () => {
     expect(report).toContain('Device:           Google Pixel 8, Android 15');
     expect(report).toContain('Key attestation:  Android Key Attestation, 3 certificates');
     expect(report).toContain('0001  media/0001-clip0-seg0.mp4');
-    expect(report).toContain('Recorded:        20/10/2026 14:32:03 IST to 20/10/2026 14:33:03 IST');
+    expect(report).toContain('Started:         20/10/2026 14:32:03 IST\n      Ended:           20/10/2026 14:33:03 IST');
     expect(report).toContain('Place:           19.07600, 72.87770 (±13 m)');
     expect(report).toContain('Size:            70,000 bytes');
     expect(report).toContain(`SHA-256:         ${records[1].record.file.sha256}`);

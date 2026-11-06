@@ -111,7 +111,7 @@ export function certificateHtml(input: CertificateInput): string {
       const f = record.file;
       return `<tr>
         <td>${String(record.sequence).padStart(4, '0')}</td>
-        <td>media/${escapeHtml(mediaFile)}<br/>${formatIST(record.capture.startedAt, true)} to ${formatIST(record.capture.endedAt, true)}<br/>${escapeHtml(formatPlace(record))}<br/>${f.size.toLocaleString('en-IN')} bytes</td>
+        <td>media/${escapeHtml(mediaFile)}<br/>Started ${formatIST(record.capture.startedAt, true)}<br/>Ended ${formatIST(record.capture.endedAt, true)}<br/>${escapeHtml(formatPlace(record))}<br/>${f.size.toLocaleString('en-IN')} bytes</td>
         <td class="mono">SHA-256: ${f.sha256}<br/>SHA-1: ${f.sha1}<br/>MD5: ${f.md5}<br/>Record (records/${escapeHtml(recordFile)}) SHA-256: ${recordSha256}</td>
       </tr>`;
     })

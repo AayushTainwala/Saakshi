@@ -24,8 +24,13 @@ export type BundledCheckpoint = {
 export const CERTIFICATE_FILE = 'certificate-part-a.pdf';
 
 /** `saakshi-8c2d4b6a-20261020-1432.zip`, with the session's start time in IST. */
+/**
+ * The bundle's file name, with the time the recording started, the same "Started" time the app
+ * and the witness message show (fix round 1, group 7; it was when the session was created).
+ */
 export function bundleFileName(session: SessionState): string {
-  const ist = new Date(new Date(session.createdAt).getTime() + 330 * 60 * 1000);
+  const started = session.items.length ? Math.min(...session.items.map((i) => Date.parse(i.startedAt))) : Date.parse(session.createdAt);
+  const ist = new Date(started + 330 * 60 * 1000);
   const pad = (n: number) => String(n).padStart(2, '0');
   const stamp = `${ist.getUTCFullYear()}${pad(ist.getUTCMonth() + 1)}${pad(ist.getUTCDate())}-${pad(ist.getUTCHours())}${pad(ist.getUTCMinutes())}`;
   return `saakshi-${session.id.slice(0, 8)}-${stamp}.zip`;
@@ -169,7 +174,8 @@ export function hashReport(
     const { capture, file } = record;
     lines.push(
       `${String(record.sequence).padStart(4, '0')}  media/${mediaFile}`,
-      `      Recorded:        ${formatIST(capture.startedAt, true)} to ${formatIST(capture.endedAt, true)}`,
+      `      Started:         ${formatIST(capture.startedAt, true)}`,
+      `      Ended:           ${formatIST(capture.endedAt, true)}`,
       ...(capture.endReason
         ? [`      Ended:           ${describeEndReason(capture.endReason)}${record.interrupted ? ' (end time is the file\'s last write)' : ''}`]
         : []),

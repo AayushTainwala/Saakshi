@@ -303,18 +303,45 @@ The app pre-fills Part A of the certificate in the Schedule to the Bharatiya Sak
 
 The PDF states that s.63(4)(c) also requires Part B, signed by an expert, which the app cannot provide.
 
-## 9. Witness message
+## 9. Witness message (format v1)
 
-One tap composes an SMS to contacts the user chooses, so that people other than the user hold the fingerprint from the time of capture. It contains the chain head, the time (IST) and the place, for example:
+One tap composes an SMS to the trusted contacts ticked for witness messages, so that people other than the user hold the record's fingerprints from the time of capture. The user taps Send. The app records each message it composes in the manifest's `witness` list. Its format is versioned on its own, independently of the bundle; this is **version 1** (6 November 2026; before it, the message held only the chain head, the time and the place).
 
 ```
-Saakshi evidence record
-SHA-256: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
-Time: 20/10/2026 14:33 IST
-Place: 19.07600, 72.87770 (±13 m)
+Saakshi witness v1
+Record: 2026-11-06 10-40 IST Body-cam
+Started: 06/11/2026 10:40:12 IST
+Ended: 06/11/2026 10:52:30 IST
+Length: 0:12:18
+Place: 19.07600, 72.87770 (within 13 m)
+Map: https://maps.google.com/?q=19.07600,72.87770
+Files: 3
+video 1 SHA-256: 9f86d081…
+sound 1 SHA-256: 2c26b46b…
+video 2 SHA-256: fcde2b2e…
+Whole record SHA-256: 3a6eb079…
+App: Saakshi 1.0.0 (7)
+ID: 8c2d4b6a-1e3f-4a5b-9c7d-0e1f2a3b4c5d
 ```
 
-The labels follow the app's language; the hash and numbers do not change. On iPhone the user taps Send in Messages. The app records each message it composes in the manifest's `witness` list.
+- **Line 1** is always `Saakshi witness v1`, in any language: what the message is and its format version. A later version changes this line.
+- **Then one `label: value` per line, in this order.** The labels follow the app's language; the values never do. Software reads the lines by their order, not by their labels.
+
+| Line | Value |
+|---|---|
+| Record | The record's name: when it started (date and time, IST) and what it is (`Body-cam`, `Bug mode`, `Photo`, `Photos`, `Video`, `Videos`, `Camera`). |
+| Started, Ended | When the first file started and the last one ended (each record's `capture.startedAt` and `capture.endedAt`), as `DD/MM/YYYY HH:MM:SS IST`. These are the times the app shows as "Started" and the bundle's file name uses. |
+| Length | From Started to Ended, as `H:MM:SS`. |
+| Place | Where the recording started: the first file with a position, as latitude and longitude to five decimals and its accuracy; or that it was not recorded. |
+| Map (optional) | A map link to that place, when there is one. |
+| Files | How many files the record holds. |
+| one line per file (optional) | Up to three files: the file's kind and number in the record (`video 1`, `sound 2`, `photo 1`, in the record's order), then `SHA-256:` and the file's SHA-256 (its record's `file.sha256`). With more than three files, these lines are left out. |
+| Whole record SHA-256 | The chain head: the SHA-256 of the session's last signed record (section 5), a file's or a checkpoint's. It vouches for every file and checkpoint before it. Compare it with `chainHead` in the manifest. |
+| App | The app and version that signed the records (`app.version`, `app.build`). |
+| ID (optional) | The session's id (the records' `session`, the manifest's `session`). |
+
+- **Length limit.** A message is kept to at most 6 SMS parts (160 characters, or 70 outside GSM's basic character set such as Hindi, per part; 153 and 67 when joined). If it would be longer, it leaves out, in turn: the lines for each file (the chain head still covers them), the map link, and the ID. Line 1, the record's name, the times, the place, the count, the chain head and the app are always kept. In English, the message uses only GSM characters, so that it stays in the cheaper encoding.
+- **Bug mode's witness texts** (section 3, step 9) are shorter, and sent while it records: `Saakshi bug mode: recording since 10:40 IST, signed up to 10:50 IST. SHA-256: <chain head>`.
 
 ## 10. How to verify a bundle
 
@@ -387,6 +414,7 @@ To check a joined copy: verify its record's signature as in section 10, step 3; 
 - **0.5** (this document, 6 November 2026): body-cam records one continuous file per unbroken stretch instead of pieces; signed checkpoint records (section 4a) while each file is written, in the chain; new record member `recording`; manifest `checkpoints`; iPhone body-cam files are fragmented MP4 (`.mp4`) and sound-only files ADTS AAC (`.aac`), both written by the app and cut-off safe (section 3, steps 2, 7 and 9).
 - **0.6** (6 November 2026): bug mode records one continuous file per unbroken stretch instead of 2-minute pieces, with checkpoint records (section 4a) as for body-cam, and its files are ADTS AAC (`.aac`) on iPhone too (section 3, steps 2, 7 and 9). No record member was added or removed.
 - **0.7** (6 November 2026): joined copies of a record's files for sharing, with their own signed records (section 11a). No member of the records in a bundle was added or removed.
+- **Witness message v1** (6 November 2026): section 9. The message's format is versioned on its own; the bundle format is unchanged by it.
 - **Later (planned, R2):** OpenTimestamps proofs for each chain head and record, in `timestamps/<recordSha256>.ots`, listed in the manifest's `timestamps`; upload state for copies in the user's cloud drive.
 - **1.1 of the app** (planned): C2PA Content Credentials and sensor readings.
 
