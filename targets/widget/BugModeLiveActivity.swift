@@ -12,7 +12,7 @@ struct BugModeAttributes: ActivityAttributes {
   var startedAt: Date
 }
 
-/// Bug mode's Live Activity (spec E8): shows that sound is being recorded, for how long, and how
+/// Pocket recording's Live Activity (spec E8; bug mode until round 2): shows that sound is being recorded, for how long, and how
 /// many pieces are saved. The words come from the app, in its language.
 struct BugModeLiveActivity: Widget {
   var body: some WidgetConfiguration {
@@ -30,7 +30,7 @@ struct BugModeLiveActivity: Widget {
           .frame(maxWidth: 80, alignment: .trailing)
       }
       .padding()
-      .widgetURL(URL(string: "saakshi://sos/bugmode"))
+      .widgetURL(URL(string: "saakshi://record/pocket"))
     } dynamicIsland: { context in
       DynamicIsland {
         DynamicIslandExpandedRegion(.leading) {
@@ -52,7 +52,7 @@ struct BugModeLiveActivity: Widget {
       } minimal: {
         Image(systemName: "mic.fill").foregroundStyle(.red)
       }
-      .widgetURL(URL(string: "saakshi://sos/bugmode"))
+      .widgetURL(URL(string: "saakshi://record/pocket"))
     }
   }
 }

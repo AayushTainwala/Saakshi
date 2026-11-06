@@ -1,6 +1,6 @@
 /**
  * The iPhone widget extension (@bacons/apple-targets): the quick-alert control for Control Center,
- * the Lock Screen and the Action Button (spec S4), a Lock Screen widget, and bug mode's Live
+ * the Lock Screen and the Action Button (spec S4), a Lock Screen widget, and Pocket recording's Live
  * Activity (spec E8). Files in _shared/ are also built into the app itself.
  *
  * @type {import('@bacons/apple-targets/app.plugin').Config}

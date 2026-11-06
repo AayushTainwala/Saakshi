@@ -8,7 +8,7 @@ import { bugMode } from '@/modules/bugmode';
 import { isBodyCamRunning } from '@/modules/evidence';
 import { liveShare, registerLiveLocationTask } from '@/modules/location';
 import { registerRunningCheck } from '@/modules/secretcode';
-import { useQuickTriggers } from '@/modules/trigger';
+import { removeOldCodePadSetting, useQuickTriggers } from '@/modules/trigger';
 import { PreferencesProvider } from '@/preferences/PreferencesProvider';
 import { loadPreferences } from '@/preferences/store';
 import { useTheme } from '@/theme';
@@ -22,6 +22,8 @@ registerLiveLocationTask();
 registerRunningCheck('body-cam', isBodyCamRunning);
 registerRunningCheck('pocket-recording', () => bugMode.getState().running);
 registerRunningCheck('live-location', () => liveShare.getShare() !== null);
+// Round 2 removed the 3-digit code pad: its old setting, with the code in it, is deleted.
+removeOldCodePadSetting();
 
 export default function RootLayout() {
   return (
@@ -33,7 +35,7 @@ export default function RootLayout() {
 
 function ThemedStack() {
   const { scheme, colors } = useTheme();
-  // The code pad opens from the iPhone controls and Action Button, and Android's notification.
+  // The SOS screen opens from the iPhone controls and Action Button (Android opens saakshi://sos).
   useQuickTriggers();
   // Nothing goes into iCloud device backup until the user chooses (spec section 2).
   useBackupExclusion();

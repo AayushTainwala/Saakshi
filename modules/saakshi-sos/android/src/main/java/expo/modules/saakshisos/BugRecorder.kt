@@ -68,7 +68,7 @@ object BugRecorder {
   /** False if an earlier recording is still stopping (it says so as an error). */
   fun start(context: Context, config: Config): Boolean {
     if (thread != null) {
-      emit("onBugRecorderError", mapOf("message" to "Bug mode is still stopping. Try again in a moment."))
+      emit("onBugRecorderError", mapOf("message" to "Pocket recording is still stopping. Try again in a moment."))
       return false
     }
     config.outputDir.mkdirs()

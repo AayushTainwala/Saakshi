@@ -84,7 +84,7 @@ export function androidRecorder(
   notice: { title: string; text: string },
   native: AndroidNative | null | undefined = SaakshiSos,
 ): SoundRecorderNative {
-  if (!native) throw new Error('Bug mode is not built into this app');
+  if (!native) throw new Error('Pocket recording is not built into this app');
   let stopped: (() => void) | null = null;
   return {
     listen(handlers) {
@@ -152,7 +152,7 @@ export function startBugEngine(
       // iPhone: the evidence module's recorder (SoundRecorder.swift). iOS shows the orange
       // microphone dot; the Live Activity is started by the controller.
       const ios = soundRecorder();
-      if (!ios) throw new Error('Bug mode is not built into this app');
+      if (!ios) throw new Error('Pocket recording is not built into this app');
       native = ios;
     }
     const handle = await startSoundRecording({ mode: 'bug', native, location: locationTracker(), onPart, onProblem });
