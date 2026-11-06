@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, StyleSheet, View } from 'react-native';
 
-import { AppText, Button, Card, CheckboxGroup, Screen, TextField } from '@/components';
+import { AppText, Button, Card, CheckboxGroup, KeyboardGroup, Screen, TextField } from '@/components';
 import {
   getLocationPermission,
   type LocationPermission,
@@ -96,27 +96,30 @@ export function ContactsEditor() {
 
       <Button label={t('contacts.pick')} disabled={full} onPress={() => void pick()} />
 
-      <AppText variant="heading">{t('contacts.typeHeading')}</AppText>
-      <TextField
-        label={t('contacts.name')}
-        value={name}
-        onChangeText={setName}
-        autoComplete="name"
-        textContentType="name"
-        maxLength={80}
-      />
-      <TextField
-        label={t('contacts.phone')}
-        hint={t('contacts.phoneHint')}
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-        autoComplete="tel"
-        textContentType="telephoneNumber"
-        maxLength={24}
-        onSubmitEditing={add}
-      />
-      <Button variant="secondary" label={t('contacts.add')} disabled={full || phone.trim() === ''} onPress={add} />
+      {/* Kept above the keyboard together, on any phone and in either language (round 2, group 1.1). */}
+      <KeyboardGroup>
+        <AppText variant="heading">{t('contacts.typeHeading')}</AppText>
+        <TextField
+          label={t('contacts.name')}
+          value={name}
+          onChangeText={setName}
+          autoComplete="name"
+          textContentType="name"
+          maxLength={80}
+        />
+        <TextField
+          label={t('contacts.phone')}
+          hint={t('contacts.phoneHint')}
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+          autoComplete="tel"
+          textContentType="telephoneNumber"
+          maxLength={24}
+          onSubmitEditing={add}
+        />
+        <Button variant="secondary" label={t('contacts.add')} disabled={full || phone.trim() === ''} onPress={add} />
+      </KeyboardGroup>
 
       <DirectSmsCard />
       <LocationCard />
