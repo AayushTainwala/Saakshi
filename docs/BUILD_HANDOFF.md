@@ -2,13 +2,36 @@
 
 The pickup file for build sessions. Each stream keeps its own section current: status, what was done, what's next, questions for the owner. Read [CLAUDE.md](../CLAUDE.md) first.
 
-## Where things stand (21 Oct 2026; fix round 1 from 5 Nov)
+## Where things stand (21 Oct 2026; fix round 1 from 5 Nov; round 2 decided 6 Nov)
 
+- **Round 2 (6 Nov 2026):** specified, not started: see "Round 2" below.
 - **Merged into `main`:** #1–#9. That is R1 and R2 as planned, apart from E3 and E7, plus the law checks against the Gazette of India (#9). Since then: the owner's docs and briefs (#10–#15), and fix round 1, groups 1, 2 and 2a (#16–#18; see "Fix round 1" below). Typecheck, lint, all tests and both native builds pass on `main`.
 - **Pace:** no 24-hour deadline (owner, 21 Oct). The next goal is a beta for about 50 testers on iPhone and Android; see BUILD_PLAN.md, section 1, "Road to the beta".
 - **First Release run (21 Oct, iOS only):** the owner set up iOS credentials and the App Store Connect API key with EAS (role App Manager). The EAS build succeeded; the **Submit to TestFlight step failed**. Its log is visible only to someone signed in to GitHub, so the cause isn't known yet. The owner is submitting that build from his Mac with `eas submit --platform ios --latest`. **Stream D:** find the cause and fix the workflow.
 - **Owner's phone testing:** round 1 on iPhone through TestFlight, with a checklist and his notes on a claude.ai page (https://claude.ai/artifact/BQU34AZ76SbRZpBKE5iyc6). Android follows when his phone arrives (about 23 Oct). The review session turns his notes into fix work for the streams.
 - **Streams:** each opens pull requests into `main`; the owner or a review session merges them.
+
+## Round 2 (SOS redesign, Pocket recording, phone taken, Saakshi-to-Saakshi; decided 6 Nov 2026)
+
+The owner's decisions after his SOS test are in `docs/SPEC.md` (sections 4, 5, 6), `docs/spec/evidence-bundle.md` (0.9) and `docs/BUILD_PLAN.md` ("Round 2"). The work, in parts, is **[docs/briefs/2026-11-06-round-2.md](briefs/2026-11-06-round-2.md)**. Read it, then this section.
+
+| Part and group | State |
+|---|---|
+| 1.1 Contacts keyboard bug | Not started |
+| 1.2 Secret code, Settings | Not started |
+| 1.3 SOS swipes, Pocket recording, "My phone is being taken" | Not started |
+| 1.4 Alerts (both links, battery level, calm Share my location) | Not started |
+| 1.5 Low battery at 5%, bundle format 0.9 | Not started |
+| 2.1–2.3 E7, Google Drive | Not started (needs the owner's Google Cloud project) |
+| 3.1 Protocol `docs/spec/alerts.md` | Not started. **Documents only; needs the owner's review before Part 3 code.** May start with Part 1. |
+| 3.2–3.5 Server, pairing, receiving, silence alarm | Not started (needs the Apple push key and Google's notification service) |
+| 4 First-open walkthrough | Not started (needs `docs/research/power-off-locks.md`) |
+
+Questions for the owner from this round go in "Owner questions" as `- [ ] (Round 2) …`. The builders' reports go under this heading, one `### Group n.n` each.
+
+**Start prompt for Part 1** (model Opus, effort high):
+
+> You are the builder for Saakshi round 2, Part 1. Read CLAUDE.md, docs/SPEC.md (sections 4, 5, 6), docs/spec/evidence-bundle.md, docs/BUILD_HANDOFF.md ("Round 2") and docs/briefs/2026-11-06-round-2.md. Work through groups 1.1 to 1.5 in order, one branch `round-2/<group>` and one pull request each, from the latest `main`. Each needs tests, green typecheck, lint and tests, green native builds, an updated handoff and plain test steps for the owner in the description. Raise questions in the handoff as `- [ ] (Round 2) …` and do not change scope.
 
 ## Fix round 1 (iPhone test round 1, A–C)
 
@@ -450,11 +473,13 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [x] (Stream B, for Stream D) **Apple Team ID.** The widget extension needs `ios.appleTeamId` in `app.json`. *Answered (owner's review of R2):* `5NYAUT5C56` (not secret); set in `app.json`.
 - [x] (Fix round 1) **Camera picture on the iPhone body-cam screen.** *Withdrawn 5 Nov:* the old iPhone body-cam drew the camera's live picture under its controls, but behind an 85%-black layer, so it couldn't really be seen (the owner never noticed it). The new recorder draws no picture, as Android never did. Nothing changes for the user.
 - [x] (Fix round 1) **Bug mode, continuous too?** *Answered 6 Nov:* yes, like body-cam (iPhone: the cut-off-safe AAC writer; witness texts, at most every 10 minutes, carry the latest checkpoint). Built in #20; SPEC E8.
-- [ ] (Fix round 1) **Camera research (group 4).** Switching between front and back during one video needs the app's own iPhone recorder (about 400–700 lines of Swift, medium risk) and, on Android, either an undocumented hand-over (high risk) or a GPU step (600–1,000 more lines). Dual capture is a larger separate feature (1,000–2,000 lines per platform, high risk, newer phones only). Build either, and when? Details in "Group 4" above.
-- [ ] (Fix round 1) **No playback while recording.** Group 3 lets nothing play while Saakshi is recording (for example, bug mode in the background), so the recording doesn't pick the playback up, and iPhone doesn't take the microphone from the recorder. The player says so. Is that right, or should playback be allowed (on Android, where the microphone isn't taken)?
-- [ ] (Fix round 1) **Bug mode and the 3% auto-save.** You decided on 22 Oct that bug mode has no 3% auto-save, because its pieces were short and a dying battery lost at most the piece being recorded. With one file, a dying battery now leaves that one file cut off: it still plays up to the cut, its checkpoints prove all but about the last 10 seconds, and it is sealed as interrupted when the app next opens. Keep it so, or add the 3% stop-and-save that body-cam has (which would end bug mode cleanly at 3%, before the phone dies)? I've kept your 22 Oct decision until you answer.
+- [x] (Fix round 1) **Camera research (group 4).** Switching between front and back during one video needs the app's own iPhone recorder (about 400–700 lines of Swift, medium risk) and, on Android, either an undocumented hand-over (high risk) or a GPU step (600–1,000 more lines). Dual capture is a larger separate feature (1,000–2,000 lines per platform, high risk, newer phones only). Build either, and when? Details in "Group 4" above. *Answered 6 Nov:* no camera switching during a video and no front-and-back capture, for now (SPEC E1).
+- [x] (Fix round 1) **No playback while recording.** Group 3 lets nothing play while Saakshi is recording (for example, bug mode in the background), so the recording doesn't pick the playback up, and iPhone doesn't take the microphone from the recorder. The player says so. Is that right, or should playback be allowed (on Android, where the microphone isn't taken)? *Answered 6 Nov:* kept as built (SPEC E5).
+- [x] (Fix round 1) **Bug mode and the 3% auto-save.** You decided on 22 Oct that bug mode has no 3% auto-save, because its pieces were short and a dying battery lost at most the piece being recorded. With one file, a dying battery now leaves that one file cut off: it still plays up to the cut, its checkpoints prove all but about the last 10 seconds, and it is sealed as interrupted when the app next opens. Keep it so, or add the 3% stop-and-save that body-cam has (which would end bug mode cleanly at 3%, before the phone dies)? I've kept your 22 Oct decision until you answer. *Answered 6 Nov:* superseded. There is no 3% stop for any mode; at 5% body-cam and Pocket recording close the file and a new one continues, and the evidence camera never stops by itself (SPEC E1, Low battery; bundle spec 0.9).
 - [ ] (Fix round 1) **Export (group 9): three things built so.** (1) A bug-mode or other sound-only record's button is "Share sound". (2) An evidence-camera record with several photos or videos shares each from its own card, since the share sheet takes one file. (3) The bundle's file and folder names are in English in both languages of the app. Right, or change any?
 - [ ] (Fix round 1) **README and the review session's walkthrough (group 9).** The walkthrough isn't in the repository, so the bundle's README (English and Hindi) couldn't be checked against it. Please compare them, or point me to the walkthrough.
+- [x] (Round 2) **Wording review.** *Answered 6 Nov:* all wording (English and Hindi, legal and ordinary) is reviewed together in one later test round, in one or more passes. Strings marked NEEDS OWNER REVIEW are collected, not reviewed one by one.
+- [ ] (Round 2, review session) **Built so, please confirm.** (1) The secret code can be reset with the phone's passcode only while nothing is running (otherwise whoever holds the phone and its passcode could reset it and switch off "My phone is being taken"). (2) "Cannot be stopped" is worded as "can only be stopped in Saakshi with the code", because force-quit, switch-off and airplane mode remain. (3) The silence alarm's heartbeat is separate from location updates; it says the phone has stopped reporting, not that anything has happened; and a "reporting again" message follows. (4) SMS contacts get no text from the silence alarm (our server sends no SMS; a gateway costs money and needs DLT registration): only those who open the link see it. (5) Body-cam uploads use the same lengthening schedule as Pocket recording. (6) The recordings link is public to whoever holds it, set only for shares the user starts. (7) Notifications go directly through Apple and Google from our own server, not through Expo's push service. (8) Positions to Saakshi contacts are end-to-end encrypted; the live link for SMS contacts stays readable by our server, as today.
 - [ ] (Stream C) **Helpline list updates.** The Help tab fetches `helplines/helplines.json` from raw.githubusercontent.com each time it opens (a plain GET; nothing of the user's is sent, but GitHub sees the phone's IP address). Keep it automatic, or only on a "Check for updates" tap? And should the list be signed, so that a compromised `main` branch can't change numbers on every phone? Today it is only schema-checked.
 - [ ] (Stream C) **Lawyers and medics list.** The schema (`src/modules/helplines/schema.ts`, `helplines/README.md`) shows name, phone, city, state and languages, and records the registration number, consent date and an expiry (`listedUntil`) in the public file. Is publishing the registration number right, or should it be checked and kept off GitHub? Who collects the written consent, and where is it kept?
 - [ ] (Stream C) **"What police may ask of a phone"** (SPEC G5) is left out of the guide: `docs/research/law.md` has nothing on demands to unlock a phone or give a passcode. It needs its own research from statutes and judgments first. Shall I do that next?
@@ -474,6 +499,13 @@ Things that must be done or decided before a release goes public. Streams add it
 - [ ] (Stream D, beta) **Dependency audit:** `npm ci` reports 61 known vulnerabilities in build tools. Triage which, if any, reach the app; don't run `npm audit fix --force`.
 - [ ] (Stream D, beta) **TestFlight public link** (Apple's beta review) and **Play closed test** (12 or more testers for 14 days).
 - [ ] (Review, beta) **Rights and safety guides (G1, G2):** the owner decides whether they join the beta.
+- [ ] (Round 2, release) **Power-off lock requests.** Draft and file the requests to Apple (Feedback Assistant), Google and phone makers asking for a power-off lock; the release notes say a power-off lock is an essential safety feature, which phones offer it, that we have asked, and how readers can ask too (SPEC G5). **At release, not now.**
+- [ ] (Round 2, release, start early) **Google Play's SMS permission:** apply under "Apps that send SMS alerts in emergency situations" so the Play version sends by itself.
+- [ ] (Round 2, release, start early) **Google's review of email sending** (after round 2, for email contacts).
+- [ ] (Round 2, release, start early) **Apple Critical Alerts entitlement** (to sound through Do Not Disturb); time-sensitive notifications are used until then.
+- [ ] (Round 2, release) **Privacy policy, Apple privacy label and Play Data safety:** add every channel and what passes through our server (Saakshi-to-Saakshi, the silence alarm's check-ins, Google Drive), from `docs/spec/alerts.md` section "privacy-policy facts".
+- [ ] (Round 2, beta) **Supabase plan.** The server now carries a safety feature (the silence alarm); the free plan's pausing of quiet projects is unacceptable for the beta. Move `saakshi-live` to Pro before the beta, not only before the public release.
+- [ ] (Round 2, release) **Google Cloud OAuth:** publish the consent screen out of "Testing" so Drive tokens last past a week.
 
 ---
 
