@@ -243,7 +243,7 @@ Apple's attestation object (CBOR, with a certificate chain to Apple's App Attest
 
 ## 7. Bundle
 
-A ZIP file named `Saakshi <record name>.zip`, for example `Saakshi 2026-11-05 10-40 IST Body-cam.zip`: when the record's first file started (IST) and what recorded it (`Body-cam`, `Bug mode`, `Photo`, `Photos`, `Video`, `Videos` or `Camera`), as the app and the witness message (section 9) name it. Entries are stored without compression (method 0). ZIP64 is used when an entry or the archive passes 4 GiB. From 0.8 a reader may also rely on the ZIP being plain: each name once, and a plain path; each local header the same as its central-directory entry; no data descriptors, no symbolic links, and no extra fields but ZIP64's; the entries one after another from the start, with the central directory right after the last.
+A ZIP file named `Saakshi <record name>.zip`, for example `Saakshi 2026-11-05 10-40 IST Body-cam.zip`: when the record's first file started (IST) and what recorded it (`Body-cam`, `Bug mode`, `Photo`, `Photos`, `Video`, `Videos` or `Camera`), as the app and the witness message (section 9) name it. Entries are stored without compression (method 0). ZIP64 is used when an entry or the archive passes 4 GiB. From 0.8 a reader may also rely on the ZIP being plain: each name once, and a plain path; each local header the same as its central-directory entry; no data descriptors, no symbolic links, and no extra fields but ZIP64's; the entries one after another from the start, with the central directory right after the last; then, only if needed, the ZIP64 end record and locator; and the end record in the last 22 bytes, with no comment, agreeing with the ZIP64 record.
 
 From 0.8 the folders and files have names a person can read (fix round 1, group 9), and every part of each name comes from a signed record, so a reader can work it out and check it:
 - **an original:** `Original files/<capture.startedAt in IST, YYYY-MM-DD HH-MM-SS> IST <label><extension of file.name>`;
@@ -373,7 +373,7 @@ With standard tools (`unzip`, `sha256sum`, `openssl`):
 - a file that is not part of the bundle's one layout (for example a copy in a look-alike folder, or at the top);
 - a file in the originals' or records' folder that no record accounts for;
 - names a computer may treat as the same (they differ only in case, or in how a letter is written);
-- a ZIP that is not plain (section 7): a name twice, or with `.` or `..` in it; a local header that differs from the central directory, for example by naming another file; an extra field such as the Unicode Path field (0x7075), which some unzip tools take as the name (ZIP64's and the common timestamp and owner fields are allowed); a gap between entries; an entry marked as a symbolic link.
+- a ZIP that is not plain (section 7): a name twice, or with `.` or `..` in it; a local header that differs from the central directory, for example by naming another file; an extra field such as the Unicode Path field (0x7075), which some unzip tools take as the name (ZIP64's and the common timestamp and owner fields are allowed); a gap between entries; an entry marked as a symbolic link; anything between the central directory and the end records, or a ZIP64 record that disagrees with the end record (either could lead an unzip tool to a second archive in the file).
 
 It skips what a computer adds when unzipping (macOS's `.DS_Store`, `._` files and `__MACOSX/`, and Windows's `Thumbs.db` and `desktop.ini`). It allows `key.pem`, which README.txt's steps make, but only if it is the key in `device-key.json`.
 

@@ -401,10 +401,11 @@ All three checks came out feasible, so nothing falls back to pieces.
   - **every export shared one cache folder,** so sharing one record during another's long copy could remove the file being copied. Each record now has its own.
   - Seven new tests make such bundles; each passed the earlier tool and fails now.
 - **A third review** found that a crafted ZIP, though not a folder, could still unpack a doctored copy at the readable name: through `.` in a name, a local header naming another file on an entry the tool never read, or the Unicode Path extra field, which Python's `zipfile` takes as the name. The app writes plain ZIPs, so the tool now refuses anything else: every name a plain path, every local header the same as the central directory, no extra fields but ZIP64's and timestamps, no gaps between entries, no symbolic links. It skips only the exact files a computer adds (`.DS_Store`, `._`, `__MACOSX/`, `Thumbs.db`, `desktop.ini`), and a `key.pem` left in the bundle must be its key. Three more tests; the reviewer's own attack bundles all fail now.
+- **A fourth, last review** of the ZIP reader found one more: nothing after the central directory was checked, so a second archive could follow it, which Info-ZIP, Python and Java would unpack instead. The tool now requires exactly the ending the app writes (the end record in the last 22 bytes, no comment, the directory right before it or before the ZIP64 records, which must agree). The reviewer found nothing else, and confirmed the app's own ZIPs, ordinary and ZIP64, pass and unpack the same in those tools. One more test.
 - **Left as they are:**
   - on Android, if the app is killed while it writes, a cut-short ZIP can stay in the folder under the bundle's name. expo-file-system can't rename a file in such a folder, so it can't be written under a temporary name first. No ZIP tool or the checking tool will accept it;
   - on iPhone, the bundle is made in the cache, then copied in, so it needs about twice its size free for a moment.
-- Typecheck, lint and 395 tests pass.
+- Typecheck, lint and 396 tests pass.
 
 **Built so, for you to confirm** (also in "Owner questions"):
 - A sound-only record (bug mode) has **"Share sound"**.

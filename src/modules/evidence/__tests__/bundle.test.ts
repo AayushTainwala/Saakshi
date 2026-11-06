@@ -241,6 +241,52 @@ describe('evidence bundle', () => {
 
   describe('a file put where a record\'s file should be (format 0.8)', () => {
     const name = 'Original files/2026-10-20 14-32-03 IST video 1.mp4';
+    const doctored = (bytes: Uint8Array) => {
+      const copy = bytes.slice();
+      copy[100] ^= 1;
+      return copy;
+    };
+    /** Plain stored entries and their central directory, as a hand-made ZIP's parts. */
+    const rawZip = (entries: [string, Uint8Array][], base = 0) => {
+      const locals: Buffer[] = [];
+      const directory: Buffer[] = [];
+      let offset = 0;
+      for (const [entryName, data] of entries) {
+        const nameBytes = Buffer.from(entryName, 'utf8');
+        const crc = crc32(data) >>> 0;
+        const local = Buffer.alloc(30);
+        local.writeUInt32LE(0x04034b50, 0);
+        local.writeUInt16LE(20, 4);
+        local.writeUInt16LE(0x0800, 6);
+        local.writeUInt32LE(crc, 14);
+        local.writeUInt32LE(data.length, 18);
+        local.writeUInt32LE(data.length, 22);
+        local.writeUInt16LE(nameBytes.length, 26);
+        locals.push(local, nameBytes, Buffer.from(data));
+        const central = Buffer.alloc(46);
+        central.writeUInt32LE(0x02014b50, 0);
+        central.writeUInt16LE(20, 4);
+        central.writeUInt16LE(20, 6);
+        central.writeUInt16LE(0x0800, 8);
+        central.writeUInt32LE(crc, 16);
+        central.writeUInt32LE(data.length, 20);
+        central.writeUInt32LE(data.length, 24);
+        central.writeUInt16LE(nameBytes.length, 28);
+        central.writeUInt32LE(base + offset, 42);
+        directory.push(central, nameBytes);
+        offset += 30 + nameBytes.length + data.length;
+      }
+      return { locals: Buffer.concat(locals), directory: Buffer.concat(directory), count: entries.length };
+    };
+    const endRecord = (count: number, size: number, offset: number) => {
+      const end = Buffer.alloc(22);
+      end.writeUInt32LE(0x06054b50, 0);
+      end.writeUInt16LE(count, 8);
+      end.writeUInt16LE(count, 10);
+      end.writeUInt32LE(size, 12);
+      end.writeUInt32LE(offset, 16);
+      return end;
+    };
     const edit = (files: Map<string, Uint8Array>, change: (manifest: { records: { record: string; media: string }[] }) => void) => {
       const manifest = JSON.parse(new TextDecoder().decode(files.get('manifest.json')!));
       change(manifest);
@@ -403,6 +449,59 @@ describe('evidence bundle', () => {
       });
       expect(link.code).toBe(1);
       expect(link.out).toContain('a symbolic link, which a Saakshi bundle never holds');
+    });
+
+    it('refuses a ZIP whose end could lead unzip tools to another archive inside it', async () => {
+      const { files } = await bundleFiles();
+      const bad = [...files].map(([n, b]) => [n, n === name ? doctored(b) : b] as [string, Uint8Array]);
+      const save = (bytes: Buffer) => {
+        const dir = mkdtempSync(join(tmpdir(), 'saakshi-end-'));
+        cleanup.push(dir);
+        writeFileSync(join(dir, 'end.zip'), bytes);
+        return runVerifier(join(dir, 'end.zip'));
+      };
+      const good = rawZip([...files]);
+
+      // A second, doctored archive after the checked directory; the end record points at the first.
+      const second = rawZip(bad, good.locals.length + good.directory.length);
+      const after = save(Buffer.concat([good.locals, good.directory, second.locals, second.directory, endRecord(good.count, good.directory.length, good.locals.length)]));
+      expect(after.code).toBe(1);
+      expect(after.out).toContain('the central directory ends at byte');
+
+      // A ZIP64 record that points at the doctored archive, which Python's zipfile would follow.
+      const base = good.locals.length + good.directory.length;
+      const other = rawZip(bad, base);
+      const recordAt = base + other.locals.length + other.directory.length;
+      const record = Buffer.alloc(56);
+      record.writeUInt32LE(0x06064b50, 0);
+      record.writeBigUInt64LE(44n, 4);
+      record.writeBigUInt64LE(BigInt(other.count), 24);
+      record.writeBigUInt64LE(BigInt(other.count), 32);
+      record.writeBigUInt64LE(BigInt(other.directory.length), 40);
+      record.writeBigUInt64LE(BigInt(base + other.locals.length), 48);
+      const locator = Buffer.alloc(20);
+      locator.writeUInt32LE(0x07064b50, 0);
+      locator.writeBigUInt64LE(BigInt(recordAt), 8);
+      locator.writeUInt32LE(1, 16);
+      const zip64 = save(Buffer.concat([good.locals, good.directory, other.locals, other.directory, record, locator, endRecord(good.count, good.directory.length, good.locals.length)]));
+      expect(zip64.code).toBe(1);
+      expect(zip64.out).toContain("the ZIP64 record and the ZIP's end record disagree");
+
+      // One more entry in the directory than the end record counts.
+      const extra = rawZip([[name, doctored(files.get(name)!)]], good.locals.length + good.directory.length + 0);
+      const fixed = rawZip([[name, doctored(files.get(name)!)]], good.locals.length + good.directory.length + extra.directory.length);
+      const counted = save(
+        Buffer.concat([good.locals, good.directory, fixed.directory, fixed.locals, endRecord(good.count, good.directory.length + fixed.directory.length, good.locals.length)]),
+      );
+      expect(counted.code).toBe(1);
+      expect(counted.out).toContain(`bytes more than its ${good.count} entries`);
+
+      // The app's own ZIPs, classic and ZIP64, pass.
+      for (const forceZip64 of [false, true]) {
+        const chunks: Uint8Array[] = [];
+        await writeZip({ write: async (b) => void chunks.push(b.slice()) }, [...files].map(([n, b]) => bytesEntry(n, b, new Date(2026, 9, 20))), { forceZip64 });
+        expect(save(Buffer.concat(chunks)).code).toBe(0);
+      }
     });
 
     it('refuses the Unicode Path extra field, which some unzip tools take as the name', async () => {

@@ -128,29 +128,56 @@ function zipSource(path) {
   };
   const u64 = (b, at) => Number(b.readBigUInt64LE(at));
 
-  const tailLength = Math.min(fileSize, 22 + 0xffff);
-  const tail = read(fileSize - tailLength, tailLength);
-  const eocdAt = tail.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
-  if (eocdAt < 0) throw new Error('Not a ZIP file');
-  let count = tail.readUInt16LE(eocdAt + 10);
-  let dirSize = tail.readUInt32LE(eocdAt + 12);
-  let dirOffset = tail.readUInt32LE(eocdAt + 16);
-  if (count === 0xffff || dirSize === 0xffffffff || dirOffset === 0xffffffff) {
-    const locator = tail.subarray(eocdAt - 20, eocdAt);
-    if (locator.readUInt32LE(0) !== 0x07064b50) throw new Error('ZIP64 locator missing');
-    const record = read(u64(locator, 8), 56);
-    if (record.readUInt32LE(0) !== 0x06064b50) throw new Error('ZIP64 record missing');
-    count = u64(record, 32);
-    dirSize = u64(record, 40);
-    dirOffset = u64(record, 48);
+  // The end of the ZIP must be exactly what the app writes (export/zip.ts): the end record in the
+  // last 22 bytes, with no comment, and the central directory right before it, or before the ZIP64
+  // record and locator. Otherwise a second archive could sit in the file, which unzip tools that
+  // find the directory another way would unpack instead.
+  const ending = [];
+  if (fileSize < 22) throw new Error('Not a ZIP file');
+  const eocdAt = fileSize - 22;
+  const eocd = read(eocdAt, 22);
+  if (eocd.readUInt32LE(0) !== 0x06054b50) {
+    throw new Error('Not a Saakshi bundle ZIP: it does not end with the ZIP end record (it may have a comment, or something after it)');
   }
+  if (eocd.readUInt16LE(4) !== 0 || eocd.readUInt16LE(6) !== 0) ending.push('the ZIP says it is split over several disks');
+  if (eocd.readUInt16LE(20) !== 0) ending.push('the ZIP has a comment');
+  let count = eocd.readUInt16LE(10);
+  let dirSize = eocd.readUInt32LE(12);
+  let dirOffset = eocd.readUInt32LE(16);
+  if (eocd.readUInt16LE(8) !== count) ending.push("the ZIP's end record gives two different entry counts");
+  let dirEnd = eocdAt;
+  const locatorAt = eocdAt - 20;
+  const hasLocator = locatorAt >= 0 && read(locatorAt, 4).readUInt32LE(0) === 0x07064b50;
+  if (hasLocator) {
+    const locator = read(locatorAt, 20);
+    const recordAt = u64(locator, 8);
+    if (recordAt !== locatorAt - 56) ending.push('the ZIP64 locator does not point right before itself');
+    const record = read(recordAt, 56);
+    if (record.readUInt32LE(0) !== 0x06064b50) throw new Error('ZIP64 record missing');
+    if (u64(record, 4) !== 44) ending.push('the ZIP64 record has extra data');
+    const zipCount = u64(record, 32);
+    const zipSize = u64(record, 40);
+    const zipOffset = u64(record, 48);
+    if (u64(record, 24) !== zipCount) ending.push("the ZIP64 record gives two different entry counts");
+    // Each classic field holds its placeholder, or the same value as the ZIP64 record.
+    if ((count !== 0xffff && count !== zipCount) || (dirSize !== 0xffffffff && dirSize !== zipSize) || (dirOffset !== 0xffffffff && dirOffset !== zipOffset)) {
+      ending.push("the ZIP64 record and the ZIP's end record disagree");
+    }
+    count = zipCount;
+    dirSize = zipSize;
+    dirOffset = zipOffset;
+    dirEnd = recordAt;
+  } else if (count === 0xffff || dirSize === 0xffffffff || dirOffset === 0xffffffff) {
+    throw new Error('ZIP64 locator missing');
+  }
+  if (dirOffset + dirSize !== dirEnd) ending.push(`the central directory ends at byte ${dirOffset + dirSize}, not right before the end records (${dirEnd})`);
 
   const dir = read(dirOffset, dirSize);
   const entries = new Map();
   // Ways the ZIP could unpack differently from what is checked. The app writes plain ZIPs: each
   // entry once, stored, its local header the same as its central one, one after another with
   // nothing between, and no extra fields but ZIP64's. So anything else is refused here.
-  const problems = [];
+  const problems = [...ending];
   const MAX32 = 0xffffffff;
   // ZIP64; and timestamps and owners, which other zip tools add and which name nothing.
   const HARMLESS_EXTRA = new Set([0x0001, 0x000a, 0x5455, 0x7875]);
@@ -177,7 +204,7 @@ function zipSource(path) {
   let at = 0;
   const list = [];
   for (let i = 0; i < count; i++) {
-    if (dir.readUInt32LE(at) !== 0x02014b50) throw new Error('Bad central directory');
+    if (at + 46 > dir.length || dir.readUInt32LE(at) !== 0x02014b50) throw new Error('Bad central directory');
     const flags = dir.readUInt16LE(at + 8);
     const method = dir.readUInt16LE(at + 10);
     const crc = dir.readUInt32LE(at + 16);
@@ -207,6 +234,8 @@ function zipSource(path) {
     list.push(entry);
     at += 46 + nameLength + extraLength + commentLength;
   }
+
+  if (at !== dirSize) problems.push(`the central directory holds ${dirSize - at} bytes more than its ${count} entries`);
 
   // Each local header must say what the central directory says, since tools that read a ZIP front
   // to back go by it; and the entries must follow one another exactly, so none is hidden between.
@@ -329,10 +358,15 @@ function hashWithPrefixes(stream, offsets) {
 // ---- Checks -----------------------------------------------------------------------------------
 
 export async function verifyBundle(path) {
-  const source = statSync(path).isDirectory() ? folderSource(path) : zipSource(path);
   const failures = [];
   const notes = [];
   const fail = (message) => failures.push(message);
+  let source;
+  try {
+    source = statSync(path).isDirectory() ? folderSource(path) : zipSource(path);
+  } catch (error) {
+    return { ok: false, failures: [error instanceof Error ? error.message : String(error)], notes };
+  }
 
   try {
     const keyFile = JSON.parse(source.read('device-key.json').toString('utf8'));
