@@ -87,6 +87,7 @@ In v1.1, C2PA Content Credentials and motion, compass and network readings are a
 ## 5. SOS and confiscation mode
 
 **S1. Emergency contacts and SOS.** Several contacts, stored only on the phone. SOS sends them an SMS with the user's location link and the time. On iPhone the user taps Send once. 112 is always one tap away. The feature is worded as alerting trusted contacts, never as an emergency service.
+- **Three ticks per person (decided 5 Nov 2026, test round 1).** One trusted-contacts list, with three ticks for each person: SOS alerts, live location and witness messages, all ticked by default. Every message fills in the people ticked for it: the SOS alert (and confiscation mode's), the live-location link, the witness message from a record and bug mode's witness texts. The user never types a recipient at the moment of sending.
 
 **S2. SOS sends itself on Android.** In the Android APK, SOS SMS goes out with no tap. The Play build keeps tap-to-send unless Play approves the emergency-alert exception.
 

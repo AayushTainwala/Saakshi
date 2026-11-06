@@ -4,12 +4,14 @@ import i18n from '@/i18n';
 import { getCurrentFix } from '@/modules/location';
 
 import { contactsStore } from '../contacts/fileStore';
+import { forUse } from '../contacts/store';
 import { phoneChannels } from './channels';
 import { AlertController, type AlertState } from './controller';
 
 /** The app's one alert. The SOS tab, and later the code pad and confiscation mode, all drive it. */
 export const alertController = new AlertController({
-  contacts: contactsStore.list,
+  // The people ticked for SOS alerts (fix round 1, group 6).
+  contacts: () => forUse(contactsStore.list(), 'sos'),
   locate: () => getCurrentFix({ timeoutMs: 6000 }),
   now: () => new Date(),
   channels: phoneChannels,

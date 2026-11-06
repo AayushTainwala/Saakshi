@@ -6,8 +6,9 @@ import type { ComposerResult, SmsChannels } from '../alert/channels';
 import { AlertController, type AlertDeps } from '../alert/controller';
 import type { TrustedContact } from '../contacts/store';
 
-const asha: TrustedContact = { id: '1', name: 'Asha', phone: '+919876543210' };
-const ravi: TrustedContact = { id: '2', name: 'Ravi', phone: '+919123456789' };
+const all = { sos: true, live: true, witness: true };
+const asha: TrustedContact = { id: '1', name: 'Asha', phone: '+919876543210', uses: all };
+const ravi: TrustedContact = { id: '2', name: 'Ravi', phone: '+919123456789', uses: all };
 
 const fixed: FixResult = {
   status: 'fixed',

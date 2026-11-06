@@ -1,7 +1,7 @@
 import type { DirectSmsResult } from '@native/saakshi-sos';
 
 import { contactsStore } from '../contacts/fileStore';
-import type { TrustedContact } from '../contacts/store';
+import { type ContactUse, forUse, type TrustedContact } from '../contacts/store';
 import { type ComposerResult, phoneChannels, type SmsChannels } from './channels';
 
 export type TextOutcome =
@@ -10,19 +10,22 @@ export type TextOutcome =
   | { channel: 'none'; reason: 'no-contacts' | 'no-sms' | 'needs-tap' };
 
 /**
- * Texts every trusted contact: by itself where the build and the user allow it (Android APK),
- * otherwise through the Messages app, unless `directOnly` (for texts sent while the screen is
- * locked, such as bug mode's witness messages, where nobody can tap Send).
+ * Texts the trusted contacts ticked for `use` (fix round 1, group 6): by itself where the build and
+ * the user allow it (Android APK), otherwise through the Messages app with them filled in, unless
+ * `directOnly` (for texts sent while the screen is locked, such as bug mode's witness messages,
+ * where nobody can tap Send).
  */
 export async function textTrustedContacts(
   message: string,
-  options: { directOnly?: boolean } = {},
+  options: { use: ContactUse; except?: ContactUse; directOnly?: boolean },
   deps: { contacts: () => readonly TrustedContact[]; channels: SmsChannels } = {
     contacts: contactsStore.list,
     channels: phoneChannels,
   },
 ): Promise<TextOutcome> {
-  const phones = deps.contacts().map((c) => c.phone);
+  const phones = forUse(deps.contacts(), options.use)
+    .filter((c) => !options.except || !c.uses[options.except])
+    .map((c) => c.phone);
   if (phones.length === 0) return { channel: 'none', reason: 'no-contacts' };
   if (await deps.channels.direct.allowed().catch(() => false)) {
     try {

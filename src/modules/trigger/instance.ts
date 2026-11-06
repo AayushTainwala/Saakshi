@@ -12,8 +12,10 @@ export function startConfiscationMode(): Promise<ConfiscationResult> {
       return { link: share.link, invite: liveInvite(share) };
     },
     alert: (liveLink) => alertController.start({ immediate: true, liveLink }),
-    text: async (message) => {
-      await textTrustedContacts(message);
+    // The live link on its own: to the people ticked for live location (those not ticked for SOS
+    // alerts only, when the alert already carried it).
+    text: async (message, to) => {
+      await textTrustedContacts(message, { use: 'live', except: to === 'not-alerted' ? 'sos' : undefined });
     },
   });
 }

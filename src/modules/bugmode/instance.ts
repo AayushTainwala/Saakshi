@@ -34,9 +34,10 @@ export const bugMode = new BugModeController({
       (part) => partListener?.(part),
       onProblem,
     ),
-  witnessCost: async () => ((await canTextWithoutTap()) ? (await getTrustedContacts()).length : 0),
+  // The people ticked for witness messages (fix round 1, group 6).
+  witnessCost: async () => ((await canTextWithoutTap()) ? (await getTrustedContacts('witness')).length : 0),
   witness: async (message) => {
-    const outcome = await textTrustedContacts(message, { directOnly: true });
+    const outcome = await textTrustedContacts(message, { use: 'witness', directOnly: true });
     return outcome.channel === 'direct' ? outcome.results.filter((r) => r.status !== 'failed').length : 0;
   },
   witnessText: (latest, startedAt) =>

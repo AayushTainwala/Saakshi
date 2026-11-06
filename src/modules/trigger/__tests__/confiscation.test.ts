@@ -24,7 +24,8 @@ describe('confiscation mode', () => {
     expect(d.startLive).toHaveBeenCalledWith(CONFISCATION_LIVE_HOURS);
     expect(d.alert).toHaveBeenCalledWith('https://example.org/live/#tok');
     expect(calls.indexOf('alert')).toBeGreaterThan(calls.indexOf('live'));
-    expect(d.text).not.toHaveBeenCalled();
+    // The alert carried the link; it goes on its own only to those ticked for live location and not SOS.
+    expect(d.text).toHaveBeenCalledWith('Follow: https://example.org/live/#tok', 'not-alerted');
   });
 
   it('still alerts when live location fails, without a link', async () => {
@@ -52,7 +53,7 @@ describe('confiscation mode', () => {
     });
     const result = await startConfiscation(d);
     expect(d.alert).toHaveBeenCalledWith(undefined);
-    expect(d.text).toHaveBeenCalledWith('Follow: late');
+    expect(d.text).toHaveBeenCalledWith('Follow: late', 'all');
     expect(result.live).toBe('started');
   });
 });
