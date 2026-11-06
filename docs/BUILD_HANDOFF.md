@@ -19,8 +19,8 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 | 1. Body-cam: back swipe, and sound in the video (C2, C6) | Merged: https://github.com/AayushTainwala/Saakshi/pull/16. Not yet run on a phone. |
 | 2. Body-cam: other fixes (C1–C3) | Merged: https://github.com/AayushTainwala/Saakshi/pull/17. Not yet run on a phone. |
 | 2a. Body-cam: one continuous file, with checkpoints | Merged: https://github.com/AayushTainwala/Saakshi/pull/18. Not yet run on a phone. |
-| 2b. Bug mode: one continuous file, with checkpoints (owner said yes, 6 Nov) | Built: https://github.com/AayushTainwala/Saakshi/pull/20 (branch `claude/keen-rubin-urautd`, from `main` after #19). Not yet run on a phone. |
-| 3. Records list and playback (B1, C6) | Built: https://github.com/AayushTainwala/Saakshi/pull/21 (branch `claude/fix-round-1-group-3`, stacked on #20). Not yet run on a phone. |
+| 2b. Bug mode: one continuous file, with checkpoints (owner said yes, 6 Nov) | Merged: https://github.com/AayushTainwala/Saakshi/pull/20. Not yet run on a phone. |
+| 3. Records list and playback (B1, C6) | Built: https://github.com/AayushTainwala/Saakshi/pull/21 (branch `claude/fix-round-1-group-3`, on `main`). Not yet run on a phone. |
 | 4. Evidence camera: front and back, zoom (B2) | Built: https://github.com/AayushTainwala/Saakshi/pull/22 (branch `claude/fix-round-1-group-4`, stacked on #21). Research items reported below, not built. Not yet run on a phone. |
 | 5. Why a recording ended (B8) | Built: https://github.com/AayushTainwala/Saakshi/pull/23 (branch `claude/fix-round-1-group-5`, stacked on #22). Not yet run on a phone. |
 | 6. Trusted contacts, three ticks per person (B5) | Built: https://github.com/AayushTainwala/Saakshi/pull/24 (branch `claude/fix-round-1-group-6`, stacked on #23). Not yet run on a phone. |
