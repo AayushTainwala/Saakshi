@@ -8,7 +8,6 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
@@ -27,7 +26,7 @@ class BodyCamService : Service() {
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     when (intent?.action) {
       ACTION_START -> start(intent)
-      ACTION_STOP -> stop(fromNotification = intent.getBooleanExtra(EXTRA_FROM_NOTIFICATION, false))
+      ACTION_STOP -> stop()
     }
     return START_NOT_STICKY
   }
@@ -36,7 +35,6 @@ class BodyCamService : Service() {
     val notification = buildNotification(
       intent.getStringExtra(EXTRA_TITLE) ?: "Saakshi",
       intent.getStringExtra(EXTRA_TEXT) ?: "",
-      intent.getStringExtra(EXTRA_STOP_LABEL) ?: "Stop",
     )
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
       startForeground(
@@ -73,7 +71,8 @@ class BodyCamService : Service() {
     running = true
   }
 
-  private fun stop(fromNotification: Boolean = false) {
+  /** Only the app stops body-cam, after its secret code (round 2; SPEC 5.3). */
+  private fun stop() {
     if (!running) {
       stopSelf()
       return
@@ -83,8 +82,6 @@ class BodyCamService : Service() {
     wakeLock?.let { if (it.isHeld) it.release() }
     wakeLock = null
     running = false
-    // Tell the app, so its screen finishes the session, when the notice's Stop button was used.
-    if (fromNotification) CameraRecorder.listener?.invoke("onBodyCamStopped", emptyMap())
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
       stopForeground(STOP_FOREGROUND_REMOVE)
     } else {
@@ -99,7 +96,11 @@ class BodyCamService : Service() {
     super.onDestroy()
   }
 
-  private fun buildNotification(title: String, text: String, stopLabel: String): Notification {
+  /**
+   * The recording notice. It has no Stop button (round 2; SPEC 5.3): body-cam is stopped only in
+   * the app, with the secret code. Tapping the notice opens the app.
+   */
+  private fun buildNotification(title: String, text: String): Notification {
     val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       manager.createNotificationChannel(
@@ -110,11 +111,6 @@ class BodyCamService : Service() {
     val open = launch?.let {
       PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
-    val stopIntent = Intent(this, BodyCamService::class.java).apply {
-      action = ACTION_STOP
-      putExtra(EXTRA_FROM_NOTIFICATION, true)
-    }
-    val stop = PendingIntent.getService(this, 1, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       Notification.Builder(this, CHANNEL_ID)
     } else {
@@ -127,7 +123,6 @@ class BodyCamService : Service() {
       .setSmallIcon(applicationInfo.icon)
       .setOngoing(true)
       .apply { if (open != null) setContentIntent(open) }
-      .addAction(Notification.Action.Builder(Icon.createWithResource(this, applicationInfo.icon), stopLabel, stop).build())
       .build()
   }
 
@@ -142,8 +137,6 @@ class BodyCamService : Service() {
     const val EXTRA_CLIP = "clip"
     const val EXTRA_TITLE = "title"
     const val EXTRA_TEXT = "text"
-    const val EXTRA_STOP_LABEL = "stopLabel"
-    const val EXTRA_FROM_NOTIFICATION = "fromNotification"
     private const val CHANNEL_ID = "saakshi-bodycam"
     private const val NOTIFICATION_ID = 6301
 

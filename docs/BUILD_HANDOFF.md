@@ -4,7 +4,7 @@ The pickup file for build sessions. Each stream keeps its own section current: s
 
 ## Where things stand (21 Oct 2026; fix round 1 from 5 Nov; round 2 decided 6 Nov)
 
-- **Round 2 (6 Nov 2026):** Part 1 under way (groups 1.1, 1.2 and 1.3A built): see "Round 2" below.
+- **Round 2 (6 Nov 2026):** Part 1 under way (groups 1.1 to 1.3 built): see "Round 2" below.
 - **Merged into `main`:** #1–#9. That is R1 and R2 as planned, apart from E3 and E7, plus the law checks against the Gazette of India (#9). Since then: the owner's docs and briefs (#10–#15), and fix round 1, groups 1, 2 and 2a (#16–#18; see "Fix round 1" below). Typecheck, lint, all tests and both native builds pass on `main`.
 - **Pace:** no 24-hour deadline (owner, 21 Oct). The next goal is a beta for about 50 testers on iPhone and Android; see BUILD_PLAN.md, section 1, "Road to the beta".
 - **First Release run (21 Oct, iOS only):** the owner set up iOS credentials and the App Store Connect API key with EAS (role App Manager). The EAS build succeeded; the **Submit to TestFlight step failed**. Its log is visible only to someone signed in to GitHub, so the cause isn't known yet. The owner is submitting that build from his Mac with `eas submit --platform ios --latest`. **Stream D:** find the cause and fix the workflow.
@@ -19,7 +19,7 @@ The owner's decisions after his SOS test are in `docs/SPEC.md` (sections 4, 5, 6
 |---|---|
 | 1.1 Contacts keyboard bug | Built: https://github.com/AayushTainwala/Saakshi/pull/31. Not yet run on a phone. |
 | 1.2 Secret code, Settings | Built: https://github.com/AayushTainwala/Saakshi/pull/32 (on top of 1.1). Not yet run on a phone. |
-| 1.3 SOS swipes, Pocket recording, "My phone is being taken" | Split in two, as the brief allows. **A** (the page, the move, the quick trigger): built, branch `round-2/1-3a-sos-page`, on top of 1.2. **B** ("My phone is being taken", Stop gating): next. Not yet run on a phone. |
+| 1.3 SOS swipes, Pocket recording, "My phone is being taken" | Split in two, as the brief allows. **A** (the page, the move, the quick trigger): https://github.com/AayushTainwala/Saakshi/pull/33. **B** ("My phone is being taken", Stop gating, the server migration): built, branch `round-2/1-3b-phone-taken`, on top of A. Not yet run on a phone. |
 | 1.4 Alerts (both links, battery level, calm Share my location) | Not started |
 | 1.5 Low battery at 5%, bundle format 0.9 | Not started |
 | 2.1–2.3 E7, Google Drive | Not started (needs the owner's Google Cloud project; owner's guide "Round 2 setup guide" is in his vault) |
@@ -114,6 +114,57 @@ Questions for the owner from this round go in "Owner questions" as `- [ ] (Round
 **Not verified:** nothing has run on a phone. The Swift and Kotlin changes compile only in the Native build workflow. Most important: how the swipe feels (on a small and a large phone, and with a thumb in a hurry), VoiceOver and TalkBack, the Action Button and Back Tap opening the SOS screen, and from a locked iPhone. A Back Tap Shortcut made before this change should still run; its action's name in Shortcuts now reads "Open Saakshi SOS".
 
 **NEEDS OWNER REVIEW:** the new and changed wording: `sos.json` (`home`, `trigger`, `bug`), `record.json` (`pocket`, `list.bug`), `common.json` (`swipe`), the widget's and intent's strings (`targets/widget/*.lproj`), the Android widget description, and the microphone permission text, in English and Hindi.
+
+### Group 1.3B: "My phone is being taken", and the code on every Stop
+
+**What was built:**
+- **The third swipe, "My phone is being taken"** (SPEC 5.4). It starts four things, each on its own, so that one failing doesn't stop the rest (`src/modules/trigger/phoneTaken.ts`):
+  - **the SOS alert** to the people ticked for SOS alerts. It waits up to 8 seconds for the live link and goes with it, or goes without it and the link follows on its own; group 1.4 adds the battery level and the map link;
+  - **live location with no fixed end** (below);
+  - **Pocket recording**, without Saakshi's Lock Screen Live Activity, so the locked screen shows less. iOS still shows its orange microphone dot, which an app can't hide. A Pocket recording already running keeps going and loses its Live Activity. The low-battery handover comes with it in group 1.5;
+  - **the silence alarm's heartbeat:** nothing yet. The seam is `heartbeat.start()` and `heartbeat.stop()` in `phoneTakenInstance.ts`, called when the mode starts, when the app restarts with it on, and when it is stopped with the code. Group 3.5 fills it in.
+- **It needs a secret code to start.** Without one, the swipe explains why and offers to set one. Once it is set, the mode starts (built so).
+- **While it runs**, the SOS page shows, in plain words, what really runs. If a part failed, or was stopped on its own with the code, it says so and offers "Try again". It also says that it can only be stopped in Saakshi with the secret code. Its state is saved, so it is still on after the app restarts. The secret code's reset is never offered while it runs.
+- **Stop needs the code, everywhere** (SPEC 5.3): body-cam's Stop, Pocket recording's Stop, live location's Stop, and this mode's Stop all open the code screen first.
+- **Body-cam's Android notification has no Stop button any more.** Tapping it still opens the app. Pocket recording's notification and the Live Activity never had one.
+- **The server** (Supabase `saakshi-live`): migration `supabase/migrations/20261106190000_live_persistent_shares.sql`, **applied on 6 Nov with your approval**.
+  - A share flagged `persistent` isn't deleted at 24 hours. Its end moves to a week after each position or check-in (`live_push`, and the new `live_keep`). The existing cron job deletes it a week after the phone last reported.
+  - `live_keep` makes a share already running persistent, keeping its link, if "My phone is being taken" starts during Share my location.
+  - `live_view` now says whether a share is persistent. The viewer page (`web/live/index.html`) then says "Shared until they stop sharing" in place of an end time a week away.
+  - Ordinary shares, and the app already on phones (which asks with two arguments), are unchanged. The `live` schema stays closed to the API.
+- **Checks run as the `anon` role** on the live server, all passing:
+  - a persistent share starts, ending a week away;
+  - a push with the secret is taken, and its end moves later. Checked across separate calls: within one transaction the database's clock stands still;
+  - a push, a keep and a stop with a wrong secret are refused;
+  - the view says persistent, with only the right position;
+  - an ordinary share from the old two-argument call ends in 4 hours, and `live_keep` turns it persistent;
+  - `live.shares`, `live.positions` and `live.keep_for` are refused to `anon` directly;
+  - both shares stop; afterwards the links show nothing, pushes are refused, and no row is left in either table.
+- **Supabase's security advisor:** the same findings as before, by design (the public functions can be called without signing in, and the tables have row-level security with no policies, so nothing reaches them directly), plus `live_keep` in the first group.
+
+**How each of these can still be stopped outside Saakshi's code screen** (the brief asked for the list; SPEC 5.4, "What this does and does not promise"):
+- **Both platforms:**
+  - switching the phone off, or a forced restart, stops everything. The recording is sealed as cut off when Saakshi next opens;
+  - airplane mode, or no signal, stops nothing on the phone. Recording carries on, and positions wait on the phone until signal returns; texts don't go;
+  - taking away the microphone or location permission in the phone's Settings stops that part;
+  - deleting the app.
+- **iPhone:**
+  - **force-quit** (swiping Saakshi away in the app switcher) is expected to end Pocket recording, body-cam's sound and live location, because they run inside the app. Apple's pages I read don't say so in so many words, and it hasn't been tested. Saakshi doesn't use the location service that iOS restarts after the app ends (significant-change monitoring; [Apple](https://developer.apple.com/documentation/corelocation/cllocationmanager/startmonitoringsignificantlocationchanges())). Apple also says a background notification is dropped "if something force quits or kills the app" ([Apple](https://developer.apple.com/documentation/usernotifications/pushing-background-updates-to-your-app)). So the silence alarm (3.5) is what covers a force-quit. On the server, a persistent share keeps its last position for a week;
+  - iOS can end an app in the background to free memory ("The system can terminate apps at any time to free up memory or other system resources", [Apple](https://developer.apple.com/documentation/corelocation/handling-location-updates-in-the-background));
+  - Control Center on the Lock Screen allows airplane mode unless it is turned off; the walkthrough (Part 4) covers this;
+  - a phone call stops sound recording for its length. A new file follows, as before.
+- **Android:**
+  - **Task Manager's Stop** (the "Active apps" list in the notification shade, Android 13 and later): "The system removes your app from memory. Therefore, your entire app stops, not just the running foreground service … The system doesn't send your app any callbacks when the user taps the Stop button" ([Android](https://developer.android.com/develop/background-work/services/fgs/handle-user-stopping)). **It can't be removed:** that page gives an app no way to opt out, and I found none for an ordinary app;
+  - Settings → Apps → Saakshi → Force stop;
+  - makers' battery managers (Xiaomi, Oppo, Vivo in particular) may stop background services; untested;
+  - swiping Saakshi away from the recent apps is expected to leave its foreground services running; untested.
+- **Inside Saakshi, without the code, still:** body-cam's stop-and-save at 3% battery, which group 1.5 removes; an ordinary live share reaching its end; and a recording ending because the app's screen was torn down (a crash).
+
+**Tests (25 new, 467 in all):** the orchestration: each part started; the alert with the link, or without it when the link is slow, with the late link sent on; each part failing on its own; Stop refused without the code, and done with it; one part failing to stop; still on after a restart, with the heartbeat resumed; no double start; a part restarted. Also: bug mode without its Live Activity, and taking it from a running recording; persistent live shares (start, keep, a share already ended on the server, the end moving with each position, and the server calls exactly as before for an ordinary share); the swipe asking for a code first, then starting; the running card, with a part stopped on its own; Stop only through the code on this mode, Pocket recording and live location; body-cam's Stop asking for the code, and its notification having no Stop.
+
+**Not verified:** nothing has run on a phone; the Kotlin change compiles only in the Native build workflow. Most important to test: the whole mode from a locked phone; that the Live Activity really doesn't appear; force-quit on iPhone (does recording and location stop, as expected?); Task Manager's Stop on Android 13 or later; the viewer page for a persistent share; the code screen over body-cam while it records.
+
+**NEEDS OWNER REVIEW:** the new wording (`sos.json` → `taken`, both languages), and the viewer's new line in English and Hindi.
 
 ## Fix round 1 (iPhone test round 1, A–C)
 
@@ -566,6 +617,8 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [ ] (Round 2) **A Stop when no code is set** (built so): the code screen asks the user to set a code first, and setting it lets the Stop go through. Right? (The alternative, refusing the Stop, would leave a recording that can't be stopped in the app.)
 - [ ] (Round 2) **The waits follow the phone's clock.** Setting the clock forward ends a wait early; setting it back restarts it. Accept? I recommend yes: it needs the phone unlocked, and without the internet an app can't know the true time.
 - [ ] (Round 2) **A phone with no screen lock** can't reset a forgotten code; the screen says to set a passcode first. Right?
+- [ ] (Round 2) **"My phone is being taken" after setting a code** (built so): if no code is set, the swipe asks for one, and once it is set the mode starts at once, since the swipe already said what the user wants. Right, or should it ask for a second swipe?
+- [ ] (Round 2) **Stopping "My phone is being taken" stops everything it runs**, including a Pocket recording or a location share that was already running before it started (built so). Right?
 - [ ] (Stream C) **Helpline list updates.** The Help tab fetches `helplines/helplines.json` from raw.githubusercontent.com each time it opens (a plain GET; nothing of the user's is sent, but GitHub sees the phone's IP address). Keep it automatic, or only on a "Check for updates" tap? And should the list be signed, so that a compromised `main` branch can't change numbers on every phone? Today it is only schema-checked.
 - [ ] (Stream C) **Lawyers and medics list.** The schema (`src/modules/helplines/schema.ts`, `helplines/README.md`) shows name, phone, city, state and languages, and records the registration number, consent date and an expiry (`listedUntil`) in the public file. Is publishing the registration number right, or should it be checked and kept off GitHub? Who collects the written consent, and where is it kept?
 - [ ] (Stream C) **"What police may ask of a phone"** (SPEC G5) is left out of the guide: `docs/research/law.md` has nothing on demands to unlock a phone or give a passcode. It needs its own research from statutes and judgments first. Shall I do that next?

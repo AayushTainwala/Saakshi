@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Platform } from 'react-native';
 
 import { AppText, Button, Card, Screen } from '@/components';
+import { requireSecretCode } from '@/modules/secretcode';
 import { canTextWithoutTap } from '@/modules/sos';
 
 import { MicrophoneDeniedError } from '../engines';
@@ -49,7 +50,9 @@ export function BugModeScreen() {
     }
   };
 
+  // Stop asks for the secret code first (round 2; SPEC 5.3).
   const stop = async () => {
+    if (!(await requireSecretCode({ reason: 'pocket-recording' }))) return;
     setBusy(true);
     await bugMode.stop().finally(() => setBusy(false));
   };

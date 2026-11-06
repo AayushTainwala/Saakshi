@@ -137,8 +137,11 @@
     var map = 'https://www.openstreetmap.org/export/embed.html?bbox=' + (p.lng - d) + '%2C' + (p.lat - d) + '%2C' +
       (p.lng + d) + '%2C' + (p.lat + d) + '&layer=mapnik&marker=' + lat + '%2C' + lng;
     if (map !== lastMap) { $('map').src = map; lastMap = map; }
-    $('ends').textContent = 'Sharing ends ' + time(data.expiresAt) + ' unless they stop it sooner. · ' +
-      'शेयरिंग ' + time(data.expiresAt) + ' पर ख़त्म होगी, अगर वे पहले बंद न करें।';
+    // "My phone is being taken" (round 2): no fixed end; the share lasts while the phone reports.
+    $('ends').textContent = data.persistent
+      ? 'Shared until they stop sharing. · ' + 'जब तक वे शेयर करना बंद न करें, तब तक शेयर होगी।'
+      : 'Sharing ends ' + time(data.expiresAt) + ' unless they stop it sooner. · ' +
+        'शेयरिंग ' + time(data.expiresAt) + ' पर ख़त्म होगी, अगर वे पहले बंद न करें।';
 
     var list = $('trailList');
     list.innerHTML = '';

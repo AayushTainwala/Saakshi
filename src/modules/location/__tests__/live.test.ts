@@ -17,6 +17,7 @@ function setup() {
   const server = {
     start: jest.fn(async () => ({ shareId: 'share-1', viewToken: 'tok_ABCDEFGHIJKLMNOPQRSTU', expiresAt: '2026-10-20T13:00:00Z' })),
     push: jest.fn(async (): Promise<string | null> => '2026-10-20T13:00:00Z'),
+    keep: jest.fn(async (): Promise<string | null> => '2026-10-27T09:00:00Z'),
     stop: jest.fn(async () => true),
   } satisfies LiveApi;
   const tracker = { start: jest.fn(async () => undefined), stop: jest.fn(async () => undefined) };
@@ -40,13 +41,70 @@ function setup() {
 
 const notice = { title: 'Saakshi', body: 'Sharing your location' };
 
+describe('LiveShareController: "My phone is being taken" (round 2, group 1.3)', () => {
+  it('starts a share with no fixed end', async () => {
+    const { live, server, saved } = setup();
+    server.start.mockResolvedValueOnce({ shareId: 'share-1', viewToken: 'tok_ABCDEFGHIJKLMNOPQRSTU', expiresAt: '2026-10-27T09:00:00Z' });
+    const share = await live.start(4, notice, { persistent: true });
+    expect(server.start).toHaveBeenCalledWith(expect.any(String), 4, true);
+    expect(share.persistent).toBe(true);
+    expect(saved().active.persistent).toBe(true);
+  });
+
+  it('makes a share already running persistent, keeping its link', async () => {
+    const { live, server } = setup();
+    const first = await live.start(4, notice);
+    const kept = await live.start(4, notice, { persistent: true });
+    expect(server.keep).toHaveBeenCalledWith('share-1', 'ab'.repeat(32));
+    expect(server.start).toHaveBeenCalledTimes(1);
+    expect(kept).toEqual({ ...first, persistent: true, expiresAt: '2026-10-27T09:00:00Z' });
+    // Asked again, it is already persistent: nothing more to do.
+    await live.start(4, notice, { persistent: true });
+    expect(server.keep).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts afresh if the running share had already ended on the server', async () => {
+    const { live, server, tracker } = setup();
+    await live.start(4, notice);
+    server.keep.mockResolvedValueOnce(null);
+    server.start.mockResolvedValueOnce({ shareId: 'share-2', viewToken: 'tok_ZYXWVUTSRQPONMLKJIHGF', expiresAt: '2026-10-27T09:00:00Z' });
+    const share = await live.start(4, notice, { persistent: true });
+    expect(share.shareId).toBe('share-2');
+    expect(share.persistent).toBe(true);
+    expect(tracker.stop).toHaveBeenCalled();
+  });
+
+  it('moves the end on with every position the server takes', async () => {
+    const { live, server } = setup();
+    await live.start(4, notice, { persistent: true });
+    server.push.mockResolvedValueOnce('2026-10-27T09:05:00Z');
+    await live.receive([point(5)]);
+    expect(live.getShare()?.expiresAt).toBe('2026-10-27T09:05:00Z');
+  });
+
+  it('asks the server for an ordinary share exactly as before', async () => {
+    const calls: { url: string; body: string }[] = [];
+    const api = createLiveApi(async (url, init) => {
+      calls.push({ url, body: init.body });
+      return { ok: true, status: 200, json: async () => (url.endsWith('live_keep') ? '2026-10-27T09:00:00Z' : [{ share_id: 's', view_token: 't', expires_at: 'e' }]) };
+    });
+    await api.start('ab'.repeat(32), 4);
+    await api.start('ab'.repeat(32), 4, true);
+    expect(await api.keep('s', 'secret')).toBe('2026-10-27T09:00:00Z');
+    expect(JSON.parse(calls[0].body)).toEqual({ write_hash_hex: 'ab'.repeat(32), hours: 4 });
+    expect(JSON.parse(calls[1].body)).toEqual({ write_hash_hex: 'ab'.repeat(32), hours: 4, persistent: true });
+    expect(calls[2].url).toMatch(/\/rest\/v1\/rpc\/live_keep$/);
+    expect(JSON.parse(calls[2].body)).toEqual({ share_id: 's', write_secret: 'secret' });
+  });
+});
+
 describe('LiveShareController', () => {
   it('starts a share with only the hash of its secret, and gives a link with the token after #', async () => {
     const { live, server, tracker, saved } = setup();
     const share = await live.start(4, notice);
 
     const expectedHash = createHash('sha256').update('ab'.repeat(32)).digest('hex');
-    expect(server.start).toHaveBeenCalledWith(expectedHash, 4);
+    expect(server.start).toHaveBeenCalledWith(expectedHash, 4, false);
     expect(tracker.start).toHaveBeenCalledWith(notice);
     expect(share.link).toBe(`${LIVE_VIEWER_URL}#tok_ABCDEFGHIJKLMNOPQRSTU`);
     expect(live.getShare()).toEqual(share);

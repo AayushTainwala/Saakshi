@@ -10,6 +10,7 @@ import { BackHandler, Linking, PermissionsAndroid, Platform, Pressable, StyleShe
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, Button, Card, OptionGroup, Screen } from '@/components';
+import { requireSecretCode } from '@/modules/secretcode';
 import { palettes, spacing } from '@/theme';
 
 import type { BatteryAction } from '../battery/monitor';
@@ -216,7 +217,6 @@ export function BodyCamScreen() {
               ...common,
               notificationTitle: t('bodycam.notificationTitle'),
               notificationText: t('bodycam.notificationText'),
-              notificationStop: t('bodycam.notificationStop'),
             })
           : iosBodyCam({ ...common, onProblem: () => setProblem(true) });
       await activateKeepAwakeAsync(KEEP_AWAKE_TAG);
@@ -253,12 +253,11 @@ export function BodyCamScreen() {
     [disablePrevention, session, unlock],
   );
 
-  // Android: stopped from the recording notice's Stop button.
-  useEffect(() => {
-    if (Platform.OS !== 'android' || !SaakshiEvidence || phase !== 'running') return;
-    const subscription = SaakshiEvidence.addListener('onBodyCamStopped', () => void stop());
-    return () => subscription.remove();
-  }, [phase, stop]);
+  // Stop asks for the secret code first (round 2; SPEC 5.3). The recording notice has no Stop.
+  const stopWithCode = useCallback(async () => {
+    if (!(await requireSecretCode({ reason: 'body-cam' }))) return;
+    await stop();
+  }, [stop]);
 
   // Spec E1: warn at 10% and 5%; at 3%, stop and save so a dying battery never cuts a piece off.
   const [batteryNote, setBatteryNote] = useState<string | null>(null);
@@ -434,7 +433,7 @@ export function BodyCamScreen() {
           {notificationsOff ? <AppText style={{ color: dark.textMuted }}>{t('bodycam.notificationsOff')}</AppText> : null}
           {Platform.OS === 'ios' ? <AppText style={{ color: dark.warning }}>{t('bodycam.iosWarning')}</AppText> : null}
           <Button label={t('bodycam.lock')} disabled={phase !== 'running'} onPress={lock} />
-          <Button variant="danger" label={t('bodycam.stop')} busy={phase === 'stopping'} disabled={phase !== 'running'} onPress={() => void stop()} />
+          <Button variant="danger" label={t('bodycam.stop')} busy={phase === 'stopping'} disabled={phase !== 'running'} onPress={() => void stopWithCode()} />
         </SafeAreaView>
       )}
     </View>

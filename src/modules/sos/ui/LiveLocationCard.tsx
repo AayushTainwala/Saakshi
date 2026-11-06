@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AppText, Button, Card } from '@/components';
 import { LocationDeniedError, useLiveLength, useLiveShare } from '@/modules/location';
+import { requireSecretCode } from '@/modules/secretcode';
 
 import { liveInvite, startLiveLocation, stopLiveLocation } from '../alert/live';
 import { textTrustedContacts } from '../alert/text';
@@ -41,7 +42,9 @@ export function LiveLocationCard() {
     }
   };
 
+  // Stop asks for the secret code first (round 2; SPEC 5.3).
   const stop = async () => {
+    if (!(await requireSecretCode({ reason: 'live-location' }))) return;
     setBusy(true);
     await stopLiveLocation().finally(() => setBusy(false));
   };
