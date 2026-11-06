@@ -1,10 +1,12 @@
 import { Platform } from 'react-native';
 
-import { androidFolderName, exportToFolder, pickExportFolder, readExportFolder, saveExportFolder } from '../export/folder';
+import { androidFolderName, ExportFolderError, exportToFolder, pickExportFolder, readExportFolder, saveExportFolder } from '../export/folder';
 
 const mockLog: string[] = [];
 const mockFiles = new Map<string, string>();
 let mockFailWrite = false;
+let mockFailCreate = false;
+let mockNativeError: { code: string; message: string } | null = null;
 
 jest.mock('expo-file-system', () => {
   class File {
@@ -52,6 +54,7 @@ jest.mock('expo-file-system', () => {
     }
     create() {}
     createFile(name: string, mimeType: string) {
+      if (mockFailCreate) throw new Error('Permission Denial: no access to content://tree');
       mockLog.push(`create ${name} (${mimeType})`);
       const file = new File(`${this.uri}/doc-${name}`);
       file.create();
@@ -72,6 +75,7 @@ jest.mock('@native/saakshi-evidence', () => ({
   default: {
     pickExportFolder: async () => ({ bookmark: 'bm1', name: 'Saakshi' }),
     saveToExportFolder: async (bookmark: string, uri: string, name: string) => {
+      if (mockNativeError) throw Object.assign(new Error(mockNativeError.message), { code: mockNativeError.code });
       mockLog.push(`native save ${bookmark} ${uri} ${name}`);
       return { name: 'Saakshi 2026-11-06 10-40 IST Body-cam (2).zip', folder: 'Saakshi', bookmark: 'bm2' };
     },
@@ -98,6 +102,8 @@ beforeEach(() => {
   mockLog.length = 0;
   mockFiles.clear();
   mockFailWrite = false;
+  mockFailCreate = false;
+  mockNativeError = null;
 });
 
 describe('the export folder (fix round 1, group 9)', () => {
@@ -145,9 +151,25 @@ describe('the export folder (fix round 1, group 9)', () => {
   it('Android: leaves no half-written bundle behind', async () => {
     jest.replaceProperty(Platform, 'OS', 'android');
     mockFailWrite = true;
-    await expect(exportToFolder('s1', { platform: 'android', uri: 'content://tree', name: null })).rejects.toThrow('disk full');
+    const failed = exportToFolder('s1', { platform: 'android', uri: 'content://tree', name: null });
+    await expect(failed).rejects.toThrow('disk full');
+    await expect(failed).rejects.toMatchObject({ problem: 'write' });
     expect(mockLog.at(-1)).toBe('delete content://tree/doc-Saakshi 2026-11-06 10-40 IST Body-cam.zip');
     expect(mockFiles.size).toBe(0);
+  });
+
+  it('says when the folder itself is the problem', async () => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+    mockFailCreate = true;
+    const gone = exportToFolder('s1', { platform: 'android', uri: 'content://tree', name: null });
+    await expect(gone).rejects.toBeInstanceOf(ExportFolderError);
+    await expect(gone).rejects.toMatchObject({ problem: 'gone' });
+
+    jest.replaceProperty(Platform, 'OS', 'ios');
+    mockNativeError = { code: 'ERR_FOLDER_ACCESS', message: 'iOS no longer gives access to that folder.' };
+    await expect(exportToFolder('s1', { platform: 'ios', bookmark: 'bm1', name: 'Saakshi' })).rejects.toMatchObject({ problem: 'access' });
+    // The bundle made in the cache is still removed.
+    expect(mockLog).toEqual(['delete cache:/exports/b.zip']);
   });
 
   it('iPhone: copies the bundle in through the bookmark, keeps a refreshed one, and clears the cache', async () => {

@@ -33,6 +33,13 @@ jest.mock('../export/bundle', () => ({
   shareBundle: async () => void mockCalls.push('share bundle'),
 }));
 jest.mock('../export/folder', () => ({
+  ExportFolderError: class extends Error {
+    problem: string;
+    constructor(mockProblem: string, message: string) {
+      super(message);
+      this.problem = mockProblem;
+    }
+  },
   readExportFolder: () => mockFolder,
   saveExportFolder: (folder: ExportFolder) => {
     mockFolder = folder;
@@ -44,7 +51,9 @@ jest.mock('../export/folder', () => ({
   },
   exportToFolder: async (id: string, folder: ExportFolder) => {
     mockCalls.push(`export ${id} to ${folder.name}`);
-    if (folder.name === 'Gone') throw new Error('No such folder');
+    const { ExportFolderError } = jest.requireMock('../export/folder');
+    if (folder.name === 'Gone') throw new ExportFolderError('gone', 'No such folder');
+    if (folder.name === 'Broken record') throw new Error('0001.mp4 is missing or has changed size; run Check files.');
     return { folder, fileName: folder.platform === 'ios' ? 'Saakshi 2026-11-06 10-40 IST Body-cam.zip' : null };
   },
 }));
@@ -163,12 +172,26 @@ describe('the record screen\'s two actions (fix round 1, group 9)', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Export evidence bundle' }));
     const failed = alerts.at(-1)!;
     expect(failed.title).toBe('Couldn’t save the bundle');
-    expect(failed.body).toContain('No such folder');
+    expect(failed.body).toBe(
+      'Saakshi couldn’t save to Gone. The folder may have been moved or deleted, or Saakshi’s access to it removed. Choose a folder again, or share the bundle instead.',
+    );
     await act(async () => failed.buttons!.find((b) => b.text === 'Share the bundle instead')!.onPress!());
     expect(mockCalls.at(-1)).toBe('share bundle');
 
     mockPicked = { platform: 'android', uri: 'content://x/tree/primary%3ADownload', name: 'Download' };
     await fireEvent.press(screen.getByRole('button', { name: 'Change folder' }));
     expect(screen.getByText('Saves to: Download')).toBeTruthy();
+  });
+
+  it('doesn\'t blame the folder for a problem with the record itself', async () => {
+    mockSession = session([item(0), item(1)]);
+    mockFolder = { platform: 'android', uri: 'content://x/tree/ok', name: 'Broken record' };
+    await render(wrap(<SessionDetail id="s1" />));
+    await fireEvent.press(screen.getByRole('button', { name: 'Export evidence bundle' }));
+    expect(alerts.at(-1)).toEqual({
+      title: 'Couldn’t save the bundle',
+      body: '0001.mp4 is missing or has changed size; run Check files.',
+      buttons: undefined,
+    });
   });
 });

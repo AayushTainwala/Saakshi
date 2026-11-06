@@ -20,6 +20,20 @@ import { Readable } from 'node:stream';
 const SUPPORTED_VERSIONS = ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'];
 // Where the records are: records/ up to 0.7, "Signed records/" from 0.8.
 const RECORD_PATH = /^(records|Signed records)\/[^/]+\.json$/;
+// Where the originals are: media/ up to 0.7, "Original files/" from 0.8.
+const NEW_RECORDS = 'Signed records/';
+const NEW_MEDIA = 'Original files/';
+const MEDIA_FOLDERS = ['media/', NEW_MEDIA];
+
+/** Files a computer adds when a bundle is unzipped or opened (macOS .DS_Store, ._ and __MACOSX). */
+function ignored(name) {
+  return name.startsWith('__MACOSX/') || name.split('/').some((part) => part.startsWith('.'));
+}
+
+/** A plain path inside the bundle: no "..", no leading "/", no backslash, no empty part. */
+function plainPath(name) {
+  return typeof name === 'string' && !name.includes('\\') && name.split('/').every((part) => part !== '' && part !== '.' && part !== '..');
+}
 const RECORD_TYPE = 'saakshi.evidence.record';
 const CHECKPOINT_TYPE = 'saakshi.evidence.checkpoint';
 
@@ -207,8 +221,10 @@ export async function verifyBundle(path) {
         : `No key attestation: ${keyFile.attestationError ?? 'none given'}`,
     );
 
-    // The manifest is not signed: it only says where each record's file is. Every file is then
-    // checked against its signed record, so a wrong entry can only make the check fail.
+    // The manifest is not signed. From 0.8 it says which file in "Original files/" is each record's;
+    // each is then checked against its signed record, no file may be claimed twice, and every file
+    // in "Original files/" must be claimed. So the file at a readable name is always the one checked.
+    // Up to 0.7 a record's file is found by the name it signed (media/<file.name>), as before.
     let manifest = null;
     if (source.has('manifest.json')) {
       try {
@@ -225,7 +241,7 @@ export async function verifyBundle(path) {
     // Every record in the bundle, in chain order (its "sequence"; from 0.8 the names start with it).
     const loaded = source
       .names()
-      .filter((name) => RECORD_PATH.test(name))
+      .filter((name) => RECORD_PATH.test(name) && !ignored(name))
       .map((name) => {
         const body = source.read(name);
         let record = null;
@@ -244,6 +260,8 @@ export async function verifyBundle(path) {
     // Checkpoints by recording, waiting for their file's record (which comes after them).
     const pending = new Map();
     let checkpointCount = 0;
+    // Each original checked, and the record it was checked against.
+    const claimed = new Map();
     for (const [index, { name, body, record }] of loaded.entries()) {
       const bodyHash = createHash('sha256').update(body).digest('hex');
       const label = name;
@@ -271,10 +289,17 @@ export async function verifyBundle(path) {
         if (!pending.has(record.recording)) pending.set(record.recording, []);
         pending.get(record.recording).push({ label, record });
       } else {
-        const media = mediaOf.get(name) ?? `media/${record.file?.name}`;
+        const folder = name.startsWith(NEW_RECORDS) ? NEW_MEDIA : 'media/';
+        const media = folder === NEW_MEDIA ? mediaOf.get(name) : `media/${record.file?.name}`;
         const checkpoints = record.recording ? (pending.get(record.recording) ?? []) : [];
         if (record.recording) pending.delete(record.recording);
-        if (!source.has(media)) {
+        if (media === undefined) {
+          fail(`${label}: manifest.json doesn't say which file in "${NEW_MEDIA}" is this record's`);
+        } else if (!plainPath(media) || ignored(media) || !media.startsWith(folder) || media.slice(folder.length).includes('/')) {
+          fail(`${label}: its file is named ${JSON.stringify(media)}, which is not a file in "${folder}"`);
+        } else if (claimed.has(media)) {
+          fail(`${media}: claimed by ${claimed.get(media)} and by ${label}`);
+        } else if (!source.has(media)) {
           fail(`${label}: ${media} is missing`);
         } else {
           if (source.size(media) !== record.file.size) fail(`${media}: size differs from its record`);
@@ -282,6 +307,7 @@ export async function verifyBundle(path) {
             source.stream(media),
             checkpoints.map((c) => c.record.file?.size),
           );
+          claimed.set(media, label);
           if (read.sha256 !== record.file.sha256) {
             fail(`${media}: SHA-256 ${read.sha256} differs from its record (${record.file.sha256})`);
           }
@@ -325,9 +351,25 @@ export async function verifyBundle(path) {
       fail(`${checkpoints[0].label}: checkpoint of recording ${recording}, whose file's record is not in the bundle`);
     }
 
+    // Nothing in the originals' or records' folders that no record vouches for.
+    const recordNames = new Set(loaded.map((entry) => entry.name));
+    for (const name of source.names()) {
+      // Folder entries (a bundle zipped again), and what a computer adds, are skipped.
+      if (ignored(name) || name.endsWith('/')) continue;
+      if (MEDIA_FOLDERS.some((folder) => name.startsWith(folder)) && !claimed.has(name)) {
+        fail(`${name}: no signed record in this bundle vouches for this file`);
+      }
+      if (name.startsWith(NEW_RECORDS) || name.startsWith('records/')) {
+        const recordName = name.endsWith('.sig') ? name.slice(0, -4) : name;
+        if (!recordNames.has(recordName)) fail(`${name}: not a record of this bundle, or its signature`);
+      }
+    }
+
     if (manifest && manifest.chainHead !== lastBodyHash) fail(`manifest.json: chainHead differs from the last record (${lastBodyHash})`);
+    for (const [media, label] of claimed) notes.push(`Checked ${media} against ${label}`);
     notes.push(`Records: ${loaded.length}${checkpointCount ? ` (${checkpointCount} of them checkpoints)` : ''}`);
     notes.push(`Chain head: ${lastBodyHash}`);
+    notes.push('Compare the chain head with a witness message or another copy held elsewhere: this tool cannot tell whether the last records were taken off the end.');
   } catch (error) {
     fail(error instanceof Error ? error.message : String(error));
   } finally {

@@ -237,6 +237,80 @@ describe('evidence bundle', () => {
     expect(out).toContain('FAIL Original files/2026-10-20 14-32-03 IST video 2.mp4: size differs from its record');
   });
 
+  describe('a file put where a record\'s file should be (format 0.8)', () => {
+    const name = 'Original files/2026-10-20 14-32-03 IST video 1.mp4';
+    const edit = (files: Map<string, Uint8Array>, change: (manifest: { records: { record: string; media: string }[] }) => void) => {
+      const manifest = JSON.parse(new TextDecoder().decode(files.get('manifest.json')!));
+      change(manifest);
+      files.set('manifest.json', new TextEncoder().encode(JSON.stringify(manifest)));
+    };
+    const doctor = (files: Map<string, Uint8Array>) => {
+      const changed = files.get(name)!.slice();
+      changed[100] ^= 1;
+      files.set(name, changed);
+    };
+
+    it('catches a doctored file at the readable name, with the genuine one hidden and named in the manifest', async () => {
+      const { files } = await bundleFiles();
+      const genuine = files.get(name)!;
+      doctor(files);
+      files.set('Original files/genuine.bin', genuine);
+      edit(files, (m) => void (m.records[1].media = 'Original files/genuine.bin'));
+      const folder = writeFolder(files);
+      cleanup.push(folder);
+      const { code, out } = runVerifier(folder);
+      expect(code).toBe(1);
+      expect(out).toContain(`FAIL ${name}: no signed record in this bundle vouches for this file`);
+    });
+
+    it('catches a manifest that names a file outside the bundle, or in another folder', async () => {
+      const { files } = await bundleFiles();
+      const genuine = files.get(name)!;
+      doctor(files);
+      for (const media of ['../outside-genuine.bin', '.hidden/g.bin', 'media/0001-clip0-seg0.mp4', 'Original files/../manifest.json']) {
+        const copy = new Map(files);
+        edit(copy, (m) => void (m.records[1].media = media));
+        const dir = writeFolder(copy);
+        // The genuine file, beside the folder: a reader must not go there.
+        writeFileSync(join(dir, '..', 'outside-genuine.bin'), genuine);
+        cleanup.push(dir, join(dir, '..', 'outside-genuine.bin'));
+        const { code, out } = runVerifier(dir);
+        expect(code).toBe(1);
+        expect(out).toContain(`FAIL Signed records/0001 video 1.json: its file is named ${JSON.stringify(media)}, which is not a file in "Original files/"`);
+      }
+    });
+
+    it('catches a record left out of the manifest, and one file claimed twice', async () => {
+      const { files } = await bundleFiles();
+      const missing = new Map(files);
+      edit(missing, (m) => void (m.records = m.records.filter((r) => r.record !== 'Signed records/0001 video 1.json')));
+      const twice = new Map(files);
+      edit(twice, (m) => void (m.records[2].media = m.records[1].media));
+      const a = writeFolder(missing);
+      const b = writeFolder(twice);
+      cleanup.push(a, b);
+      expect(runVerifier(a).out).toContain('FAIL Signed records/0001 video 1.json: manifest.json doesn\'t say which file in "Original files/" is this record\'s');
+      expect(runVerifier(b).out).toContain(`FAIL ${name}: claimed by Signed records/0001 video 1.json and by Signed records/0002 video 2.json`);
+    });
+
+    it('catches a stray record, and ignores what a computer adds when unzipping', async () => {
+      const { files } = await bundleFiles();
+      const stray = new Map(files);
+      stray.set('Signed records/0009 video 9.json', new TextEncoder().encode('{}'));
+      const mac = new Map(files);
+      mac.set('Original files/.DS_Store', new Uint8Array([1]));
+      mac.set('__MACOSX/Signed records/._0001 video 1.json', new Uint8Array([1]));
+      const a = writeFolder(stray);
+      const b = writeFolder(mac);
+      cleanup.push(a, b);
+      expect(runVerifier(a).code).toBe(1);
+      const ok = runVerifier(b);
+      expect(ok.out).toContain('OK: signatures, files, checkpoints and chain check out.');
+      expect(ok.out).toContain(`Checked ${name} against Signed records/0001 video 1.json`);
+      expect(ok.out).toContain('cannot tell whether the last records were taken off the end');
+    });
+  });
+
   it('catches a removed segment', async () => {
     const { files } = await bundleFiles();
     const folder = writeFolder(files);

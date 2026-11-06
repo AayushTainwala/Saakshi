@@ -7,7 +7,8 @@ import { CERTIFICATE_NAME, HASH_REPORT_NAME, MEDIA_FOLDER, RECORDS_FOLDER } from
  * bundle. It is not an app screen, so it is not in the i18n files: every bundle carries both
  * languages, whatever the app's language. The steps are section 10 of docs/spec/evidence-bundle.md.
  *
- * NEEDS OWNER REVIEW: the Hindi text, and the closing lines on section 63(4)(c).
+ * NEEDS OWNER REVIEW: the whole text (it tells a court reader what the bundle proves), the Hindi,
+ * and the closing lines on section 63(4)(c).
  */
 export function readme(input: {
   /** "2026-11-05 10-40 IST Body-cam". */
@@ -74,11 +75,13 @@ HOW THE PROOF WORKS
 
 A fingerprint (SHA-256) is a long number worked out from every byte of a file. If even one byte of
 the file changes, the fingerprint changes. Each record holds its file's fingerprint and is signed
-with a key that never leaves the phone. Each record also holds the fingerprint of the record
-before it, so the records form a chain: a record cannot be removed, added or swapped without it
-showing. The fingerprint of the last record, the "chain head", stands for the whole recording. If
-a witness message was sent, the trusted contacts who received it hold the same chain head, sent
-at the time; ${HASH_REPORT_NAME} lists the witness messages.
+with the phone's own key, which Saakshi keeps on the phone and never sends anywhere. Each record
+also holds the fingerprint of the record before it, so the records form a chain: a record cannot
+be changed, added, or taken out of the middle without it showing. The fingerprint of the last
+record, the "chain head", stands for the whole recording. Records taken off the end don't show
+from the bundle alone; they show against a chain head that someone else holds. If a witness
+message was sent, the trusted contacts who received it hold the chain head as it was then;
+${HASH_REPORT_NAME} lists the witness messages.
 
 HOW A LAWYER OR EXPERT CHECKS IT
 
@@ -90,7 +93,8 @@ The quick way: with Node.js, run tools/verify-bundle.mjs from the Saakshi reposi
     node verify-bundle.mjs "${fileName}"
 
 It prints "OK" if every signature, file, checkpoint and the chain check out, and says what is
-wrong if not.
+wrong if not. It lists each file it checked, and the chain head to compare with any witness
+message.
 
 By hand, with standard tools (the full steps are in docs/spec/evidence-bundle.md, section 10, in
 the same repository):
@@ -161,12 +165,14 @@ present, is Part A, filled in by the app. The app cannot provide Part B.
 सबूत कैसे काम करता है
 
 फ़िंगरप्रिंट (SHA-256) एक लंबी संख्या है जो फ़ाइल के हर बाइट से निकाली जाती है। फ़ाइल का एक भी बाइट
-बदले तो फ़िंगरप्रिंट बदल जाता है। हर रिकॉर्ड में उसकी फ़ाइल का फ़िंगरप्रिंट होता है, और उस पर ऐसी की
-से हस्ताक्षर होता है जो कभी फ़ोन से बाहर नहीं जाती। हर रिकॉर्ड में उससे पहले वाले रिकॉर्ड का
-फ़िंगरप्रिंट भी होता है, इसलिए रिकॉर्ड एक कड़ी (chain) बनाते हैं: कोई रिकॉर्ड हटाया, जोड़ा या बदला
-जाए तो पता चल जाता है। आख़िरी रिकॉर्ड का फ़िंगरप्रिंट, यानी "chain head", पूरी रिकॉर्डिंग की पहचान
-है। अगर गवाह मैसेज भेजा गया था, तो जिन भरोसेमंद लोगों को वह मिला उनके पास उसी समय भेजा गया यही
-chain head है; ${HASH_REPORT_NAME} में गवाह मैसेज की सूची है।
+बदले तो फ़िंगरप्रिंट बदल जाता है। हर रिकॉर्ड में उसकी फ़ाइल का फ़िंगरप्रिंट होता है, और उस पर फ़ोन की
+अपनी की से हस्ताक्षर होता है, जिसे साक्षी फ़ोन में ही रखता है और कहीं नहीं भेजता। हर रिकॉर्ड में
+उससे पहले वाले रिकॉर्ड का फ़िंगरप्रिंट भी होता है, इसलिए रिकॉर्ड एक कड़ी (chain) बनाते हैं: कोई
+रिकॉर्ड बदला, जोड़ा या बीच में से हटाया जाए तो पता चल जाता है। आख़िरी रिकॉर्ड का फ़िंगरप्रिंट, यानी
+"chain head", पूरी रिकॉर्डिंग की पहचान है। आख़िर से हटाए गए रिकॉर्ड सिर्फ़ बंडल से पता नहीं चलते;
+वे किसी और के पास रखे chain head से मिलाने पर पता चलते हैं। अगर गवाह मैसेज भेजा गया था, तो जिन
+भरोसेमंद लोगों को वह मिला उनके पास उस समय का chain head है; ${HASH_REPORT_NAME} में गवाह मैसेज की
+सूची है।
 
 वकील या विशेषज्ञ इसकी जाँच कैसे करें
 
@@ -178,7 +184,8 @@ tools/verify-bundle.mjs चलाएँ:
     node verify-bundle.mjs "${fileName}"
 
 अगर हर हस्ताक्षर, फ़ाइल, checkpoint और कड़ी सही है तो यह "OK" लिखता है, और नहीं तो बताता है कि क्या
-ग़लत है।
+ग़लत है। यह हर जाँची गई फ़ाइल की सूची देता है, और chain head भी, ताकि उसे किसी गवाह मैसेज से मिलाया
+जा सके।
 
 हाथ से, आम टूल से (पूरे क़दम उसी रिपॉज़िटरी में docs/spec/evidence-bundle.md के सेक्शन 10 में हैं):
 

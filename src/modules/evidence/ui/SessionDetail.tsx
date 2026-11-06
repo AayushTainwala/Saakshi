@@ -9,7 +9,7 @@ import { spacing } from '@/theme';
 
 import { lastLink } from '../capture/pipeline';
 import { BundleBusyError, shareBundle } from '../export/bundle';
-import { type ExportFolder, exportToFolder, pickExportFolder, readExportFolder, saveExportFolder } from '../export/folder';
+import { type ExportFolder, ExportFolderError, exportToFolder, pickExportFolder, readExportFolder, saveExportFolder } from '../export/folder';
 import { JoinError } from '../export/joinedCopy';
 import { shareKind, shareTarget } from '../export/shareTarget';
 import { needsCopy, playVideo, shareFile, shareJoinedCopy } from '../export/videoActions';
@@ -303,7 +303,7 @@ export function SessionDetail({ id }: { id: string }) {
       }
       return picked;
     } catch (error) {
-      Alert.alert(t('locker.errorTitle'), message(error));
+      Alert.alert(t('locker.errorTitle'), error instanceof ExportFolderError ? t(`export.problem.${error.problem}`) : message(error));
       return null;
     }
   };
@@ -325,11 +325,12 @@ export function SessionDetail({ id }: { id: string }) {
           saved.fileName ? t('export.savedBody', { file: saved.fileName, folder: where }) : t('export.savedBodyNoName', { folder: where }),
         );
       } catch (error) {
-        if (error instanceof BundleBusyError) {
-          Alert.alert(t('locker.errorTitle'), t('export.recording'));
+        // A problem making the bundle (a file missing, say) is not the folder's fault.
+        if (!(error instanceof ExportFolderError)) {
+          Alert.alert(t('export.failedTitle'), bundleError(error));
           return;
         }
-        Alert.alert(t('export.failedTitle'), t('export.failedBody', { folder: folderName(into), error: message(error) }), [
+        Alert.alert(t('export.failedTitle'), t('export.failedBody', { folder: folderName(into), reason: t(`export.problem.${error.problem}`) }), [
           { text: t('export.cancel'), style: 'cancel' },
           { text: t('export.choose'), onPress: () => void chooseFolder() },
           { text: t('export.shareInstead'), onPress: () => void shareBundleNow() },

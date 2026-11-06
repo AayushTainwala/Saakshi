@@ -387,8 +387,17 @@ All three checks came out feasible, so nothing falls back to pieces.
   
   It has a byte-order mark and Windows line ends, so Notepad on an older PC shows the Hindi and the lines.
 - **A certificate made from now on** names the files as the bundle does. One made before keeps the old names (`media/0003-clip0-seg0.mp4`), which the hash report gives as each file's "Name in record".
-- **Guards:** a bundle can't be made while its record is still recording or being sealed, and a record can't be deleted while its bundle is being written.
-- Typecheck, lint and 380 tests pass.
+- **Guards:** a bundle can't be made while its record is still recording or being sealed, and a record can't be deleted while its bundle is being written or copied.
+- **An independent review** found these, and I fixed them:
+  - **the checking tool could say "OK" about a tampered 0.8 bundle.** It found each original through the manifest, which isn't signed, so a doctored file could sit at the readable name with the genuine one elsewhere. Now each record's file must be directly in `Original files/`, no file may be claimed twice, every file there must be claimed, and paths outside the bundle are refused. The tool lists each file it checked. Four new tests make such bundles, and each fails as it should (they passed the old tool);
+  - **the README claimed too much:** that a record "cannot be removed" without it showing. Records taken off the end show only against a chain head held elsewhere, such as a witness message. The README (both languages), the spec and the tool now say so;
+  - **every export failure blamed the folder,** even a missing file in the record. Folder problems and bundle problems now have their own messages;
+  - **the iPhone's folder errors were in English only.** They now have codes, which the app says in English or Hindi;
+  - **on iPhone, a failed copy could leave half a bundle behind,** and the record could be deleted during the copy. Both are fixed. The folder's name is now the one the Files app shows ("iCloud Drive", not "com~apple~CloudDocs").
+- **Left as they are:**
+  - on Android, if the app is killed while it writes, a cut-short ZIP can stay in the folder under the bundle's name. expo-file-system can't rename a file in such a folder, so it can't be written under a temporary name first. No ZIP tool or the checking tool will accept it;
+  - on iPhone, the bundle is made in the cache, then copied in, so it needs about twice its size free for a moment.
+- Typecheck, lint and 386 tests pass.
 
 **Built so, for you to confirm** (also in "Owner questions"):
 - A sound-only record (bug mode) has **"Share sound"**.
@@ -396,7 +405,9 @@ All three checks came out feasible, so nothing falls back to pieces.
 - File and folder names in the bundle are in English, whatever the app's language, so that they read the same for every lawyer and court and every ZIP tool handles them.
 
 **NEEDS OWNER REVIEW:**
-- The README's Hindi, and its closing lines on section 63(4)(c). They say what the old README said: Part A by the person in charge of the device, Part B by an expert (law.md 1A, s.63(4)(c); 1B, the Schedule).
+- The README as a whole, since a court reader may rely on what it says the bundle proves: in particular "How the proof works".
+- Its Hindi.
+- Its closing lines on section 63(4)(c). They say what the old README said: Part A by the person in charge of the device, Part B by an expert (law.md 1A, s.63(4)(c); 1B, the Schedule).
 - The new strings (`share` and `export` in `record.json`, English and Hindi).
 
 **Not checked:** the brief asks the README to agree with the bundle walkthrough the review session is giving you. That walkthrough isn't in the repository, so I couldn't compare them. Please check them against each other, or point me to it.

@@ -328,7 +328,14 @@
     "savedBody": "“{{file}}” is saved in {{folder}}.",
     "savedBodyNoName": "The bundle is saved in {{folder}}.",
     "failedTitle": "Couldn’t save the bundle",
-    "failedBody": "Saakshi couldn’t save to {{folder}}. The folder may have been moved or deleted. Choose a folder again, or share the bundle instead.\n\n{{error}}",
-    "recording": "This record is still being recorded or sealed. Stop recording, wait a moment, then export it."
+    "failedBody": "Saakshi couldn’t save to {{folder}}. {{reason}} Choose a folder again, or share the bundle instead.",
+    "recording": "This record is still being recorded or sealed. Stop recording, wait a moment, then export it.",
+    "problem": {
+      "gone": "The folder may have been moved or deleted, or Saakshi’s access to it removed.",
+      "access": "The phone no longer lets Saakshi use that folder.",
+      "write": "Saving into it failed. It may be full, or its app may not allow it.",
+      "busy": "A folder picker is already open.",
+      "unavailable": "The phone couldn’t show its folder picker."
+    }
   }
 }

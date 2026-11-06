@@ -44,7 +44,7 @@ final class ExportFolder: NSObject, UIDocumentPickerDelegate, UIAdaptivePresenta
     defer { url.stopAccessingSecurityScopedResource() }
     do {
       let bookmark = try url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
-      promise.resolve(["bookmark": bookmark.base64EncodedString(), "name": url.lastPathComponent])
+      promise.resolve(["bookmark": bookmark.base64EncodedString(), "name": ExportFolder.displayName(of: url)])
     } catch {
       promise.reject("ERR_FOLDER_BOOKMARK", error.localizedDescription)
     }
@@ -69,21 +69,21 @@ final class ExportFolder: NSObject, UIDocumentPickerDelegate, UIAdaptivePresenta
   /// to keep in its place.
   static func save(bookmark: String, source: URL, name: String) throws -> [String: Any] {
     guard let data = Data(base64Encoded: bookmark) else {
-      throw Exception(name: "ERR_FOLDER_GONE", description: "The saved folder can't be read.")
+      throw Exception(name: "ExportFolderGone", description: "The saved folder can't be read.", code: "ERR_FOLDER_GONE")
     }
     var stale = false
     let folder: URL
     do {
       folder = try URL(resolvingBookmarkData: data, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
     } catch {
-      throw Exception(name: "ERR_FOLDER_GONE", description: error.localizedDescription)
+      throw Exception(name: "ExportFolderGone", description: error.localizedDescription, code: "ERR_FOLDER_GONE")
     }
     guard folder.startAccessingSecurityScopedResource() else {
-      throw Exception(name: "ERR_FOLDER_ACCESS", description: "iOS no longer gives access to that folder.")
+      throw Exception(name: "ExportFolderAccess", description: "iOS no longer gives access to that folder.", code: "ERR_FOLDER_ACCESS")
     }
     defer { folder.stopAccessingSecurityScopedResource() }
 
-    var result: [String: Any] = ["folder": folder.lastPathComponent]
+    var result: [String: Any] = ["folder": displayName(of: folder)]
     if stale, let fresh = try? folder.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil) {
       result["bookmark"] = fresh.base64EncodedString()
     }
@@ -96,13 +96,22 @@ final class ExportFolder: NSObject, UIDocumentPickerDelegate, UIAdaptivePresenta
         try FileManager.default.copyItem(at: source, to: url)
       } catch {
         copyError = error
+        // Don't leave half a bundle behind (but never remove a file that was there already).
+        if (error as? CocoaError)?.code != .fileWriteFileExists {
+          try? FileManager.default.removeItem(at: url)
+        }
       }
     }
     if let error = coordinationError ?? copyError {
-      throw Exception(name: "ERR_FOLDER_WRITE", description: error.localizedDescription)
+      throw Exception(name: "ExportFolderWrite", description: error.localizedDescription, code: "ERR_FOLDER_WRITE")
     }
     result["name"] = target.lastPathComponent
     return result
+  }
+
+  /// The name the Files app shows ("iCloud Drive", not "com~apple~CloudDocs"). Needs access.
+  static func displayName(of url: URL) -> String {
+    (try? url.resourceValues(forKeys: [.localizedNameKey]))?.localizedName ?? url.lastPathComponent
   }
 
   private static func freeName(in folder: URL, for name: String) -> URL {
