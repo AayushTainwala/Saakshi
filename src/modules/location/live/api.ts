@@ -1,6 +1,10 @@
 import { LIVE_SERVER } from './config';
 
-export type LivePoint = { lat: number; lng: number; acc: number | null; at: string };
+/**
+ * One position for the server. `bat` is the battery level, 0 to 100, when the phone sent it, or
+ * absent (round 2, group 1.4); the server keeps it with the position and the viewer shows it.
+ */
+export type LivePoint = { lat: number; lng: number; acc: number | null; at: string; bat?: number | null };
 
 export type StartedShare = { shareId: string; viewToken: string; expiresAt: string };
 

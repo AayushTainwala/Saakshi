@@ -1,4 +1,4 @@
-import { batteryMonitor } from '../battery/monitor';
+import { batteryMonitor } from '../monitor';
 
 describe('batteryMonitor', () => {
   it('warns once at 10%, once at 5%, and stops once at 3%', () => {

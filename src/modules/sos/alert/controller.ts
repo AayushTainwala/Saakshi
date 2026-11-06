@@ -33,16 +33,26 @@ export type AlertDeps = {
   channels: SmsChannels;
   /** Read when the text is written, so it follows the app's language at that moment. */
   labels: () => AlertLabels;
+  /** The battery level, 0 to 100, or null if the phone doesn't say (round 2: every alert carries it). */
+  battery: () => Promise<number | null>;
   countdownSeconds?: number;
+  /** How long the alert waits for a live link that is still being made. */
+  liveWaitMs?: number;
 };
 
-type Plan = { recipients: TrustedContact[]; message: string; located: boolean };
+/** "I need help": the live link joins the alert if it is ready within this long (SPEC 5.2). */
+export const LIVE_WAIT_MS = 8000;
+
+type Plan = { recipients: TrustedContact[]; message: string; located: boolean; liveLink: string | null };
 
 export type StartOptions = {
   /** Skip the countdown: the code pad (S4) is already a deliberate act. */
   immediate?: boolean;
-  /** A live-location link (S3) to include. */
-  liveLink?: string;
+  /**
+   * A live-location link (S3) to include, or one still being made: the alert waits for it while it
+   * finds the position, up to `LIVE_WAIT_MS`, and goes without it after that.
+   */
+  liveLink?: string | Promise<string | null>;
 };
 
 /**
@@ -71,6 +81,11 @@ export class AlertController {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   };
+
+  /** The live link the last alert carried, or null (so the link can follow on its own if it didn't). */
+  get lastLiveLink(): string | null {
+    return this.lastPlan?.liveLink ?? null;
+  }
 
   get busy(): boolean {
     return ['countdown', 'locating', 'sending'].includes(this.current.phase);
@@ -137,13 +152,31 @@ export class AlertController {
     this.set({ phase: 'idle' });
   }
 
-  private async makePlan(recipients: TrustedContact[], liveLink?: string): Promise<Plan> {
-    const where = await this.deps.locate();
+  private async makePlan(recipients: TrustedContact[], liveLink?: string | Promise<string | null>): Promise<Plan> {
+    // The position, the live link and the battery are found at the same time.
+    const [where, link, battery] = await Promise.all([
+      this.deps.locate(),
+      this.waitForLink(liveLink),
+      this.deps.battery().catch(() => null),
+    ]);
     return {
       recipients,
-      message: alertMessage(where, this.deps.now(), this.deps.labels(), liveLink),
+      message: alertMessage(where, this.deps.now(), this.deps.labels(), { liveLink: link, battery }),
       located: where.status === 'fixed',
+      liveLink: link,
     };
+  }
+
+  private async waitForLink(liveLink?: string | Promise<string | null>): Promise<string | null> {
+    if (liveLink === undefined) return null;
+    if (typeof liveLink === 'string') return liveLink;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<null>((resolve) => (timer = setTimeout(() => resolve(null), this.deps.liveWaitMs ?? LIVE_WAIT_MS)));
+    try {
+      return await Promise.race([liveLink.catch(() => null), late]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private async deliver(run: number, channel: 'direct' | 'composer'): Promise<void> {

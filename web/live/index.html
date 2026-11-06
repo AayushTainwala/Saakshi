@@ -53,6 +53,7 @@
   <section id="where" class="card" hidden>
     <div class="big" id="ago"></div>
     <div id="detail"></div>
+    <div id="battery" hidden></div>
     <div class="links">
       <a id="gmaps" target="_blank" rel="noopener noreferrer">Google Maps</a>
       <a id="osm" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>
@@ -72,12 +73,13 @@
   </section>
 </main>
 <script>
-  // Public by design: the publishable key only lets a browser call the four live_* functions.
+  // Public by design: the publishable key only lets a browser call the public live_* functions.
   var SUPABASE_URL = 'https://ppmaxuksrdjhnlnfcfgt.supabase.co';
   var SUPABASE_KEY = 'sb_publishable_HTTTU0RIQO5b6Cn9G6kHqA_H7kyg4cG';
   var REFRESH_MS = 15000;
 
-  var token = decodeURIComponent((location.hash || '').replace(/^#/, ''));
+  // A full stop or bracket a messaging app took into the link is not part of the token.
+  var token = decodeURIComponent((location.hash || '').replace(/^#/, '')).replace(/[.,;:!?)\]]+$/, '');
   var $ = function (id) { return document.getElementById(id); };
   var timer = null;
   var lastMap = '';
@@ -130,6 +132,15 @@
     $('ago').textContent = 'Last seen ' + a.en + ' · ' + a.hi;
     var acc = p.acc != null ? ' · ±' + Math.round(p.acc) + ' m' : '';
     $('detail').textContent = time(p.at) + acc + ' · ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5);
+    // The battery level when the phone sent its newest reading (round 2), with how long ago that was.
+    var withBattery = positions.filter(function (q) { return q.bat != null; })[0];
+    if (withBattery) {
+      var b = ago(withBattery.at);
+      $('battery').textContent = 'Battery ' + withBattery.bat + '% (' + b.en + ') · ' + 'बैटरी ' + withBattery.bat + '% (' + b.hi + ')';
+      $('battery').hidden = false;
+    } else {
+      $('battery').hidden = true;
+    }
     var lat = p.lat.toFixed(5), lng = p.lng.toFixed(5);
     $('gmaps').href = 'https://maps.google.com/?q=' + lat + ',' + lng;
     $('osm').href = 'https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lng + '#map=17/' + lat + '/' + lng;

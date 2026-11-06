@@ -9,7 +9,7 @@ import { LiveLocationCard } from '../ui/LiveLocationCard';
 
 const mockStopLive = jest.fn(async () => undefined);
 jest.mock('../alert/live', () => ({
-  liveInvite: () => 'invite',
+  liveInviteNow: async () => 'invite',
   startLiveLocation: jest.fn(),
   stopLiveLocation: () => mockStopLive(),
 }));

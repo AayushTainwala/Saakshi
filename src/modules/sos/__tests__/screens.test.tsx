@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { Linking } from 'react-native';
 
 import { initI18n } from '@/i18n';
+import { liveShare } from '@/modules/location';
 import { PreferencesProvider } from '@/preferences/PreferencesProvider';
 
 import { contactsStore } from '../contacts/fileStore';
@@ -101,8 +102,11 @@ describe('SOS screens', () => {
 
   it('asks for trusted contacts when "I need help" is swiped with nobody to alert', async () => {
     await render(wrap(<SosHome />));
+    const start = jest.spyOn(liveShare, 'start');
     await swipe('swipe-help');
     expect(await screen.findByText('You have no trusted contacts for SOS alerts yet.')).toBeTruthy();
+    // No location is shared with nobody told.
+    expect(start).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByRole('button', { name: 'Add trusted contacts' }));
     expect(router.push).toHaveBeenCalledWith('/settings/contacts');
     await fireEvent.press(screen.getByRole('button', { name: 'Done' }));

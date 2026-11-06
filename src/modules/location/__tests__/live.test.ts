@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { createLiveApi, type LiveApi, type LivePoint } from '../live/api';
 import { LIVE_VIEWER_URL } from '../live/config';
-import { type LiveDeps, LiveShareController, MAX_PENDING } from '../live/share';
+import { type LiveDeps, LiveShareController, MAX_PENDING, withBattery } from '../live/share';
 
 const point = (minute: number): LivePoint => ({
   lat: 19.076,
@@ -40,6 +40,27 @@ function setup() {
 }
 
 const notice = { title: 'Saakshi', body: 'Sharing your location' };
+
+describe('the battery level in every location update (round 2, group 1.4)', () => {
+  it('goes with the newest position of each delivery', () => {
+    expect(withBattery([point(2), point(5), point(3)], 82)).toEqual([point(2), { ...point(5), bat: 82 }, point(3)]);
+    expect(withBattery([point(2)], null)).toEqual([point(2)]);
+    expect(withBattery([], 82)).toEqual([]);
+  });
+
+  it('is sent to the server with its position, and kept while there is no signal', async () => {
+    const { live, server, saved } = setup();
+    await live.start(4, notice);
+    server.push.mockRejectedValueOnce(new Error('offline'));
+    await live.receive([{ ...point(1), bat: 64 }]);
+    expect(saved().active.pending).toEqual([{ ...point(1), bat: 64 }]);
+    await live.receive([{ ...point(2), bat: 63 }]);
+    expect(server.push).toHaveBeenLastCalledWith('share-1', 'ab'.repeat(32), [
+      { ...point(1), bat: 64 },
+      { ...point(2), bat: 63 },
+    ]);
+  });
+});
 
 describe('LiveShareController: "My phone is being taken" (round 2, group 1.3)', () => {
   it('starts a share with no fixed end', async () => {

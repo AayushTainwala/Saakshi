@@ -5,7 +5,7 @@ import { Linking } from 'react-native';
 
 import { Button, Screen, SwipeControl } from '@/components';
 
-import { alertController, useAlertState } from '../alert/instance';
+import { alertController, startNeedHelp, useAlertState } from '../alert/instance';
 import { AlertPanel } from './AlertPanel';
 import { LiveLocationCard } from './LiveLocationCard';
 
@@ -35,8 +35,8 @@ export function SosHome({ phoneTaken, running }: { phoneTaken?: ReactNode; runni
         label={t('home.help')}
         detail={t('home.helpDetail')}
         confirm={{ title: t('home.helpConfirm.title'), body: t('home.helpConfirm.body'), action: t('home.helpConfirm.action') }}
-        // A full swipe is already a deliberate act: no countdown (as for the old code pad).
-        onConfirm={() => void alertController.start({ immediate: true })}
+        // The alert with both links and the battery, and live location for the Settings length.
+        onConfirm={() => void startNeedHelp()}
       />
       {phoneTaken}
       <LiveLocationCard />

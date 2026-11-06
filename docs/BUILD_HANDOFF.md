@@ -4,7 +4,7 @@ The pickup file for build sessions. Each stream keeps its own section current: s
 
 ## Where things stand (21 Oct 2026; fix round 1 from 5 Nov; round 2 decided 6 Nov)
 
-- **Round 2 (6 Nov 2026):** Part 1 under way (groups 1.1 to 1.3 built): see "Round 2" below.
+- **Round 2 (6 Nov 2026):** Part 1 under way (groups 1.1 to 1.4 built): see "Round 2" below.
 - **Merged into `main`:** #1–#9. That is R1 and R2 as planned, apart from E3 and E7, plus the law checks against the Gazette of India (#9). Since then: the owner's docs and briefs (#10–#15), and fix round 1, groups 1, 2 and 2a (#16–#18; see "Fix round 1" below). Typecheck, lint, all tests and both native builds pass on `main`.
 - **Pace:** no 24-hour deadline (owner, 21 Oct). The next goal is a beta for about 50 testers on iPhone and Android; see BUILD_PLAN.md, section 1, "Road to the beta".
 - **First Release run (21 Oct, iOS only):** the owner set up iOS credentials and the App Store Connect API key with EAS (role App Manager). The EAS build succeeded; the **Submit to TestFlight step failed**. Its log is visible only to someone signed in to GitHub, so the cause isn't known yet. The owner is submitting that build from his Mac with `eas submit --platform ios --latest`. **Stream D:** find the cause and fix the workflow.
@@ -19,8 +19,8 @@ The owner's decisions after his SOS test are in `docs/SPEC.md` (sections 4, 5, 6
 |---|---|
 | 1.1 Contacts keyboard bug | Built: https://github.com/AayushTainwala/Saakshi/pull/31. Not yet run on a phone. |
 | 1.2 Secret code, Settings | Built: https://github.com/AayushTainwala/Saakshi/pull/32 (on top of 1.1). Not yet run on a phone. |
-| 1.3 SOS swipes, Pocket recording, "My phone is being taken" | Split in two, as the brief allows. **A** (the page, the move, the quick trigger): https://github.com/AayushTainwala/Saakshi/pull/33. **B** ("My phone is being taken", Stop gating, the server migration): built, branch `round-2/1-3b-phone-taken`, on top of A. Not yet run on a phone. |
-| 1.4 Alerts (both links, battery level, calm Share my location) | Not started |
+| 1.3 SOS swipes, Pocket recording, "My phone is being taken" | Split in two, as the brief allows. **A** (the page, the move, the quick trigger): https://github.com/AayushTainwala/Saakshi/pull/33. **B** ("My phone is being taken", Stop gating, the server migration): https://github.com/AayushTainwala/Saakshi/pull/34. Not yet run on a phone. |
+| 1.4 Alerts (both links, battery level, calm Share my location) | Built: branch `round-2/1-4-alerts`, on top of 1.3B. Not yet run on a phone. |
 | 1.5 Low battery at 5%, bundle format 0.9 | Not started |
 | 2.1–2.3 E7, Google Drive | Not started (needs the owner's Google Cloud project; owner's guide "Round 2 setup guide" is in his vault) |
 | 3.1 Protocol `docs/spec/alerts.md` | Not started. **Documents only; needs the owner's review before Part 3 code.** May start with Part 1. |
@@ -165,6 +165,44 @@ Questions for the owner from this round go in "Owner questions" as `- [ ] (Round
 **Not verified:** nothing has run on a phone; the Kotlin change compiles only in the Native build workflow. Most important to test: the whole mode from a locked phone; that the Live Activity really doesn't appear; force-quit on iPhone (does recording and location stop, as expected?); Task Manager's Stop on Android 13 or later; the viewer page for a persistent share; the code screen over body-cam while it records.
 
 **NEEDS OWNER REVIEW:** the new wording (`sos.json` → `taken`, both languages), and the viewer's new line in English and Hindi.
+
+### Group 1.4: the alerts
+
+**What was built:**
+- **"I need help"** (SPEC 5.2). It sends one alert to the people ticked for SOS alerts, and live location starts for the Settings length (`sos/alert/help.ts`). If nobody is ticked for SOS alerts, the alert says so and no location is shared. The alert carries:
+  - the current-location map link (Google Maps), with its accuracy and the time of the fix;
+  - the live-location link;
+  - the battery level ("Battery: not known" if the phone doesn't say);
+  - the time sent.
+
+  The alert waits for the live link only while it is finding the position, up to 8 seconds; the position, the link and the battery are found at the same time. A link that comes later is texted on its own, in the calm message. When the alert carried it, the people ticked for live location but not for SOS alerts get it on its own. If live location can't start, the alert still goes.
+- **"Share my location":** a calm message to the people ticked for live location, never worded as an alert. For example: "I'm sharing my location with you until 18:40 IST. Battery 82%." and then "Follow it here: <link>". A share with no fixed end says "until I stop". "Send the link again", and the link that follows an alert or "My phone is being taken", use the same message with the battery level read at that moment.
+- **The battery level in every location update.** The phone reads the level each time positions arrive, and sends it with the newest of them. The server keeps it with that position (migration `supabase/migrations/20261106200000_live_battery.sql`, applied 6 Nov). The viewer page shows the newest level and how long ago it was sent, in English and Hindi: "Battery 82% (3 minutes ago) · बैटरी 82% (3 मिनट पहले)".
+  - **One difference from the brief, for you to confirm:** the brief says "an optional argument to `live_push`". I put the level inside each position (`"bat"`) instead. A new argument would mean dropping `live_push` and making it again, as the 1.3 migration had to for `live_start`. While two versions existed side by side, the server couldn't choose between them, and the app already on phones would stop working. A level inside the position also stays with the position it belongs to when positions wait for signal. `live_push`'s call is unchanged.
+  - A missing, non-numeric or out-of-range level is stored as unknown, and the position is still taken.
+- **Checks as the `anon` role** on the live server, passing: a push with levels 82, missing, `"abc"` and 150 is taken; the view gives 82 and three unknowns, newest first; stop; nothing left.
+- **The SMS budget.** These are the limits the tests hold the messages to, at their longest: a place far off, poor accuracy, a fix from another day, a full battery and the real link.
+
+  | Message | English | Hindi |
+  |---|---|---|
+  | "I need help" | at most 2 parts; 258 of 306 characters | at most 5 parts; 4 for a usual alert |
+  | "Share my location" | 1 part; 151 of 160 characters | at most 3 parts |
+
+  English uses only GSM characters, so the location's accuracy now reads "within 20 m" (the "±" sign isn't in GSM's alphabet and would have made the whole alert Unicode). Each link ends its line, so a full stop can't be taken into it. The viewer page also now ignores a full stop or bracket a messaging app added to the end of the link.
+- **The battery reading's shared place:** `src/platform/battery` (`monitor.ts` and `useLowBattery.ts` moved there from `evidence/battery`, plus `readBatteryPercent`). The evidence module uses it from there. There is also `src/platform/sms` (`smsParts`).
+
+**Tests (23 new, 490 in all):**
+- The message builders: every field, a missing battery or position, a fix from an earlier day, links at line ends, GSM only in English, the budget in both languages, and the calm message reading as no alert.
+- "I need help": the link in time, late, or failing.
+- The alert controller waiting for the link only as long as for the position, and carrying the battery.
+- The battery on the newest position, and kept while there is no signal.
+- The battery reader.
+- The SMS part counter.
+- The viewer page's own script, run against a stand-in page: the battery line and its age, the newest position with a level, no line without one, "until they stop sharing", and a full stop in the link.
+
+**Not verified:** on a phone. How Messages and SMS apps split and show a 2-part alert. Whether iPhone's background location task gets a battery reading every time (if not, that position has none, and the viewer shows the last one known with its age).
+
+**NEEDS OWNER REVIEW:** the new wording in `sos.json` (`message.accuracy`, `message.battery`, `message.batteryUnknown`, `message.share*`) and the viewer's battery line, in English and Hindi. The Hindi share message is written to need no gendered verb ("मेरी लोकेशन … शेयर हो रही है").
 
 ## Fix round 1 (iPhone test round 1, A–C)
 
@@ -619,6 +657,7 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [ ] (Round 2) **A phone with no screen lock** can't reset a forgotten code; the screen says to set a passcode first. Right?
 - [ ] (Round 2) **"My phone is being taken" after setting a code** (built so): if no code is set, the swipe asks for one, and once it is set the mode starts at once, since the swipe already said what the user wants. Right, or should it ask for a second swipe?
 - [ ] (Round 2) **Stopping "My phone is being taken" stops everything it runs**, including a Pocket recording or a location share that was already running before it started (built so). Right?
+- [ ] (Round 2) **Battery level with each position, not as a new argument to `live_push`** (group 1.4). The brief says "an optional argument to `live_push`". A new argument would mean replacing the function in a way that, for a while, stops the app already on phones from sending positions, so the level travels inside each position instead. It does the same job, and stays with the right position when positions wait for signal. Right?
 - [ ] (Stream C) **Helpline list updates.** The Help tab fetches `helplines/helplines.json` from raw.githubusercontent.com each time it opens (a plain GET; nothing of the user's is sent, but GitHub sees the phone's IP address). Keep it automatic, or only on a "Check for updates" tap? And should the list be signed, so that a compromised `main` branch can't change numbers on every phone? Today it is only schema-checked.
 - [ ] (Stream C) **Lawyers and medics list.** The schema (`src/modules/helplines/schema.ts`, `helplines/README.md`) shows name, phone, city, state and languages, and records the registration number, consent date and an expiry (`listedUntil`) in the public file. Is publishing the registration number right, or should it be checked and kept off GitHub? Who collects the written consent, and where is it kept?
 - [ ] (Stream C) **"What police may ask of a phone"** (SPEC G5) is left out of the guide: `docs/research/law.md` has nothing on demands to unlock a phone or give a passcode. It needs its own research from statutes and judgments first. Shall I do that next?
@@ -854,6 +893,7 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
 - **App Review notes:** I added an optional "R2 features" block to `store/apple/review-notes.md`, covering live location's server, background audio and location, the controls, and why the Location Always string exists though it is never requested. All blocks stay under 4000 bytes (checked by the store tests).
 - **Privacy label, Play Data safety and privacy policy for an R2 build.** The policy says it will be updated before live location ships. The facts:
   - Positions (precise location) go to our Supabase server (Mumbai) only while the user shares, for App Functionality, and are deleted when sharing stops or after at most 24 hours.
+    - **Round 2 changes these facts** (groups 1.3 and 1.4): a "My phone is being taken" share has no fixed end. It is kept while the phone reports and deleted a week after its last position, or when it is stopped with the code. And each position now carries the battery level when the phone sent it, shown to whoever has the link. Both need to be in the privacy texts.
   - There is no account and nothing that identifies the user: the share is a random id and token.
   - Supabase's request logs probably record the phone's IP address for their own retention period. I have not checked that period.
   - Nothing else goes to us.

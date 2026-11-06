@@ -4,7 +4,7 @@ import { useSyncExternalStore } from 'react';
 import { bugMode } from '@/modules/bugmode';
 import { liveLength } from '@/modules/location';
 import { isSecretCodeSet, requireSecretCode } from '@/modules/secretcode';
-import { alertController, liveInvite, startLiveLocation, stopLiveLocation, textTrustedContacts } from '@/modules/sos';
+import { alertController, liveInviteNow, startLiveLocation, stopLiveLocation, textTrustedContacts } from '@/modules/sos';
 
 import { PhoneTakenController, type PhoneTakenState } from './phoneTaken';
 
@@ -31,7 +31,7 @@ export const phoneTaken = new PhoneTakenController({
   startLive: async () => {
     // No fixed end; the Settings length is not used for this share.
     const { share } = await startLiveLocation(liveLength.get(), { sendLink: false, persistent: true });
-    return { link: share.link, invite: liveInvite(share) };
+    return { link: share.link, invite: await liveInviteNow(share) };
   },
   stopLive: stopLiveLocation,
   alert: (liveLink) => alertController.start({ immediate: true, liveLink }),
