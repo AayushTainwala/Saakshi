@@ -1,7 +1,8 @@
 import Constants from 'expo-constants';
+import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { AppText, Card, OptionGroup, Screen } from '@/components';
+import { AppText, Button, Card, OptionGroup, Screen } from '@/components';
 import { usePreferences } from '@/preferences/PreferencesProvider';
 import type { LanguagePreference, ThemePreference } from '@/preferences/store';
 
@@ -37,6 +38,10 @@ export default function SettingsScreen() {
         value={preferences.theme}
         onChange={setTheme}
       />
+
+      <AppText variant="heading">{t('certificates.heading')}</AppText>
+      <AppText color="textMuted">{t('certificates.body')}</AppText>
+      <Button variant="secondary" label={t('certificates.open')} onPress={() => router.push('/settings/certificate-profile')} />
 
       <AppText variant="heading">{t('about.heading')}</AppText>
       <Card>

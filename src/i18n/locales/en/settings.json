@@ -12,6 +12,11 @@
     "light": "Light",
     "dark": "Dark"
   },
+  "certificates": {
+    "heading": "Certificates",
+    "body": "Your name, address and the phone’s IMEI for Part A of the certificate under section 63(4)(c) of the Bharatiya Sakshya Adhiniyam, 2023. Kept only on this phone.",
+    "open": "Your details for certificates"
+  },
   "about": {
     "heading": "About",
     "version": "Version {{version}}",
