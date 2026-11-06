@@ -22,7 +22,8 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 | 2b. Bug mode: one continuous file, with checkpoints (owner said yes, 6 Nov) | Built: https://github.com/AayushTainwala/Saakshi/pull/20 (branch `claude/keen-rubin-urautd`, from `main` after #19). Not yet run on a phone. |
 | 3. Records list and playback (B1, C6) | Built: https://github.com/AayushTainwala/Saakshi/pull/21 (branch `claude/fix-round-1-group-3`, stacked on #20). Not yet run on a phone. |
 | 4. Evidence camera: front and back, zoom (B2) | Built: https://github.com/AayushTainwala/Saakshi/pull/22 (branch `claude/fix-round-1-group-4`, stacked on #21). Research items reported below, not built. Not yet run on a phone. |
-| 5–9 | Not started |
+| 5. Why a recording ended (B8) | Built: https://github.com/AayushTainwala/Saakshi/pull/23 (branch `claude/fix-round-1-group-5`, stacked on #22). Not yet run on a phone. |
+| 6–9 | Not started |
 
 ### Where fix round 1 stands, and what's next (6 Nov 2026)
 
@@ -289,6 +290,23 @@ All three checks came out feasible, so nothing falls back to pieces.
   - that zoom during a video doesn't end the file;
   - that front-camera video on Android plays upright.
 - Whether expo-camera calls `onCameraReady` again after a lens change. The zoom controls are learnt there, and stay as they were if it doesn't.
+
+### Group 5: why a recording ended (#23)
+
+**What was built:**
+- Each file on the record screen, and the recording as a whole (its last file), says why it ended, in plain words, in English and Hindi. There are words for all twelve end reasons the records can hold. The ones the brief named:
+  - "You stopped it."
+  - "Stopped when you left Saakshi or locked the phone."
+  - "Battery low: stopped and saved."
+  - "Cut off: the app closed or the phone switched off…".
+  - A test checks that every end reason has words in both languages.
+- **The evidence camera** now stops a video only when Saakshi goes into the background, and records that as `app-left` (it recorded `stopped`). Only covering the app (Control Center, Notification Center) leaves it recording, as you decided for body-cam in group 2.
+
+**Found:** iPhone doesn't tell an app whether the user locked the phone or left the app; both look the same to the app (it goes into the background). The only public signal is `UIApplication.protectedDataWillBecomeUnavailableNotification`, "posts shortly before protected files are locked down and become inaccessible" ([Apple](https://developer.apple.com/documentation/uikit/uiapplication/protecteddatawillbecomeunavailablenotification)). It comes only on a phone with a passcode, and Apple gives no timing, so a lock a few seconds after leaving can't be told apart. So one sentence covers both, and says why. Android records in the background, so it never needs this.
+
+**For the next test round, a genuine cut-off:** while recording (evidence camera, body-cam or bug mode), force-restart the iPhone: volume up, volume down, then hold the side button until the Apple logo. When Saakshi opens again, the record should say "Cut off: …", and Check files should pass.
+
+**Not verified:** on a phone, that the evidence camera now keeps recording under Control Center and Notification Center (expo-camera's capture session isn't stopped when the app is only covered; untested).
 
 ## Owner questions
 

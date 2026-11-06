@@ -68,7 +68,6 @@
     "deleteCancel": "Keep it",
     "deleteConfirm": "Delete",
     "deleteBusy": "This record is still being recorded, saved or copied. Try again when that has finished.",
-    "itemInterrupted": "Cut off before it was stopped (the app closed or the phone switched off). It plays up to the cut, and was sealed when the app next opened.",
     "video": "Video",
     "audio": "Sound"
   },
@@ -270,5 +269,20 @@
       "one-video": "This record has only one video file; share it on its own.",
       "unsealed": "Not every file of this record is sealed yet. Try again in a moment."
     }
+  },
+  "ended": {
+    "label": "Ended: {{reason}}",
+    "stopped": "You stopped it.",
+    "pieceComplete": "This piece was complete; the next one carried on.",
+    "appLeft": "Stopped when you left Saakshi or locked the phone. (iPhone records video only while Saakshi is on screen.)",
+    "cameraInUse": "Stopped because another app took the camera.",
+    "systemPressure": "Stopped because the phone was under strain, for example too hot.",
+    "cameraLost": "Stopped because the camera stopped working.",
+    "lowBattery": "Battery low: stopped and saved.",
+    "audioInterrupted": "Sound stopped, for example for a phone call.",
+    "soundResumed": "Ended so that the next file has sound again.",
+    "videoResumed": "Ended when video started again.",
+    "interrupted": "Cut off: the app closed or the phone switched off. It plays up to the cut, and was sealed when the app next opened.",
+    "error": "Ended because the file could not be written."
   }
 }

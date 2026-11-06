@@ -273,10 +273,12 @@ export function CaptureScreen() {
     else router.back();
   }, [session, stopRecording]);
 
-  // The camera can't record in the background; close the file cleanly instead.
+  // The camera can't record in the background; close the file cleanly instead, and say why (fix
+  // round 1, group 5). Only covering the app (Control Center, Notification Center) leaves it
+  // recording, as for body-cam (group 2).
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') void stopRecording();
+      if (state === 'background') void stopRecording('app-left');
     });
     return () => subscription.remove();
   }, [stopRecording]);
