@@ -49,7 +49,6 @@
     "statusWitness": "Witness message sent",
     "statusCertificate": "Certificate (Part A) made",
     "notYet": "Not yet",
-    "export": "Export bundle",
     "exportDialog": "Share evidence bundle",
     "check": "Check files",
     "checkOkTitle": "All files match",
@@ -222,12 +221,6 @@
   "video": {
     "play": "Play",
     "playCopy": "Play (MP4 copy)",
-    "share": "Share video",
-    "cancel": "Cancel",
-    "shareTitle": "Share this video",
-    "shareBody": "The original recording (.ts) is your evidence and stays unchanged on this phone. Many phones and computers play an MP4 copy more easily. The copy is made without re-encoding and has its own signed record naming the original. For court, export the bundle, which holds the original.",
-    "shareCopy": "Share the MP4 copy",
-    "shareOriginal": "Share the original (.ts)",
     "copyMade": "MP4 copy for playing (not the original). SHA-256 {{sha256}}"
   },
   "list": {
@@ -270,9 +263,7 @@
     "missing": "This photo is no longer on your phone."
   },
   "joined": {
-    "share": "Share the whole video",
     "making": "Joining the files…",
-    "help": "For sharing, this record’s files are joined into one MP4 copy, made without re-encoding where the phone can. It is a copy, not the original: the files below stay your evidence, and the copy’s own signed record names each of them. For court, export the bundle.",
     "made": "Joined MP4 copy for sharing (not the original). SHA-256 {{sha256}}",
     "madeReencoded": "Joined MP4 copy for sharing (not the original; the phone had to re-encode it). SHA-256 {{sha256}}",
     "error": {
@@ -313,5 +304,31 @@
       "managed": "manages",
       "operated": "operates"
     }
+  },
+  "share": {
+    "video": "Share video",
+    "photo": "Share photo",
+    "sound": "Share sound",
+    "helpFile": "Send it with your phone’s share menu, to WhatsApp, Instagram, YouTube, Mail and others. This sends the file as it was recorded; it also stays here as your evidence.",
+    "helpCopy": "Send it with your phone’s share menu, to WhatsApp, Instagram, YouTube, Mail and others. This sends an MP4 copy that plays everywhere, made without re-encoding; the original stays here as your evidence.",
+    "helpJoined": "Send the whole recording as one video with your phone’s share menu, to WhatsApp, Instagram, YouTube, Mail and others. Its files are joined into one MP4 copy, without re-encoding where the phone can; the files below stay here as your evidence.",
+    "each": "This record has several photos or videos. Share each one from its card below."
+  },
+  "export": {
+    "button": "Export evidence bundle",
+    "help": "For your lawyer or a court: one ZIP file with the original files, their signed records, the hash report, and a README in English and Hindi that explains how to check them.",
+    "savesTo": "Saves to: {{folder}}",
+    "firstTime": "The first time, you choose a folder to keep bundles in. After that, one tap saves there.",
+    "someFolder": "the folder you chose",
+    "change": "Change folder",
+    "shareInstead": "Share the bundle instead",
+    "choose": "Choose a folder",
+    "cancel": "Cancel",
+    "savedTitle": "Bundle saved",
+    "savedBody": "“{{file}}” is saved in {{folder}}.",
+    "savedBodyNoName": "The bundle is saved in {{folder}}.",
+    "failedTitle": "Couldn’t save the bundle",
+    "failedBody": "Saakshi couldn’t save to {{folder}}. The folder may have been moved or deleted. Choose a folder again, or share the bundle instead.\n\n{{error}}",
+    "recording": "This record is still being recorded or sealed. Stop recording, wait a moment, then export it."
   }
 }

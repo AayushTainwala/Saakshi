@@ -65,6 +65,16 @@ declare class SaakshiEvidenceModule extends NativeModule<SaakshiEvidenceEvents> 
    * re-encodes; iPhone re-encodes only if it can't join otherwise, and says so.
    */
   joinToMp4(request: JoinToMp4Request): Promise<JoinToMp4Result>;
+  /**
+   * iPhone only: the document picker for the default export folder (fix round 1, group 9).
+   * Resolves with a bookmark to keep, and the folder's name, or with null if the user cancels.
+   */
+  pickExportFolder(): Promise<{ bookmark: string; name: string } | null>;
+  /**
+   * iPhone only: copies a file into the bookmarked folder as `name`, or "name (2)" if that is taken.
+   * `bookmark` is set when the old one was stale; keep it in its place.
+   */
+  saveToExportFolder(bookmark: string, sourceUri: string, name: string): Promise<{ name: string; folder: string; bookmark?: string }>;
   /** Android: MP4 copy of an MPEG-TS file without re-encoding; returns the copy's file:// URI. */
   remuxToMp4(input: string, output: string, rotationDegrees: number | null): Promise<string>;
   /** Starts delivering `onVolumeUp` events and stops the volume buttons changing the volume. */
