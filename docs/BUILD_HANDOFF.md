@@ -20,22 +20,22 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 | 2. Body-cam: other fixes (C1–C3) | Merged: https://github.com/AayushTainwala/Saakshi/pull/17. Not yet run on a phone. |
 | 2a. Body-cam: one continuous file, with checkpoints | Merged: https://github.com/AayushTainwala/Saakshi/pull/18. Not yet run on a phone. |
 | 2b. Bug mode: one continuous file, with checkpoints (owner said yes, 6 Nov) | Merged: https://github.com/AayushTainwala/Saakshi/pull/20. Not yet run on a phone. |
-| 3. Records list and playback (B1, C6) | Built: https://github.com/AayushTainwala/Saakshi/pull/21 (branch `claude/fix-round-1-group-3`, on `main`). Not yet run on a phone. |
-| 4. Evidence camera: front and back, zoom (B2) | Built: https://github.com/AayushTainwala/Saakshi/pull/22 (branch `claude/fix-round-1-group-4`, stacked on #21). Research items reported below, not built. Not yet run on a phone. |
-| 5. Why a recording ended (B8) | Built: https://github.com/AayushTainwala/Saakshi/pull/23 (branch `claude/fix-round-1-group-5`, stacked on #22). Not yet run on a phone. |
-| 6. Trusted contacts, three ticks per person (B5) | Built: https://github.com/AayushTainwala/Saakshi/pull/24 (branch `claude/fix-round-1-group-6`, stacked on #23). Not yet run on a phone. |
-| 7. Witness message (B5) | Built: https://github.com/AayushTainwala/Saakshi/pull/25 (branch `claude/fix-round-1-group-7`, stacked on #24). Not yet run on a phone. |
-| 8. Certificate: one profile (B7) | Built: https://github.com/AayushTainwala/Saakshi/pull/26 (branch `claude/fix-round-1-group-8`, stacked on #25). Not yet run on a phone. |
-| 9. Export (B6) | Built: https://github.com/AayushTainwala/Saakshi/pull/27 (branch `claude/fix-round-1-group-9`, stacked on #26). Not yet run on a phone. |
+| 3. Records list and playback (B1, C6) | Merged: https://github.com/AayushTainwala/Saakshi/pull/21. Not yet run on a phone. |
+| 4. Evidence camera: front and back, zoom (B2) | Merged: https://github.com/AayushTainwala/Saakshi/pull/22. Research items reported below, not built. Not yet run on a phone. |
+| 5. Why a recording ended (B8) | Merged: https://github.com/AayushTainwala/Saakshi/pull/23. Not yet run on a phone. |
+| 6. Trusted contacts, three ticks per person (B5) | Merged: https://github.com/AayushTainwala/Saakshi/pull/24. Not yet run on a phone. |
+| 7. Witness message (B5) | Merged: https://github.com/AayushTainwala/Saakshi/pull/25. Not yet run on a phone. |
+| 8. Certificate: one profile (B7) | Merged: https://github.com/AayushTainwala/Saakshi/pull/26. Not yet run on a phone. |
+| 9. Export (B6) | Built: https://github.com/AayushTainwala/Saakshi/pull/27 (branch `claude/fix-round-1-group-9`, on `main`). Not yet run on a phone. |
 
 ### Where fix round 1 stands, and what's next (6 Nov 2026)
 
 For the session that takes over. Read the brief, then this section, then CLAUDE.md as usual.
 
-- **Finished:** groups 1, 2 and 2a are merged into `main` (#16, #17, #18). Each pull request has plain test steps for the owner. Typecheck, lint and all 307 tests pass, and both native builds pass on every one.
-- **Built since:** bug mode as one continuous file with checkpoints (#20, "Bug mode: one continuous file" below). With it, typecheck, lint and 320 tests pass (three tests of the old iPhone pieces went with them).
-- **Not yet tested:** nothing from fix round 1 has run on a phone. The owner's next TestFlight round should follow the test steps in #16, #17 and #18. Step C of #18, a forced restart while recording, is the genuine cut-off test that round 1 couldn't do.
-- **Next: group 3** (records list and playback), on a new branch from the latest `main` (for example `claude/fix-round-1-group-3`), then groups 4 to 9 in the brief's order, one pull request each. The owner merges each pull request; when asked, stack the next group on the previous branch instead, as group 2 was.
+- **Finished:** groups 1 to 8 are merged into `main`: #16, #17 and #18, bug mode (#20), then #21 to #26. Each pull request has plain test steps for the owner, and both native builds passed on every one.
+- **Open:** group 9, export (#27, on `main`). It is the brief's last group. Typecheck, lint and 396 tests pass, and both native builds pass on its native code.
+- **Not yet tested:** nothing from fix round 1 has run on a phone. The owner's next TestFlight round should follow the test steps in each pull request, #16 to #27. Step C of #18, a forced restart while recording, is the genuine cut-off test that round 1 couldn't do.
+- **Next:** the owner's answers to the "(Fix round 1)" questions below, then whatever they decide. Nothing else in the brief is left to build.
 - **What group 3 starts from:**
   - **Body-cam files now:** one file per clip. iPhone video is fragmented MP4 (`.mp4`), and each file's timeline starts at 0. iPhone sound-only files are ADTS (`.aac`). Android is MPEG-TS (`.ts`), with its existing MP4 copy (`Remuxer.kt`).
   - **Bug mode (from #20):** one continuous ADTS AAC file (`.aac`) per recording on both phones, with checkpoints; a follow-on file of the same clip only after the microphone was lost (a call) or a file failed.
