@@ -6,21 +6,23 @@
  * it.
  */
 import { contactsStore } from './contacts/fileStore';
-import type { TrustedContact } from './contacts/store';
+import { type ContactUse, forUse, type TrustedContact } from './contacts/store';
 
 export { alertController, useAlertState } from './alert/instance';
 export { liveInvite, startLiveLocation, stopLiveLocation } from './alert/live';
 export { canTextWithoutTap, textTrustedContacts, type TextOutcome } from './alert/text';
 export type { AlertOutcome, AlertState, StartOptions } from './alert/controller';
-export type { TrustedContact } from './contacts/store';
+export type { ContactUse, TrustedContact } from './contacts/store';
 export { useTrustedContacts } from './contacts/fileStore';
 export { ContactsEditor } from './ui/ContactsEditor';
 export { SosHome } from './ui/SosHome';
 
 /**
  * The user's trusted contacts, as stored on the phone, for other features that message them (such
- * as the witness message, E2). Phones are in international form, such as +919876543210.
+ * as the witness message, E2): all of them, or those ticked for one use (fix round 1, group 6).
+ * Phones are in international form, such as +919876543210.
  */
-export async function getTrustedContacts(): Promise<TrustedContact[]> {
-  return [...contactsStore.list()];
+export async function getTrustedContacts(use?: ContactUse): Promise<TrustedContact[]> {
+  const all = contactsStore.list();
+  return use ? forUse(all, use) : [...all];
 }

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Button, Card, Screen } from '@/components';
+import { getTrustedContacts } from '@/modules/sos';
 import { spacing } from '@/theme';
 
 import { lastLink } from '../capture/pipeline';
@@ -188,12 +189,18 @@ export function SessionDetail({ id }: { id: string }) {
   const witness = async () => {
     setWitnessing(true);
     try {
-      await sendWitnessMessage(id, {
-        title: t('witness.title'),
-        time: t('witness.time'),
-        place: t('witness.place'),
-        noPlace: t('witness.noPlace'),
-      });
+      // The people ticked for witness messages are filled in (fix round 1, group 6).
+      const recipients = (await getTrustedContacts('witness')).map((c) => c.phone);
+      await sendWitnessMessage(
+        id,
+        {
+          title: t('witness.title'),
+          time: t('witness.time'),
+          place: t('witness.place'),
+          noPlace: t('witness.noPlace'),
+        },
+        recipients,
+      );
     } catch (error) {
       Alert.alert(
         t('locker.errorTitle'),

@@ -22,7 +22,7 @@ export async function startLiveLocation(
     body: i18n.t('sos:live.noticeBody'),
   });
   const sent =
-    options.sendLink === false ? null : await textTrustedContacts(liveInvite(share), { directOnly: options.directOnly });
+    options.sendLink === false ? null : await textTrustedContacts(liveInvite(share), { use: 'live', directOnly: options.directOnly });
   return { share, sent };
 }
 

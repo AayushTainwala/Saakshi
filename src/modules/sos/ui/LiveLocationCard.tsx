@@ -51,7 +51,7 @@ export function LiveLocationCard({ hasContacts }: { hasContacts: boolean }) {
             variant="secondary"
             label={t('live.sendLink')}
             disabled={!hasContacts}
-            onPress={() => void textTrustedContacts(liveInvite(share))}
+            onPress={() => void textTrustedContacts(liveInvite(share), { use: 'live' })}
           />
           <Button variant="danger" label={t('live.stop')} busy={busy} onPress={() => void stop()} />
         </>

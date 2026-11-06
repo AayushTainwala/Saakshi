@@ -61,7 +61,15 @@
     "invalid": "That doesn't look like a phone number.",
     "duplicate": "That number is already on the list.",
     "full": "The list is full. Remove someone to add another.",
-    "pickFailed": "Your contacts couldn't be opened: {{detail}}"
+    "pickFailed": "Your contacts couldn't be opened: {{detail}}",
+    "usesIntro": "Tick what each person gets. Everything is ticked for someone new.",
+    "usesLabel": "What {{name}} gets",
+    "usesNone": "Nothing is ticked: this person gets no messages from Saakshi.",
+    "uses": {
+      "sos": "SOS alerts",
+      "live": "Live location",
+      "witness": "Witness messages"
+    }
   },
   "direct": {
     "heading": "Send with no tap",

@@ -16,8 +16,12 @@ export type ConfiscationDeps = {
   startBug: () => Promise<void>;
   /** Starts live location without texting the link; resolves to the link and its invite text. */
   startLive: (hours: number) => Promise<{ link: string; invite: string }>;
-  /** Texts contacts on its own, for a live link that came after the alert had gone. */
-  text: (message: string) => Promise<void>;
+  /**
+   * Texts the live link on its own to the people ticked for live location: all of them when it came
+   * after the alert had gone, or only those not ticked for SOS alerts when the alert carried it
+   * (they didn't get the alert; fix round 1, group 6).
+   */
+  text: (message: string, to: 'all' | 'not-alerted') => Promise<void>;
   /** Sends the SOS alert at once, with the live link if there is one. */
   alert: (liveLink?: string) => Promise<void>;
   liveWaitMs?: number;
@@ -67,6 +71,10 @@ export async function startConfiscation(deps: ConfiscationDeps): Promise<Confisc
 
   await liveStart;
   const late = started as { link: string; invite: string } | null;
-  if (late && !inAlert) await deps.text(late.invite).catch((error) => errors.push(`live link: ${message(error)}`));
+  if (late) {
+    await deps
+      .text(late.invite, inAlert ? 'not-alerted' : 'all')
+      .catch((error) => errors.push(`live link: ${message(error)}`));
+  }
   return { bug: await bug, live, alert, errors };
 }
