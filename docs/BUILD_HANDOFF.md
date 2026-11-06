@@ -24,7 +24,8 @@ The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05
 | 4. Evidence camera: front and back, zoom (B2) | Built: https://github.com/AayushTainwala/Saakshi/pull/22 (branch `claude/fix-round-1-group-4`, stacked on #21). Research items reported below, not built. Not yet run on a phone. |
 | 5. Why a recording ended (B8) | Built: https://github.com/AayushTainwala/Saakshi/pull/23 (branch `claude/fix-round-1-group-5`, stacked on #22). Not yet run on a phone. |
 | 6. Trusted contacts, three ticks per person (B5) | Built: https://github.com/AayushTainwala/Saakshi/pull/24 (branch `claude/fix-round-1-group-6`, stacked on #23). Not yet run on a phone. |
-| 7–9 | Not started |
+| 7. Witness message (B5) | Built: https://github.com/AayushTainwala/Saakshi/pull/25 (branch `claude/fix-round-1-group-7`, stacked on #24). Not yet run on a phone. |
+| 8–9 | Not started |
 
 ### Where fix round 1 stands, and what's next (6 Nov 2026)
 
@@ -324,6 +325,27 @@ All three checks came out feasible, so nothing falls back to pieces.
 - **For other modules:** `getTrustedContacts(use?)` and `textTrustedContacts(message, { use })` from `@/modules/sos`.
 
 **Not verified:** on a phone, that iPhone's Messages composer opens with the witness recipients filled in.
+
+### Group 7: the witness message (#25)
+
+**What was built:** the witness message from a record is now **format v1**, specified in `docs/spec/evidence-bundle.md`, section 9. Its own version is independent of the bundle's.
+- **Line 1** is always `Saakshi witness v1`.
+- **Then, in a fixed order:**
+  - the record's name ("2026-11-06 10-40 IST Body-cam");
+  - Started and Ended, with seconds, in IST, and the length ("0:12:18");
+  - the place where it started, with its accuracy and a map link;
+  - the number of files, and each file's SHA-256 when there are three or fewer ("video 1 SHA-256: …");
+  - the whole record's SHA-256 (the chain head);
+  - the app version and the record's id.
+- **Language:** labels follow the app's language, as before; values never change. Software reads the lines by their order.
+- **Length:** at most 6 SMS parts. Over that, it leaves out, in turn, the per-file lines, the map link and the id. English uses only GSM characters ("within 13 m", not "±13 m"), so it stays in the cheaper encoding. Hindi is Unicode and loses the per-file lines first.
+- **Times:**
+  - The 03:42 / 03:43 mismatch you saw: the bundle's file name used the time the session was opened, and the message used the time the last file ended. Now the bundle's name uses the time recording started, the same "Started" the app and the message show.
+  - The bundle's `hash-report.txt` and the certificate's enclosed hash report label each file's times "Started" and "Ended". Neither is the Schedule's form wording, which is unchanged.
+- **Names** (`naming.ts`): "2026-11-06 10-40 IST Body-cam" for a record, and "video 1", "sound 2" for its files. They follow the brief's group 9 examples, so that the bundle can use the same names.
+- **Bug mode's automatic texts** keep their own short form ("Saakshi bug mode: recording since 10:40 IST, signed up to 10:50 IST. SHA-256: …"), which the spec now describes. They are still not noted in the session's `witness` list.
+
+**Not verified:** on a phone, how Messages shows a six-part message, and whether it splits it.
 
 ## Owner questions
 

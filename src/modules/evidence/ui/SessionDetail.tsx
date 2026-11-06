@@ -194,10 +194,19 @@ export function SessionDetail({ id }: { id: string }) {
       await sendWitnessMessage(
         id,
         {
-          title: t('witness.title'),
-          time: t('witness.time'),
+          record: t('witness.record'),
+          started: t('witness.started'),
+          ended: t('witness.ended'),
+          length: t('witness.length'),
           place: t('witness.place'),
           noPlace: t('witness.noPlace'),
+          accuracy: (m) => t('witness.accuracy', { m }),
+          map: t('witness.map'),
+          files: t('witness.files'),
+          chainHead: t('witness.chainHead'),
+          app: t('witness.app'),
+          id: t('witness.id'),
+          kindWord: (kind) => t(kind === 'video' ? 'witness.kindVideo' : kind === 'audio' ? 'witness.kindAudio' : 'witness.kindPhoto'),
         },
         recipients,
       );

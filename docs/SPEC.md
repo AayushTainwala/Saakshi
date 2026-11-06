@@ -45,6 +45,7 @@ Physical damage to the phone during a recording is not solved for in v1.
 In v1.1, C2PA Content Credentials and motion, compass and network readings are added. The aim is to make a claim that a recording is AI-generated implausible and to put the burden on whoever makes it; nothing makes a recording unquestionable.
 
 **E2. Witness message.** One tap sends the hash, time and place by SMS to the user's chosen contacts.
+- **What it says (test round 1, 5 Nov 2026).** The message identifies the recording and is easy for a person to read and for software to read later: a format tag and version, the record's name, its start and end times in IST and its length, the place with a map link, each file's SHA-256 (or the chain head and a count when there are many), and the app version. It goes to the contacts ticked for witness messages, and is kept short enough to send. The same labelled times appear in the app, the message, the bundle's name and the certificate's hash report. Format: docs/spec/evidence-bundle.md, section 9 (v1).
 
 **E3. Public timestamp.** When the phone next has internet, each hash is stamped through OpenTimestamps, implemented against its public calendar servers. The official clients are LGPL-3.0, so we write our own rather than bundle theirs.
 
