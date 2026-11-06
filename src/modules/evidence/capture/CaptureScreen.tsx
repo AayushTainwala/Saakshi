@@ -67,26 +67,57 @@ export function CaptureScreen() {
   const [facing, setFacing] = useState<Facing>('back');
   const [engine, setEngine] = useState<ZoomEngine | null>(null);
   const [factor, setFactor] = useState(1);
-  const zoomTo = (next: number) => {
-    if (engine) setFactor(clampZoom(engine, next, { recording, current: factor }));
+  // iPhone: a change to or from the 0.5x lens swaps expo-camera's camera; the shutter waits for it
+  // (until expo-camera reports the lens, or a second and a half).
+  const [lensSettling, setLensSettling] = useState(false);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+  }, []);
+  const zoomTo = (next: number, options: { lensChange?: boolean } = {}) => {
+    if (!engine) return;
+    const keepLens = engine.kind === 'ios' && options.lensChange === false;
+    const value = clampZoom(engine, next, { recording: recording || keepLens, current: factor });
+    if (engine.kind === 'ios' && value < 1 !== factor < 1) {
+      setLensSettling(true);
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+      settleTimer.current = setTimeout(() => setLensSettling(false), 1500);
+    }
+    setFactor(value);
   };
-  // Two fingers on the picture zoom: the zoom when the fingers came down, times how far they moved apart.
-  const pinch = useRef<{ distance: number; from: number } | null>(null);
+  // Two fingers on the picture zoom: the zoom when the fingers came down, times how far they moved
+  // apart. On iPhone the 0.5x lens is changed to or from only when the fingers lift, not back and
+  // forth while pinching.
+  const pinch = useRef<{ distance: number; from: number; wanted: number } | null>(null);
   const twoFingers = (e: GestureResponderEvent) => e.nativeEvent.touches.length >= 2;
   const onPinchMove = (e: GestureResponderEvent) => {
     const distance = touchDistance(e.nativeEvent.touches);
-    if (!distance) return;
-    if (!pinch.current) {
-      pinch.current = { distance, from: factor };
+    if (!distance) {
+      // A finger lifted: the next two start afresh.
+      pinch.current = null;
       return;
     }
-    zoomTo((pinch.current.from * distance) / pinch.current.distance);
+    if (!pinch.current) {
+      pinch.current = { distance, from: factor, wanted: factor };
+      return;
+    }
+    const wanted = (pinch.current.from * distance) / pinch.current.distance;
+    pinch.current.wanted = wanted;
+    zoomTo(wanted, { lensChange: false });
   };
   const onPinchEnd = () => {
+    const wanted = pinch.current?.wanted;
     pinch.current = null;
+    if (wanted !== undefined && engine?.kind === 'ios') zoomTo(wanted);
   };
+  // A new camera view for each camera and mode: expo-camera says it is ready only once per view.
+  const viewKey = `${facing}-${mode}`;
+  const facingNow = useRef(facing);
+  useEffect(() => {
+    facingNow.current = facing;
+  }, [facing]);
   const switchCamera = () => {
-    if (recording) return;
+    if (recording || !ready) return;
     setReady(false);
     setEngine(null);
     setFactor(1);
@@ -94,12 +125,9 @@ export function CaptureScreen() {
   };
   const chooseMode = (next: MediaKind) => {
     if (next === mode) return;
-    // Android changes camera between photos (expo-camera) and video (the app's recorder); iPhone
-    // keeps the same one, and its zoom.
-    if (OWN_RECORDER) {
-      setEngine(null);
-      setFactor(1);
-    }
+    setReady(false);
+    setEngine(null);
+    setFactor(1);
     setMode(next);
   };
 
@@ -108,13 +136,17 @@ export function CaptureScreen() {
     setReady(true);
     const native = SaakshiEvidence;
     if (!native) return;
+    const asked = facing;
     try {
       if (Platform.OS === 'ios') {
         const lenses = (await camera.current?.getAvailableLensesAsync()) ?? [];
-        const maxZoom = await native.cameraMaxZoom(facing, null);
-        setEngine({ kind: 'ios', maxZoom, ultraWide: facing === 'back' && lenses.some((l) => l.deviceType === ULTRA_WIDE_LENS) });
+        const maxZoom = await native.cameraMaxZoom(asked, null);
+        // A late answer about the camera before a switch is not this camera's.
+        if (facingNow.current !== asked) return;
+        setEngine({ kind: 'ios', maxZoom, ultraWide: asked === 'back' && lenses.some((l) => l.deviceType === ULTRA_WIDE_LENS) });
       } else {
-        const range = await native.cameraZoomRange(facing);
+        const range = await native.cameraZoomRange(asked);
+        if (facingNow.current !== asked) return;
         setEngine({ kind: 'android-photo', maxZoom: range.max });
       }
     } catch {
@@ -171,9 +203,22 @@ export function CaptureScreen() {
   }, [mode, facing]);
 
   const zoom = engine ? cameraZoom(engine, factor) : { lens: undefined, zoom: 0, ratio: 1 };
-  // Android video: the app's recorder takes the ratio itself, recording or not.
+  // Android video: the app's recorder takes the ratio itself, recording or not; at most about 30
+  // times a second while pinching, and always the last one.
+  const zoomSentAt = useRef(0);
   useEffect(() => {
-    if (OWN_RECORDER && mode === 'video' && engine?.kind === 'android-video') void SaakshiEvidence?.recorderSetZoom(zoom.ratio);
+    if (!OWN_RECORDER || mode !== 'video' || engine?.kind !== 'android-video') return;
+    const send = () => {
+      zoomSentAt.current = Date.now();
+      void SaakshiEvidence?.recorderSetZoom(zoom.ratio);
+    };
+    const wait = 33 - (Date.now() - zoomSentAt.current);
+    if (wait <= 0) {
+      send();
+      return;
+    }
+    const timer = setTimeout(send, wait);
+    return () => clearTimeout(timer);
   }, [mode, engine, zoom.ratio]);
 
   /** One video, one file, from start to stop (spec E1). */
@@ -282,9 +327,10 @@ export function CaptureScreen() {
   return (
     <View style={styles.fill}>
       {OWN_RECORDER && mode === 'video' ? (
-        <RecorderPreview style={StyleSheet.absoluteFill} />
+        <RecorderPreview key={facing} style={StyleSheet.absoluteFill} />
       ) : (
         <CameraView
+          key={viewKey}
           ref={camera}
           style={StyleSheet.absoluteFill}
           mode={mode === 'photo' ? 'picture' : 'video'}
@@ -293,6 +339,7 @@ export function CaptureScreen() {
           selectedLens={Platform.OS === 'ios' ? zoom.lens : undefined}
           videoQuality="720p"
           onCameraReady={() => void onCameraReady()}
+          onAvailableLensesChanged={() => setLensSettling(false)}
         />
       )}
       {/* Two fingers anywhere on the picture zoom; one finger does nothing here. */}
@@ -391,9 +438,9 @@ export function CaptureScreen() {
                     ? t('capture.stopVideo')
                     : t('capture.startVideo')
               }
-              disabled={!ready || busy}
+              disabled={!ready || busy || (lensSettling && !recording)}
               onPress={mode === 'photo' ? takePhoto : recording ? () => void stopRecording() : startRecording}
-              style={[styles.shutter, { opacity: !ready || busy ? 0.5 : 1 }]}>
+              style={[styles.shutter, { opacity: !ready || busy || (lensSettling && !recording) ? 0.5 : 1 }]}>
               <View
                 style={
                   mode === 'video'
@@ -409,10 +456,10 @@ export function CaptureScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={facing === 'back' ? t('capture.switchToFront') : t('capture.switchToBack')}
                 accessibilityHint={recording ? t('capture.switchWhileRecording') : undefined}
-                accessibilityState={{ disabled: recording }}
-                disabled={recording}
+                accessibilityState={{ disabled: recording || !ready }}
+                disabled={recording || !ready}
                 onPress={switchCamera}
-                style={[styles.roundButton, recording && { opacity: 0.4 }]}>
+                style={[styles.roundButton, (recording || !ready) && { opacity: 0.4 }]}>
                 <AppText variant="label" style={{ color: colors.text }}>
                   ⇄
                 </AppText>

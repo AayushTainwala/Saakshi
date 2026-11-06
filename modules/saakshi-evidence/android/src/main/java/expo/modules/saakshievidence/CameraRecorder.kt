@@ -83,6 +83,8 @@ object CameraRecorder {
   private var minZoom = 1f
   private var maxZoom = 1f
   private var activeArray: android.graphics.Rect? = null
+  /** Each open has its own number; a camera that opens after a newer open or a close is closed at once. */
+  private var openToken = 0
   private var deviceDegrees = 0
   private var orientationListener: OrientationEventListener? = null
 
@@ -158,6 +160,7 @@ object CameraRecorder {
     appContext = context.applicationContext
     post {
       if (device != null) return@post
+      val token = ++openToken
       val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
       val cameraId = cameraIdFor(manager, facing)
       val characteristics = manager.getCameraCharacteristics(cameraId)
@@ -182,6 +185,11 @@ object CameraRecorder {
       preparePersistentSurface()
       manager.openCamera(cameraId, object : CameraDevice.StateCallback() {
         override fun onOpened(camera: CameraDevice) {
+          if (token != openToken || device != null) {
+            // Closed, or switched again, while it was opening.
+            camera.close()
+            return
+          }
           device = camera
           rebuildSession()
           emit("onRecorderReady", mapOf(
@@ -194,6 +202,11 @@ object CameraRecorder {
         }
 
         override fun onDisconnected(camera: CameraDevice) {
+          if (device !== camera) {
+            // A camera from an earlier open: not the one in use.
+            camera.close()
+            return
+          }
           // Another app or the system took the camera (for example, the app left the screen
           // without a foreground service). Close the file cleanly.
           finishCurrent("camera-lost")
@@ -202,6 +215,11 @@ object CameraRecorder {
         }
 
         override fun onError(camera: CameraDevice, error: Int) {
+          if (device !== camera) {
+            camera.close()
+            if (token == openToken) emit("onRecorderError", mapOf("message" to "Camera error $error"))
+            return
+          }
           finishCurrent("error")
           camera.close()
           device = null
@@ -213,6 +231,7 @@ object CameraRecorder {
 
   fun close() {
     post {
+      openToken++
       finishCurrent("stopped")
       checkpointThread?.quitSafely()
       checkpointThread = null
@@ -330,8 +349,9 @@ object CameraRecorder {
     if (zoomRatio <= 1f) return
     val width = (area.width() / zoomRatio).toInt()
     val height = (area.height() / zoomRatio).toInt()
-    val left = area.left + (area.width() - width) / 2
-    val top = area.top + (area.height() - height) / 2
+    // The crop is measured from the active array's own top left.
+    val left = (area.width() - width) / 2
+    val top = (area.height() - height) / 2
     @Suppress("DEPRECATION")
     builder.set(CaptureRequest.SCALER_CROP_REGION, android.graphics.Rect(left, top, left + width, top + height))
   }

@@ -247,6 +247,17 @@ All three checks came out feasible, so nothing falls back to pieces.
     - Android expo-camera: the ratio over the camera's maximum;
     - Android video: `CONTROL_ZOOM_RATIO`, or a sensor crop before Android 11.
 - **Leaving the camera:** unchanged (group 5 records why).
+- **An independent review** found and I fixed:
+  - on iPhone, one tap on ⇄ left the shutter off until the camera was closed. expo-camera says it is ready only once per view, so the camera view is now made afresh for each camera and each mode;
+  - on Android video, the preview froze after a switch, while recording used the new camera (the preview view is now made afresh too);
+  - a double tap on ⇄ that could leave a camera open (⇄ is off until the camera is ready, and the recorder closes a camera that opens after a newer open or a close);
+  - zoom left wrong after changing between photo and video on iPhone (learnt again);
+  - a lens change racing a recording's start (the shutter waits for the new lens);
+  - iPhone lenses changing back and forth while pinching (they change only when the fingers lift);
+  - a pinch jumping after one finger lifted;
+  - Android zoom updates sent faster than the camera needs (now at most about 30 a second);
+  - the digital-zoom crop before Android 11 being slightly off centre.
+- **Joining front and back videos (Android):** a record with both front- and back-camera videos can't be joined, because their turns differ. The app now says it was filmed with different cameras. On iPhone the joiner re-encodes such a record and says so.
 
 **Research (brief item 3), not built; your decision:**
 1. **Switching camera during a video, keeping one file.**
