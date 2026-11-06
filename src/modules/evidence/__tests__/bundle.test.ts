@@ -5,13 +5,14 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { CaptureSession } from '../capture/pipeline';
-import { buildManifest, type BundledRecord, bundleFileName, hashReport, README } from '../export/contents';
+import { buildManifest, type BundledRecord, bundleFileName } from '../export/contents';
 import { bytesEntry, crc32, writeZip } from '../export/zip';
 import { mergeDeviceKey } from '../integrity/deviceKey';
-import type { EvidenceRecord } from '../integrity/record';
 import { createSealer } from '../integrity/seal';
 import { type CheckInput, checkSession } from '../locker/check';
+import { loadSealed } from '../locker/records';
 import type { ClosedFile, FileDigests } from '../types';
+import { bundleFilesOf } from './bundleFiles';
 import { memoryLocker } from './memoryLocker';
 import { nodeSha256Hex, testSigner } from './testSigner';
 
@@ -76,23 +77,32 @@ async function makeSession() {
     null,
     new Date('2026-10-20T08:59:40.511Z'),
   );
-  const records: BundledRecord[] = state.items.map((item) => ({
-    record: JSON.parse(locker.records.get(`${id}/${item.record!.file}`)!.body) as EvidenceRecord,
-    recordFile: item.record!.file,
-    mediaFile: item.media,
-    recordSha256: item.recordSha256!,
-  }));
+  const records: BundledRecord[] = loadSealed(locker.store, id).map((entry) => entry.bundled);
   return { locker, id, state, deviceKey, records };
 }
 
-/** Lays the bundle out as files: name → bytes. */
+/** Lays the bundle out as the app does, as files: name → bytes. */
 async function bundleFiles() {
+  const ctx = await makeSession();
+  const { locker, id, deviceKey } = ctx;
+  const { plan, files } = bundleFilesOf(locker, id, deviceKey, new Date('2026-10-20T10:15:00.000Z'), app);
+  return { ...ctx, files, plan };
+}
+
+/** The same session laid out as format 0.7 and before did: media/ and records/, the app's names. */
+async function oldBundleFiles() {
   const ctx = await makeSession();
   const { locker, id, state, deviceKey, records } = ctx;
   const now = new Date('2026-10-20T10:15:00.000Z');
   const enc = (s: string) => new TextEncoder().encode(s);
   const files = new Map<string, Uint8Array>();
-  files.set('manifest.json', enc(JSON.stringify(buildManifest(state, records, now, app, false), null, 2)));
+  // 0.7's manifest named the old paths.
+  const manifest = {
+    ...buildManifest(state, records, now, app, false),
+    version: '0.7',
+    records: records.map((r) => ({ record: `records/${r.recordFile}`, signature: `records/${r.recordFile}.sig`, media: `media/${r.mediaFile}` })),
+  };
+  files.set('manifest.json', enc(JSON.stringify(manifest, null, 2)));
   files.set('device-key.json', enc(JSON.stringify(deviceKey, null, 2)));
   for (const item of state.items) {
     files.set(`media/${item.media}`, locker.files.get(locker.store.mediaUri(id, item.media))!);
@@ -100,8 +110,6 @@ async function bundleFiles() {
     files.set(`records/${item.record!.file}`, enc(stored.body));
     files.set(`records/${item.record!.file}.sig`, stored.signature);
   }
-  files.set('hash-report.txt', enc(hashReport(state, records, deviceKey, now, 0)));
-  files.set('README.txt', enc(README));
   return { ...ctx, files };
 }
 
@@ -139,6 +147,11 @@ describe('evidence bundle', () => {
     const zip = await writeZipFile(files);
     cleanup.push(folder, zip.dir);
 
+    // Standard unzip tools read the names as they are (UTF-8, with spaces), and Python's zipfile too.
+    const listed = spawnSync('python3', ['-I', '-c', 'import sys, zipfile; print("\\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))', zip.path], { encoding: 'utf8' });
+    expect(listed.status).toBe(0);
+    expect(listed.stdout.trim().split('\n')).toEqual([...files.keys()]);
+
     for (const path of [folder, zip.path]) {
       const { code, out } = runVerifier(path);
       expect(out).toContain('OK: signatures, files, checkpoints and chain check out.');
@@ -148,63 +161,116 @@ describe('evidence bundle', () => {
     }
   });
 
-  it('verifies with openssl as the spec describes', async () => {
+  it('names the bundle, its folders and its files for a person to read (format 0.8)', async () => {
+    const { files, plan } = await bundleFiles();
+    expect(plan.fileName).toBe('Saakshi 2026-10-20 14-32 IST Camera.zip');
+    expect([...files.keys()]).toEqual([
+      'README.txt',
+      'Hash report.txt',
+      'Original files/2026-10-20 14-32-03 IST photo 1.jpg',
+      'Original files/2026-10-20 14-32-03 IST video 1.mp4',
+      'Original files/2026-10-20 14-32-03 IST video 2.mp4',
+      'Signed records/0000 photo 1.json',
+      'Signed records/0000 photo 1.json.sig',
+      'Signed records/0001 video 1.json',
+      'Signed records/0001 video 1.json.sig',
+      'Signed records/0002 video 2.json',
+      'Signed records/0002 video 2.json.sig',
+      'manifest.json',
+      'device-key.json',
+    ]);
+  });
+
+  it('still verifies a bundle laid out as before 0.8, with or without its manifest', async () => {
+    const { files, records } = await oldBundleFiles();
+    const folder = writeFolder(files);
+    const bare = writeFolder(new Map([...files].filter(([name]) => name !== 'manifest.json')));
+    cleanup.push(folder, bare);
+    for (const path of [folder, bare]) {
+      const { code, out } = runVerifier(path);
+      expect(out).toContain('OK: signatures, files, checkpoints and chain check out.');
+      expect(out).toContain(`Chain head: ${records[2].recordSha256}`);
+      expect(code).toBe(0);
+    }
+  });
+
+  it('verifies with openssl as the README describes', async () => {
     const { files, deviceKey } = await bundleFiles();
     const folder = writeFolder(files);
     cleanup.push(folder);
     writeFileSync(join(folder, 'key.pem'), deviceKey.publicKeyPem);
     const out = execFileSync(
       'openssl',
-      ['dgst', '-sha256', '-verify', 'key.pem', '-signature', 'records/0001.json.sig', 'records/0001.json'],
+      ['dgst', '-sha256', '-verify', 'key.pem', '-signature', 'Signed records/0001 video 1.json.sig', 'Signed records/0001 video 1.json'],
       { cwd: folder, encoding: 'utf8' },
     );
     expect(out.trim()).toBe('Verified OK');
+    const media = files.get('Original files/2026-10-20 14-32-03 IST video 1.mp4')!;
+    const record = JSON.parse(new TextDecoder().decode(files.get('Signed records/0001 video 1.json')!));
+    expect(sha(media)).toBe(record.file.sha256);
     const der = execFileSync('openssl', ['pkey', '-pubin', '-in', 'key.pem', '-outform', 'DER'], { cwd: folder });
     expect(sha(der)).toBe(deviceKey.keyId);
   });
 
   it('catches a changed media byte', async () => {
     const { files } = await bundleFiles();
-    const media = files.get('media/0001-clip0-seg0.mp4')!.slice();
+    const name = 'Original files/2026-10-20 14-32-03 IST video 1.mp4';
+    const media = files.get(name)!.slice();
     media[100] ^= 1;
-    files.set('media/0001-clip0-seg0.mp4', media);
+    files.set(name, media);
     const folder = writeFolder(files);
     cleanup.push(folder);
     const { code, out } = runVerifier(folder);
     expect(code).toBe(1);
-    expect(out).toMatch(/FAIL media\/0001-clip0-seg0.mp4: SHA-256 .* differs from its record/);
+    expect(out).toMatch(/FAIL Original files\/2026-10-20 14-32-03 IST video 1\.mp4: SHA-256 .* differs from its record/);
+  });
+
+  it('catches files swapped in the manifest', async () => {
+    const { files } = await bundleFiles();
+    const manifest = JSON.parse(new TextDecoder().decode(files.get('manifest.json')!));
+    [manifest.records[1].media, manifest.records[2].media] = [manifest.records[2].media, manifest.records[1].media];
+    files.set('manifest.json', new TextEncoder().encode(JSON.stringify(manifest)));
+    const folder = writeFolder(files);
+    cleanup.push(folder);
+    const { code, out } = runVerifier(folder);
+    expect(code).toBe(1);
+    expect(out).toContain('FAIL Original files/2026-10-20 14-32-03 IST video 2.mp4: size differs from its record');
   });
 
   it('catches a removed segment', async () => {
     const { files } = await bundleFiles();
     const folder = writeFolder(files);
     cleanup.push(folder);
-    unlinkSync(join(folder, 'records/0001.json'));
-    unlinkSync(join(folder, 'records/0001.json.sig'));
+    unlinkSync(join(folder, 'Signed records/0001 video 1.json'));
+    unlinkSync(join(folder, 'Signed records/0001 video 1.json.sig'));
     const { code, out } = runVerifier(folder);
     expect(code).toBe(1);
-    expect(out).toContain('records/0002.json: sequence 2, expected 1');
-    expect(out).toContain('records/0002.json: does not chain to the record before it');
+    expect(out).toContain('manifest.json lists Signed records/0001 video 1.json, which is not in the bundle');
+    expect(out).toContain('Signed records/0002 video 2.json: sequence 2, expected 1');
+    expect(out).toContain('Signed records/0002 video 2.json: does not chain to the record before it');
   });
 
   it('catches an edited record', async () => {
     const { files } = await bundleFiles();
-    const body = new TextDecoder().decode(files.get('records/0000.json')!);
-    files.set('records/0000.json', new TextEncoder().encode(body.replace('19.076', '19.077')));
+    const name = 'Signed records/0000 photo 1.json';
+    const body = new TextDecoder().decode(files.get(name)!);
+    files.set(name, new TextEncoder().encode(body.replace('19.076', '19.077')));
     const folder = writeFolder(files);
     cleanup.push(folder);
     const { code, out } = runVerifier(folder);
     expect(code).toBe(1);
-    expect(out).toContain('records/0000.json: signature does not verify');
-    expect(out).toContain('records/0001.json: does not chain to the record before it');
+    expect(out).toContain('Signed records/0000 photo 1.json: signature does not verify');
+    expect(out).toContain('Signed records/0001 video 1.json: does not chain to the record before it');
   });
 
   it('writes a readable hash report and a manifest that match the records', async () => {
     const { files, records, state } = await bundleFiles();
-    const report = new TextDecoder().decode(files.get('hash-report.txt')!);
+    const report = new TextDecoder().decode(files.get('Hash report.txt')!);
+    expect(report).toContain('Record:           2026-10-20 14-32 IST Camera');
     expect(report).toContain('Device:           Google Pixel 8, Android 15');
     expect(report).toContain('Key attestation:  Android Key Attestation, 3 certificates');
-    expect(report).toContain('0001  media/0001-clip0-seg0.mp4');
+    expect(report).toContain('0001  Original files/2026-10-20 14-32-03 IST video 1.mp4\n      Name in record:  0001-clip0-seg0.mp4');
+    expect(report).toContain('Record:          Signed records/0001 video 1.json (signature Signed records/0001 video 1.json.sig)');
     expect(report).toContain('Started:         20/10/2026 14:32:03 IST\n      Ended:           20/10/2026 14:33:03 IST');
     expect(report).toContain('Place:           19.07600, 72.87770 (±13 m)');
     expect(report).toContain('Size:            70,000 bytes');
@@ -212,16 +278,36 @@ describe('evidence bundle', () => {
     expect(report).toContain(`Chain head (SHA-256 of the last record): ${records[2].recordSha256}`);
     const manifest = JSON.parse(new TextDecoder().decode(files.get('manifest.json')!));
     expect(manifest.chainHead).toBe(records[2].recordSha256);
+    expect(manifest).toMatchObject({ version: '0.8', session: state.id, name: '2026-10-20 14-32 IST Camera', certificate: null });
     expect(manifest.records[1]).toEqual({
-      record: 'records/0001.json',
-      signature: 'records/0001.json.sig',
-      media: 'media/0001-clip0-seg0.mp4',
+      record: 'Signed records/0001 video 1.json',
+      signature: 'Signed records/0001 video 1.json.sig',
+      media: 'Original files/2026-10-20 14-32-03 IST video 1.mp4',
+      recordId: records[1].record.id,
+      fileName: '0001-clip0-seg0.mp4',
       recordSha256: records[1].recordSha256,
       fileSha256: records[1].record.file.sha256,
       recording: null,
     });
     expect(manifest.checkpoints).toEqual([]);
-    expect(bundleFileName(state)).toMatch(/^saakshi-[0-9a-f-]{8}-\d{8}-\d{4}\.zip$/);
+    // Named by what the records say recorded it; the session's own bookkeeping is the fallback.
+    expect(bundleFileName(state, () => 'camera')).toBe('Saakshi 2026-10-20 14-32 IST Camera.zip');
+  });
+
+  it('carries a README in English and Hindi that names this bundle\'s files', async () => {
+    const { files } = await bundleFiles();
+    const bytes = files.get('README.txt')!;
+    // A byte-order mark and Windows line ends, for Notepad.
+    expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+    const text = new TextDecoder().decode(bytes);
+    expect(text).toContain('\r\n');
+    expect(text).not.toMatch(/[^\r]\n/);
+    expect(text).toContain('Record / रिकॉर्ड: 2026-10-20 14-32 IST Camera');
+    expect(text).toContain('node verify-bundle.mjs "Saakshi 2026-10-20 14-32 IST Camera.zip"');
+    expect(text).toContain('-signature "Signed records/0000 photo 1.json.sig" "Signed records/0000 photo 1.json"');
+    expect(text).toContain('sha256sum "Original files/2026-10-20 14-32-03 IST photo 1.jpg"');
+    expect(text).toContain('वकील या विशेषज्ञ इसकी जाँच कैसे करें');
+    expect(text).toContain('section 63(4)(c) of the Bharatiya Sakshya Adhiniyam, 2023');
   });
 });
 

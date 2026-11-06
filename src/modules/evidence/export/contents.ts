@@ -1,39 +1,50 @@
 import { BUNDLE_TYPE, FORMAT_VERSION } from '../constants';
 import type { DeviceKeyFile } from '../integrity/deviceKey';
 import type { CheckpointRecord, EvidenceRecord } from '../integrity/record';
+import type { RecordSummary } from '../locker/summary';
+import { summarize } from '../locker/summary';
+import { recordName } from '../naming';
 import { formatIST } from '../ui/format';
-import type { EndReason, SessionState } from '../types';
+import type { CaptureMode, EndReason, EvidenceItem, SessionState } from '../types';
+import { CERTIFICATE_NAME, README_NAME, RECORDS_FOLDER } from './layout';
 
 /** A sealed file as it goes into a bundle. */
 export type BundledRecord = {
   record: EvidenceRecord;
-  /** File names inside records/ and media/. */
+  /** The app's own names for the record and the file, in the session folder. */
   recordFile: string;
   mediaFile: string;
   recordSha256: string;
+  /** Where the file and its record go in the bundle (format 0.8, `layout.ts`). */
+  mediaPath: string;
+  recordPath: string;
 };
 
 /** A sealed checkpoint as it goes into a bundle (format 0.5). */
 export type BundledCheckpoint = {
   record: CheckpointRecord;
-  /** File name inside records/. */
+  /** The app's own name for the record, in the session folder. */
   recordFile: string;
   recordSha256: string;
+  /** Where the record goes in the bundle (format 0.8). */
+  recordPath: string;
 };
 
+/** The certificate's name in the session folder; in the bundle it is CERTIFICATE_NAME. */
 export const CERTIFICATE_FILE = 'certificate-part-a.pdf';
 
-/** `saakshi-8c2d4b6a-20261020-1432.zip`, with the session's start time in IST. */
+/** "2026-11-05 10-40 IST Body-cam", as the app and the witness message name the record. */
+export function bundleRecordName(session: SessionState, recordMode?: (item: EvidenceItem) => CaptureMode | null): string {
+  const summary: RecordSummary = summarize(session, recordMode);
+  return recordName(summary);
+}
+
 /**
- * The bundle's file name, with the time the recording started, the same "Started" time the app
- * and the witness message show (fix round 1, group 7; it was when the session was created).
+ * The bundle's file name, "Saakshi 2026-11-05 10-40 IST Body-cam.zip": when the recording started
+ * and what it is, as the app and the witness message name it (fix round 1, groups 7 and 9).
  */
-export function bundleFileName(session: SessionState): string {
-  const started = session.items.length ? Math.min(...session.items.map((i) => Date.parse(i.startedAt))) : Date.parse(session.createdAt);
-  const ist = new Date(started + 330 * 60 * 1000);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const stamp = `${ist.getUTCFullYear()}${pad(ist.getUTCMonth() + 1)}${pad(ist.getUTCDate())}-${pad(ist.getUTCHours())}${pad(ist.getUTCMinutes())}`;
-  return `saakshi-${session.id.slice(0, 8)}-${stamp}.zip`;
+export function bundleFileName(session: SessionState, recordMode?: (item: EvidenceItem) => CaptureMode | null): string {
+  return `Saakshi ${bundleRecordName(session, recordMode)}.zip`;
 }
 
 /** The SHA-256 of the last record in the chain, a file's or a checkpoint's. */
@@ -52,25 +63,30 @@ export function buildManifest(
   app: EvidenceRecord['app'],
   hasCertificate: boolean,
   checkpoints: readonly BundledCheckpoint[] = [],
+  name: string = bundleRecordName(session),
 ) {
   return {
     type: BUNDLE_TYPE,
     version: FORMAT_VERSION,
     session: session.id,
+    name,
     createdAt: createdAt.toISOString(),
     app,
     chainHead: chainHead(records, checkpoints),
     records: records.map((r) => ({
-      record: `records/${r.recordFile}`,
-      signature: `records/${r.recordFile}.sig`,
-      media: `media/${r.mediaFile}`,
+      record: r.recordPath,
+      signature: `${r.recordPath}.sig`,
+      media: r.mediaPath,
+      recordId: r.record.id,
+      fileName: r.record.file.name,
       recordSha256: r.recordSha256,
       fileSha256: r.record.file.sha256,
       recording: r.record.recording,
     })),
     checkpoints: checkpoints.map((c) => ({
-      record: `records/${c.recordFile}`,
-      signature: `records/${c.recordFile}.sig`,
+      record: c.recordPath,
+      signature: `${c.recordPath}.sig`,
+      recordId: c.record.id,
       recording: c.record.recording,
       checkpoint: c.record.checkpoint,
       size: c.record.file.size,
@@ -78,7 +94,7 @@ export function buildManifest(
       recordSha256: c.recordSha256,
     })),
     witness: session.witness,
-    certificate: hasCertificate ? CERTIFICATE_FILE : null,
+    certificate: hasCertificate ? CERTIFICATE_NAME : null,
     timestamps: [],
   };
 }
@@ -111,8 +127,10 @@ function describeCheckpoints(record: EvidenceRecord, checkpoints: readonly Bundl
   const own = checkpoints.filter((c) => c.record.recording === record.recording);
   if (!own.length) return [];
   const last = own.reduce((a, b) => (b.record.checkpoint > a.record.checkpoint ? b : a));
+  const first = own.reduce((a, b) => (b.record.checkpoint < a.record.checkpoint ? b : a));
+  const number = (c: BundledCheckpoint) => String(c.record.sequence).padStart(4, '0');
   return [
-    `      Checkpoints:     ${own.length} signed while it was being recorded (records/${own[0].recordFile} to records/${last.recordFile});`,
+    `      Checkpoints:     ${own.length} signed while it was being recorded (${RECORDS_FOLDER}/, ${number(first)} to ${number(last)});`,
     `                       the last, at ${formatIST(last.record.capture.checkpointAt, true)}, covers its first ${groupDigits(last.record.file.size)} bytes`,
   ];
 }
@@ -152,12 +170,14 @@ export function hashReport(
   createdAt: Date,
   unsealed: number,
   checkpoints: readonly BundledCheckpoint[] = [],
+  name: string = bundleRecordName(session),
 ): string {
   const first = records[0]?.record;
   const lines = [
     'SAAKSHI HASH REPORT',
     `Evidence bundle format ${FORMAT_VERSION} (docs/spec/evidence-bundle.md)`,
     '',
+    `Record:           ${name}`,
     `Session:          ${session.id}`,
     `Report made:      ${formatIST(createdAt.toISOString(), true)}`,
     `Device:           ${first ? describeDevice(first.device) : 'unknown'}`,
@@ -170,10 +190,11 @@ export function hashReport(
     '',
   ];
 
-  for (const { record, recordFile, mediaFile, recordSha256 } of records) {
+  for (const { record, mediaPath, recordPath, recordSha256 } of records) {
     const { capture, file } = record;
     lines.push(
-      `${String(record.sequence).padStart(4, '0')}  media/${mediaFile}`,
+      `${String(record.sequence).padStart(4, '0')}  ${mediaPath}`,
+      `      Name in record:  ${file.name} (the app's name for the file)`,
       `      Started:         ${formatIST(capture.startedAt, true)}`,
       `      Ended:           ${formatIST(capture.endedAt, true)}`,
       ...(capture.endReason
@@ -184,7 +205,7 @@ export function hashReport(
       `      SHA-256:         ${file.sha256}`,
       `      SHA-1:           ${file.sha1}`,
       `      MD5:             ${file.md5}`,
-      `      Record:          records/${recordFile} (signature records/${recordFile}.sig)`,
+      `      Record:          ${recordPath} (signature ${recordPath}.sig)`,
       `      Record SHA-256:  ${recordSha256}`,
       ...describeCheckpoints(record, checkpoints),
       '',
@@ -205,36 +226,6 @@ export function hashReport(
     lines.push('');
   }
 
-  lines.push('Times are India Standard Time (UTC+05:30), from the phone clock. See README.txt to check this bundle.', '');
+  lines.push(`Times are India Standard Time (UTC+05:30), from the phone clock. See ${README_NAME} to check this bundle.`, '');
   return lines.join('\n');
 }
-
-export const README = `SAAKSHI EVIDENCE BUNDLE (format ${FORMAT_VERSION})
-
-This bundle holds photos and videos recorded with the Saakshi app, a signed record for each file,
-and the public key that checks the signatures. Nothing in it has been edited.
-
-  media/          the original files, exactly as the phone saved them
-  records/        one record per file (.json) and its signature (.json.sig); for body-cam and bug
-                  mode, also checkpoints signed every 10 seconds while each file was being recorded
-  device-key.json the phone's public key and its hardware attestation
-  manifest.json   list of the contents
-  hash-report.txt sizes and SHA-256, SHA-1 and MD5 fingerprints of every file
-
-To check it with standard tools (full steps: docs/spec/evidence-bundle.md in the Saakshi repository,
-https://github.com/AayushTainwala/Saakshi):
-
-1. Save the "publicKeyPem" value from device-key.json as key.pem.
-2. For each record:  openssl dgst -sha256 -verify key.pem -signature records/0000.json.sig records/0000.json
-   It must print "Verified OK".
-3. For each file:    sha256sum media/<file>   must equal "file.sha256" in its record.
-4. For each checkpoint record:  head -c <file.size> media/<file> | sha256sum   must equal its
-   "file.sha256", where <file> is the file whose record has the same "recording".
-5. Each record's "previous.recordSha256" must equal sha256sum of the record before it.
-   The last record's sha256sum is the chain head; compare it with any witness message.
-
-Or run tools/verify-bundle.mjs from the Saakshi repository:  node verify-bundle.mjs <this file>.zip
-
-A certificate under section 63(4)(c) of the Bharatiya Sakshya Adhiniyam, 2023 needs Part A (the
-person in charge of the device) and Part B (an expert). certificate-part-a.pdf, if present, is Part A.
-`;

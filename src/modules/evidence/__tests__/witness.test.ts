@@ -133,8 +133,8 @@ describe('names (shared with the bundle)', () => {
     expect(stampIST('2026-11-06T05:10:12.000Z', true)).toBe('2026-11-06 10-40-12');
   });
 
-  it('names the bundle by the same start time, not when the session was opened', () => {
-    expect(bundleFileName(session)).toBe('saakshi-s-20261106-1040.zip');
+  it('names the bundle as the message names the record (format 0.8)', () => {
+    expect(bundleFileName(session)).toBe('Saakshi 2026-11-06 10-40 IST Body-cam.zip');
   });
 
   it('builds the message from the record, under the chain head', () => {

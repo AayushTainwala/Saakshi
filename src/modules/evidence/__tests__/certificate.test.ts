@@ -13,7 +13,16 @@ const record = {
   app: { id: 'in.aayushtainwala.saakshi', version: '1.0.0', build: '1' },
 } as unknown as EvidenceRecord;
 
-const records: BundledRecord[] = [{ record, recordFile: '0000.json', mediaFile: '0000-photo.jpg', recordSha256: 'd'.repeat(64) }];
+const records: BundledRecord[] = [
+  {
+    record,
+    recordFile: '0000.json',
+    mediaFile: '0000-photo.jpg',
+    recordSha256: 'd'.repeat(64),
+    mediaPath: 'Original files/2026-10-20 14-32-03 IST photo 1.jpg',
+    recordPath: 'Signed records/0000 photo 1.json',
+  },
+];
 
 const details: CertificateDetails = {
   ...emptyDetails,
@@ -56,7 +65,7 @@ describe('certificate Part A', () => {
     expect(makeAndModel(record)).toBe('Apple iPhone 14 Pro (iPhone15,2)');
     expect(out).toContain('Apple iPhone 14 Pro (iPhone15,2)');
     expect(out).toContain('356938035643809');
-    expect(out).toContain(`<td>media/0000-photo.jpg</td><td class="mono">${'a'.repeat(64)}</td>`);
+    expect(out).toContain(`<td>Original files/2026-10-20 14-32-03 IST photo 1.jpg</td><td class="mono">${'a'.repeat(64)}</td>`);
     expect(out).toContain('HASH REPORT');
     expect(out).toContain(`MD5: ${'c'.repeat(32)}`);
     expect(out).toContain('12,34,567 bytes');

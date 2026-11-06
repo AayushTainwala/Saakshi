@@ -5,6 +5,10 @@
 // first bytes of its file, as many as the checkpoint names, have the SHA-256 it signed. It does not
 // check the key attestation (step 6).
 //
+// From format 0.8 the bundle's files have names a person can read ("Original files/…",
+// "Signed records/…"); manifest.json says which file goes with which record. Older bundles keep
+// media/ and records/, where each file is named as in its record.
+//
 // Usage: node verify-bundle.mjs <bundle.zip | unzipped folder>
 // Needs Node.js 18 or later and nothing else. Exits 0 if the bundle checks out, 1 if not.
 
@@ -13,7 +17,9 @@ import { closeSync, createReadStream, existsSync, openSync, readdirSync, readFil
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 
-const SUPPORTED_VERSIONS = ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7'];
+const SUPPORTED_VERSIONS = ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'];
+// Where the records are: records/ up to 0.7, "Signed records/" from 0.8.
+const RECORD_PATH = /^(records|Signed records)\/[^/]+\.json$/;
 const RECORD_TYPE = 'saakshi.evidence.record';
 const CHECKPOINT_TYPE = 'saakshi.evidence.checkpoint';
 
@@ -201,19 +207,44 @@ export async function verifyBundle(path) {
         : `No key attestation: ${keyFile.attestationError ?? 'none given'}`,
     );
 
-    const recordNames = source
+    // The manifest is not signed: it only says where each record's file is. Every file is then
+    // checked against its signed record, so a wrong entry can only make the check fail.
+    let manifest = null;
+    if (source.has('manifest.json')) {
+      try {
+        manifest = JSON.parse(source.read('manifest.json').toString('utf8'));
+      } catch {
+        fail('manifest.json: not valid JSON');
+      }
+    }
+    const mediaOf = new Map((manifest?.records ?? []).map((entry) => [entry.record, entry.media]));
+    for (const entry of [...(manifest?.records ?? []), ...(manifest?.checkpoints ?? [])]) {
+      if (typeof entry.record === 'string' && !source.has(entry.record)) fail(`manifest.json lists ${entry.record}, which is not in the bundle`);
+    }
+
+    // Every record in the bundle, in chain order (its "sequence"; from 0.8 the names start with it).
+    const loaded = source
       .names()
-      .filter((name) => /^records\/[^/]+\.json$/.test(name))
-      .sort();
-    if (recordNames.length === 0) fail('No records in the bundle');
+      .filter((name) => RECORD_PATH.test(name))
+      .map((name) => {
+        const body = source.read(name);
+        let record = null;
+        try {
+          record = JSON.parse(body.toString('utf8'));
+        } catch {
+          // Reported below.
+        }
+        return { name, body, record };
+      })
+      .sort((a, b) => (a.record?.sequence ?? Infinity) - (b.record?.sequence ?? Infinity) || (a.name < b.name ? -1 : 1));
+    if (loaded.length === 0) fail('No records in the bundle');
 
     let previous = null;
     let lastBodyHash = null;
     // Checkpoints by recording, waiting for their file's record (which comes after them).
     const pending = new Map();
     let checkpointCount = 0;
-    for (const [index, name] of recordNames.entries()) {
-      const body = source.read(name);
+    for (const [index, { name, body, record }] of loaded.entries()) {
       const bodyHash = createHash('sha256').update(body).digest('hex');
       const label = name;
 
@@ -223,10 +254,7 @@ export async function verifyBundle(path) {
         fail(`${label}: signature does not verify`);
       }
 
-      let record;
-      try {
-        record = JSON.parse(body.toString('utf8'));
-      } catch {
+      if (!record) {
         fail(`${label}: not valid JSON`);
         previous = null;
         continue;
@@ -243,7 +271,7 @@ export async function verifyBundle(path) {
         if (!pending.has(record.recording)) pending.set(record.recording, []);
         pending.get(record.recording).push({ label, record });
       } else {
-        const media = `media/${record.file?.name}`;
+        const media = mediaOf.get(name) ?? `media/${record.file?.name}`;
         const checkpoints = record.recording ? (pending.get(record.recording) ?? []) : [];
         if (record.recording) pending.delete(record.recording);
         if (!source.has(media)) {
@@ -297,11 +325,8 @@ export async function verifyBundle(path) {
       fail(`${checkpoints[0].label}: checkpoint of recording ${recording}, whose file's record is not in the bundle`);
     }
 
-    if (source.has('manifest.json')) {
-      const manifest = JSON.parse(source.read('manifest.json').toString('utf8'));
-      if (manifest.chainHead !== lastBodyHash) fail(`manifest.json: chainHead differs from the last record (${lastBodyHash})`);
-    }
-    notes.push(`Records: ${recordNames.length}${checkpointCount ? ` (${checkpointCount} of them checkpoints)` : ''}`);
+    if (manifest && manifest.chainHead !== lastBodyHash) fail(`manifest.json: chainHead differs from the last record (${lastBodyHash})`);
+    notes.push(`Records: ${loaded.length}${checkpointCount ? ` (${checkpointCount} of them checkpoints)` : ''}`);
     notes.push(`Chain head: ${lastBodyHash}`);
   } catch (error) {
     fail(error instanceof Error ? error.message : String(error));

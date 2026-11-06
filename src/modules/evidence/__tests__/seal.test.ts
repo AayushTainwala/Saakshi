@@ -90,7 +90,7 @@ describe('sealing', () => {
     const r = records[1].record;
     expect(r).toMatchObject({
       type: 'saakshi.evidence.record',
-      version: '0.7',
+      version: '0.8',
       session: id,
       sequence: 1,
       segment: { clip: 0, index: 0 },

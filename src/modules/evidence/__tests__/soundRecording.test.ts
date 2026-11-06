@@ -6,10 +6,8 @@ import { dirname, join } from 'node:path';
 
 import type { UploadPart } from '../bodycam/parts';
 import { CaptureSession } from '../capture/pipeline';
-import { type BundledCheckpoint, buildManifest, type BundledRecord, hashReport, README } from '../export/contents';
 import { crc32 } from '../export/zip';
 import { mergeDeviceKey } from '../integrity/deviceKey';
-import type { CheckpointRecord, EvidenceRecord } from '../integrity/record';
 import { createCheckpointSealer, createSealer, type SealerDeps } from '../integrity/seal';
 import {
   type SoundCheckpoint,
@@ -20,6 +18,8 @@ import {
   startSoundRecording,
 } from '../sound/recording';
 import type { FileDigests } from '../types';
+import type { CheckpointRecord, EvidenceRecord } from '../integrity/record';
+import { bundleFilesOf } from './bundleFiles';
 import { memoryLocker } from './memoryLocker';
 import { nodeSha256Hex, testSigner } from './testSigner';
 
@@ -222,18 +222,6 @@ describe('startSoundRecording (bug mode, one continuous file with checkpoints)',
 
   it('makes a bundle that verifies, checkpoints included', async () => {
     const { locker, id, key } = await record();
-    const state = locker.store.readSession(id)!;
-    const records: BundledRecord[] = state.items.map((item) => ({
-      record: JSON.parse(locker.records.get(`${id}/${item.record!.file}`)!.body) as EvidenceRecord,
-      recordFile: item.record!.file,
-      mediaFile: item.media,
-      recordSha256: item.recordSha256!,
-    }));
-    const checkpoints: BundledCheckpoint[] = state.checkpoints!.map((c) => ({
-      record: JSON.parse(locker.records.get(`${id}/${c.record!.file}`)!.body) as CheckpointRecord,
-      recordFile: c.record!.file,
-      recordSha256: c.recordSha256!,
-    }));
     const deviceKey = mergeDeviceKey(
       {
         keyId: key.keyId,
@@ -246,20 +234,11 @@ describe('startSoundRecording (bug mode, one continuous file with checkpoints)',
       null,
       new Date('2026-11-06T05:00:00.000Z'),
     );
-    const now = new Date('2026-11-06T06:00:00.000Z');
-    const enc = (s: string) => new TextEncoder().encode(s);
-    const files = new Map<string, Uint8Array>([
-      ['manifest.json', enc(JSON.stringify(buildManifest(state, records, now, app, false, checkpoints), null, 2))],
-      ['device-key.json', enc(JSON.stringify(deviceKey, null, 2))],
-      ['hash-report.txt', enc(hashReport(state, records, deviceKey, now, 0, checkpoints))],
-      ['README.txt', enc(README)],
+    const { files } = bundleFilesOf(locker, id, deviceKey, new Date('2026-11-06T06:00:00.000Z'), app);
+    expect([...files.keys()].filter((name) => name.startsWith('Original files/'))).toEqual([
+      expect.stringMatching(/^Original files\/2026-11-06 \d\d-\d\d-\d\d IST sound 1\.aac$/),
+      expect.stringMatching(/^Original files\/2026-11-06 \d\d-\d\d-\d\d IST sound 2\.aac$/),
     ]);
-    for (const item of state.items) files.set(`media/${item.media}`, locker.files.get(locker.store.mediaUri(id, item.media))!);
-    for (const name of [...state.items.map((i) => i.record!.file), ...state.checkpoints!.map((c) => c.record!.file)]) {
-      const stored = locker.records.get(`${id}/${name}`)!;
-      files.set(`records/${name}`, enc(stored.body));
-      files.set(`records/${name}.sig`, stored.signature);
-    }
     const dir = mkdtempSync(join(tmpdir(), 'saakshi-sound-'));
     cleanup.push(dir);
     for (const [name, bytes] of files) {
