@@ -22,16 +22,20 @@ The owner's decisions after his SOS test are in `docs/SPEC.md` (sections 4, 5, 6
 | 1.3 SOS swipes, Pocket recording, "My phone is being taken" | Not started |
 | 1.4 Alerts (both links, battery level, calm Share my location) | Not started |
 | 1.5 Low battery at 5%, bundle format 0.9 | Not started |
-| 2.1–2.3 E7, Google Drive | Not started (needs the owner's Google Cloud project) |
+| 2.1–2.3 E7, Google Drive | Not started (needs the owner's Google Cloud project; owner's guide "Round 2 setup guide" is in his vault) |
 | 3.1 Protocol `docs/spec/alerts.md` | Not started. **Documents only; needs the owner's review before Part 3 code.** May start with Part 1. |
 | 3.2–3.5 Server, pairing, receiving, silence alarm | Not started (needs the Apple push key and Google's notification service) |
-| 4 First-open walkthrough | Not started (needs `docs/research/power-off-locks.md`) |
+| 4 First-open walkthrough | Not started. Research for the phone-setup page is done: `docs/research/power-off-locks.md` (#29). Ship only the rows it marks primary and tested. |
 
 Questions for the owner from this round go in "Owner questions" as `- [ ] (Round 2) …`. The builders' reports go under this heading, one `### Group n.n` each.
 
 **Start prompt for Part 1** (model Opus, effort high):
 
 > You are the builder for Saakshi round 2, Part 1. Read CLAUDE.md, docs/SPEC.md (sections 4, 5, 6), docs/spec/evidence-bundle.md, docs/BUILD_HANDOFF.md ("Round 2") and docs/briefs/2026-11-06-round-2.md. Work through groups 1.1 to 1.5 in order, one branch `round-2/<group>` and one pull request each, from the latest `main`. Each needs tests, green typecheck, lint and tests, green native builds, an updated handoff and plain test steps for the owner in the description. Raise questions in the handoff as `- [ ] (Round 2) …` and do not change scope.
+
+**Start prompt for group 3.1 only** (the alerts protocol, documents only; model Opus, effort high; can run beside Part 1):
+
+> You are the builder for Saakshi round 2, group 3.1. Read CLAUDE.md, docs/SPEC.md (sections 4, 5, 6), docs/BUILD_HANDOFF.md ("Round 2") and docs/briefs/2026-11-06-round-2.md. Do group 3.1 only: write docs/spec/alerts.md and open one pull request that changes documents only. Do not write app or server code. Mark every legal or privacy statement `NEEDS OWNER REVIEW`. Raise questions in the handoff as `- [ ] (Round 2) …`; do not change scope.
 
 ## Fix round 1 (iPhone test round 1, A–C)
 
