@@ -251,5 +251,12 @@
     "open": "View the photo",
     "close": "Close",
     "missing": "This photo is no longer on your phone."
+  },
+  "joined": {
+    "share": "Share the whole video",
+    "making": "Joining the files…",
+    "help": "For sharing, this record’s files are joined into one MP4 copy, made without re-encoding where the phone can. It is a copy, not the original: the files below stay your evidence, and the copy’s own signed record names each of them. For court, export the bundle.",
+    "made": "Joined MP4 copy for sharing (not the original). SHA-256 {{sha256}}",
+    "madeReencoded": "Joined MP4 copy for sharing (not the original; the phone had to re-encode it). SHA-256 {{sha256}}"
   }
 }

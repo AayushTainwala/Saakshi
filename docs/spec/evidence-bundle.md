@@ -1,6 +1,6 @@
 # Saakshi evidence bundle format
 
-**Version 0.6** (draft, 6 November 2026; 0.5 was also 6 November 2026, 0.3 and 0.4 were 5 November 2026, 0.2 was 21 October 2026, 0.1 was 20 October 2026). Status: in use by the app from its first release; may change before 1.0, always with a new version number.
+**Version 0.7** (draft, 6 November 2026; 0.5 and 0.6 were also 6 November 2026, 0.3 and 0.4 were 5 November 2026, 0.2 was 21 October 2026, 0.1 was 20 October 2026). Status: in use by the app from its first release; may change before 1.0, always with a new version number.
 
 This document defines how Saakshi records the integrity of photos and videos, and the bundle it exports. It is written so that anyone (a lawyer, a court-appointed expert, another app) can check a bundle with standard tools and without Saakshi. Other apps and forks may produce and read this format. The key words MUST, SHOULD and MAY are used as in RFC 2119.
 
@@ -14,7 +14,7 @@ What this format does and does not show:
 
 - **Capture session:** everything recorded between opening the evidence camera and closing it, or during one run of body-cam mode or bug mode. A session holds one or more photos, videos and audio recordings, in the order they were taken.
 - **One file per video:** the evidence camera saves each video as one file from start to stop, straight from the camera, with one fingerprint and one record. A photo is a single file.
-- **Piece:** before 0.5 (body-cam) and 0.6 (bug mode), these modes saved a long recording as consecutive files of a fixed short length ("pieces"), each sealed as it was saved. Since then each records one continuous file, and a follow-on file of the same recording starts only as a fail-safe (section 3, step 7). Pieces and follow-on files are never joined. (In the record they are described by `segment`.)
+- **Piece:** before 0.5 (body-cam) and 0.6 (bug mode), these modes saved a long recording as consecutive files of a fixed short length ("pieces"), each sealed as it was saved. Since then each records one continuous file, and a follow-on file of the same recording starts only as a fail-safe (section 3, step 7). The original files are never joined; a joined copy for sharing (section 11a) is a copy, with its own record. (In the record they are described by `segment`.)
 - **Cut-off safe:** a file that stays playable up to the moment its recording was cut off (the app killed, the phone forced off), because its container needs nothing written at the end (section 3).
 - **Record:** a small JSON document, one per file, describing it. Records are signed and chained.
 - **Device key:** an ECDSA P-256 key pair created once per app install inside the phone's security hardware. Its private half never leaves the hardware.
@@ -67,7 +67,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 ```json
 {
   "type": "saakshi.evidence.record",
-  "version": "0.6",
+  "version": "0.7",
   "id": "3f0a1c9e-5d0b-4a8e-9a3c-2f1b7c6d5e4f",
   "session": "8c2d4b6a-1e3f-4a5b-9c7d-0e1f2a3b4c5d",
   "sequence": 3,
@@ -122,7 +122,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 
 | Member | Meaning |
 |---|---|
-| `type`, `version` | Always `"saakshi.evidence.record"` and `"0.6"` for this version. |
+| `type`, `version` | Always `"saakshi.evidence.record"` and `"0.7"` for this version. |
 | `id` | UUID (version 4) of this record. |
 | `session` | UUID of the capture session. |
 | `sequence` | Position in the session's chain, from 0, counting every record in the order it was made: each file's record when the file closed, and from 0.5 each checkpoint (section 4a). |
@@ -154,7 +154,7 @@ A checkpoint is signed while a body-cam file (from 0.5) or a bug-mode file (from
 ```json
 {
   "type": "saakshi.evidence.checkpoint",
-  "version": "0.6",
+  "version": "0.7",
   "id": "5d1e…",
   "session": "8c2d4b6a-1e3f-4a5b-9c7d-0e1f2a3b4c5d",
   "sequence": 7,
@@ -220,7 +220,7 @@ Apple's attestation object (CBOR, with a certificate chain to Apple's App Attest
 ```json
 {
   "type": "saakshi.device-key",
-  "version": "0.6",
+  "version": "0.7",
   "keyId": "…",
   "algorithm": "ES256",
   "publicKeySpki": "<Base64 of DER SubjectPublicKeyInfo>",
@@ -267,7 +267,7 @@ README.txt
 ```json
 {
   "type": "saakshi.evidence.bundle",
-  "version": "0.6",
+  "version": "0.7",
   "session": "8c2d4b6a-…",
   "createdAt": "2026-10-20T10:15:00.000Z",
   "app": { "id": "in.aayushtainwala.saakshi", "version": "1.0.0", "build": "1" },
@@ -330,7 +330,7 @@ With standard tools (`unzip`, `sha256sum`, `openssl`):
    - Android: verify the certificate chain up to a Google hardware attestation root, check the leaf's public key equals the device key, and read the attestation extension (package name `in.aayushtainwala.saakshi`, the app's signing-certificate digest published with each release, security level, verified-boot state). Also check Google's attestation revocation list.
    - iPhone: verify the App Attest object as Apple documents for servers ("Validating apps that connect to your server"), with App ID `<Team ID>.in.aayushtainwala.saakshi` and `clientDataHash` equal to SHA-256 of the device key's DER public key.
 
-`tools/verify-bundle.mjs` in the Saakshi repository runs steps 2–5 with Node.js and no other dependencies, step 4a included (it reads each file once and takes the SHA-256 of every checkpointed prefix on the way). The tool reads versions 0.1 to 0.6, and does not yet check attestation chains (step 6).
+`tools/verify-bundle.mjs` in the Saakshi repository runs steps 2–5 with Node.js and no other dependencies, step 4a included (it reads each file once and takes the SHA-256 of every checkpointed prefix on the way). The tool reads versions 0.1 to 0.7, and does not yet check attestation chains (step 6).
 
 ## 11. Playable copies (Android)
 
@@ -354,6 +354,30 @@ A copy record has exactly these members:
 
 To check a copy against its original: verify the copy record's signature as in section 10, step 3; check that `original.fileSha256` and `original.recordSha256` match the original's record; check the copy's own SHA-256. Its pictures and sound can be compared with the original's frame for frame, for example with `ffprobe -show_packets` on both, since the samples are the same bytes.
 
+## 11a. Joined copies (from 0.7)
+
+A body-cam record can hold more than one video file: on iPhone, video stops while the user is away from Saakshi and starts again in a new file when they come back, with a sound-only file between (section 3, step 8). For sharing, the app can join a record's files into one MP4 copy:
+
+- **What goes where:** each video file's picture, from its start, at its place in the recording (its `capture.startedAt` less the record's first file's). Between video files there is no picture. The sound comes from the video files and the sound-only files, each stretch once: a file's sound starts where the file before it ended, so the half-second overlaps of section 3, step 8 are not heard twice. Where nothing was recorded (for example, during a phone call) the copy is silent.
+- **Method:** without re-encoding where the phone can: every sample is copied unchanged (iPhone: `AVMutableComposition` exported with `AVAssetExportPresetPassthrough`; Android: `MediaExtractor` into `MediaMuxer`). If the iPhone can't (the clips were filmed turned different ways, or the passthrough export fails), it re-encodes, and the record says so (`method.reencoded: true`). Android files turned different ways are not joined.
+- **Where:** `copies/joined.copy.mp4` in the session folder, with its record `joined.copy.mp4.json` and signature `joined.copy.mp4.json.sig`, made and signed as in section 5. It is made again if the record gains a file.
+- **What it is not:** as with section 11, the joined copy is not part of the chain, is never in the bundle and is never named in the certificate. The app labels it as a copy.
+
+A joined-copy record has exactly these members:
+
+| Member | Meaning |
+|---|---|
+| `type`, `version` | `"saakshi.evidence.joined-copy"` and the format version. |
+| `id`, `session` | UUID of this record, and the session of the originals. |
+| `sources` | Every file the copy was made from, in chain order: `recordId`, `recordSha256` (SHA-256 of its record file), `fileName` and `fileSha256`. |
+| `parts` | Where each stretch went: `track` (`"video"` or `"audio"`), `source` (its `fileName`), `atMs` (where it starts in the copy), `fromMs` (where it starts in the source) and `lengthMs`. |
+| `method` | `name` (`"join-mp4"`), `reencoded` (`true` or `false`) and a plain-language `description`. |
+| `file` | The copy: `name`, `mediaType` (`"video/mp4"`), `size`, `sha256`, `sha1`, `md5`. |
+| `madeAt` | When the copy was made. |
+| `device`, `app`, `key` | As in section 4. |
+
+To check a joined copy: verify its record's signature as in section 10, step 3; check each `sources` entry against the original's record (`recordSha256`, `fileSha256`); check the copy's own SHA-256. When `reencoded` is `false`, each part's samples can be compared with its source's, for example with `ffprobe -show_packets`.
+
 ## 12. Versions
 
 - **0.1** (20 October 2026): records, signatures and chain; Android Key Attestation and Apple App Attest; bundle; certificate Part A; witness message.
@@ -362,6 +386,7 @@ To check a copy against its original: verify the copy record's signature as in s
 - **0.4** (5 November 2026): iPhone body-cam video ends only when iOS stops the camera, and its `capture.endReason` gives iOS's reason: new values `"camera-in-use"` and `"system-pressure"` (section 3, step 8). No record member was added or removed.
 - **0.5** (this document, 6 November 2026): body-cam records one continuous file per unbroken stretch instead of pieces; signed checkpoint records (section 4a) while each file is written, in the chain; new record member `recording`; manifest `checkpoints`; iPhone body-cam files are fragmented MP4 (`.mp4`) and sound-only files ADTS AAC (`.aac`), both written by the app and cut-off safe (section 3, steps 2, 7 and 9).
 - **0.6** (6 November 2026): bug mode records one continuous file per unbroken stretch instead of 2-minute pieces, with checkpoint records (section 4a) as for body-cam, and its files are ADTS AAC (`.aac`) on iPhone too (section 3, steps 2, 7 and 9). No record member was added or removed.
+- **0.7** (6 November 2026): joined copies of a record's files for sharing, with their own signed records (section 11a). No member of the records in a bundle was added or removed.
 - **Later (planned, R2):** OpenTimestamps proofs for each chain head and record, in `timestamps/<recordSha256>.ots`, listed in the manifest's `timestamps`; upload state for copies in the user's cloud drive.
 - **1.1 of the app** (planned): C2PA Content Credentials and sensor readings.
 

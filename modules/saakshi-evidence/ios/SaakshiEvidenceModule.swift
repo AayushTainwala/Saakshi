@@ -113,6 +113,11 @@ public class SaakshiEvidenceModule: Module {
       SoundRecorder.shared.stop { events in promise.resolve(events as Any) }
     }
 
+    // A record's files joined into one MP4 copy for sharing (Joiner.swift; fix round 1, group 3).
+    AsyncFunction("joinToMp4") { (request: JoinRequestRecord) async throws -> [String: Any] in
+      try await Joiner.join(request)
+    }
+
     // iPhone recordings are already QuickTime files that play everywhere; no copy is made.
     AsyncFunction("remuxToMp4") { (_: String, _: String, _: Int?) -> String in
       throw Exception(name: "ERR_UNSUPPORTED", description: "Remuxing is only needed for Android recordings")

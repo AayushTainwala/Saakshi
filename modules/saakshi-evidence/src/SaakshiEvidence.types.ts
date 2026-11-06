@@ -103,6 +103,18 @@ export type CheckpointEvent = {
   startedAt: string;
 };
 
+/** A stretch of one file placed in a joined copy: `length` seconds from `from` in the file, at `at` in the copy. */
+export type JoinSegment = { uri: string; at: number; from: number; length: number };
+
+/** What `joinToMp4` takes. */
+export type JoinToMp4Request = {
+  output: string;
+  video: JoinSegment[];
+  audio: JoinSegment[];
+  /** Android: degrees to turn the picture upright, the same for every file. */
+  rotationDegrees: number | null;
+};
+
 /** iPhone bug mode (SoundRecorder.swift): what `soundStart` takes. */
 export type SoundStartOptions = {
   /** Folders (file:// URIs) for the files and their crash-recovery markers. */

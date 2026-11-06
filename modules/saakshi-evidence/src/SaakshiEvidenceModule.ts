@@ -3,6 +3,7 @@ import { NativeModule, requireOptionalNativeModule } from 'expo';
 import type {
   BodyCamOptions,
   FileHashes,
+  JoinToMp4Request,
   KeyAttestation,
   NativeDeviceKey,
   RecorderOptions,
@@ -50,6 +51,12 @@ declare class SaakshiEvidenceModule extends NativeModule<SaakshiEvidenceEvents> 
   /** iPhone only: resolves once the file is closed, with the `onSoundClosed` events of the files the stop closed. */
   soundStop(): Promise<SoundClosedEvent[] | null | undefined>;
   soundRunning(): boolean;
+  /**
+   * Joins a record's files into one MP4 copy for sharing (fix round 1, group 3): each video file's
+   * picture at its place, and the sound from the segments given, each stretch once. Android never
+   * re-encodes; iPhone re-encodes only if it can't join otherwise, and says so.
+   */
+  joinToMp4(request: JoinToMp4Request): Promise<{ uri: string; reencoded: boolean }>;
   /** Android: MP4 copy of an MPEG-TS file without re-encoding; returns the copy's file:// URI. */
   remuxToMp4(input: string, output: string, rotationDegrees: number | null): Promise<string>;
   /** Starts delivering `onVolumeUp` events and stops the volume buttons changing the volume. */

@@ -11,7 +11,8 @@ import { shareBundle } from '../export/bundle';
 import { runCheck } from '../locker/actions';
 import { deleteSession, SessionBusyError } from '../locker/delete';
 import { fileLocker } from '../locker/store';
-import { needsCopy, playVideo, shareVideo } from '../export/videoActions';
+import { needsJoinedCopy } from '../export/joinedCopy';
+import { needsCopy, playVideo, shareJoinedCopy, shareVideo } from '../export/videoActions';
 import { recordModeOf } from '../locker/records';
 import { summarize } from '../locker/summary';
 import { useSession } from '../locker/useSessions';
@@ -148,6 +149,7 @@ export function SessionDetail({ id }: { id: string }) {
   const [checking, setChecking] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [witnessing, setWitnessing] = useState(false);
+  const [joining, setJoining] = useState(false);
 
   if (!session) {
     return (
@@ -218,6 +220,17 @@ export function SessionDetail({ id }: { id: string }) {
     ]);
   };
 
+  const shareJoined = async () => {
+    setJoining(true);
+    try {
+      await shareJoinedCopy(id, t('joined.share'));
+    } catch (error) {
+      Alert.alert(t('locker.errorTitle'), error instanceof Error ? error.message : String(error));
+    } finally {
+      setJoining(false);
+    }
+  };
+
   const exportBundle = async () => {
     setExporting(true);
     try {
@@ -241,6 +254,22 @@ export function SessionDetail({ id }: { id: string }) {
           <AppText variant="label">{t('player.heading')}</AppText>
           <AppText color="textMuted">{t('player.help')}</AppText>
           <RecordingPlayer sessionId={id} items={session.items} />
+          {needsJoinedCopy(session) ? (
+            <>
+              <Button
+                variant="secondary"
+                label={joining ? t('joined.making') : t('joined.share')}
+                busy={joining}
+                onPress={() => void shareJoined()}
+              />
+              <AppText color="textMuted">{t('joined.help')}</AppText>
+              {session.joined ? (
+                <AppText color="textMuted" selectable>
+                  {t(session.joined.reencoded ? 'joined.madeReencoded' : 'joined.made', { sha256: session.joined.sha256 })}
+                </AppText>
+              ) : null}
+            </>
+          ) : null}
         </Card>
       ) : null}
 

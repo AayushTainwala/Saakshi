@@ -149,6 +149,11 @@ export type SessionState = {
    * signed record; the originals stay the evidence (owner decision of 22 Oct).
    */
   copies?: Record<string, { file: string; sha256: string; recordSha256: string; madeAt: string }>;
+  /**
+   * The joined MP4 copy of a record with more than one video file, for sharing (format 0.7, fix
+   * round 1, group 3): its file in copies/, its own signed record, and the files it was made from.
+   */
+  joined?: { file: string; sha256: string; recordSha256: string; madeAt: string; sources: number[]; reencoded: boolean };
   /** Signed checkpoints of body-cam files while they were written (format 0.5), in chain order. */
   checkpoints?: CheckpointItem[];
   /** The last on-phone check of files, records and chain. */

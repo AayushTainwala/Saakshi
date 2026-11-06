@@ -9,6 +9,7 @@ import { hashFile } from '../integrity/hash';
 import { sha256Hex } from '../integrity/sha256';
 import { fileLocker } from '../locker/store';
 import type { EvidenceItem } from '../types';
+import { type JoinDeps, makeJoinedCopy } from './joinedCopy';
 import { type CopyDeps, makePlayableCopy } from './playableCopy';
 
 const copyDeps: CopyDeps = {
@@ -58,4 +59,25 @@ export async function shareVideo(
     return;
   }
   await Sharing.shareAsync(fileLocker.mediaUri(sessionId, item.media), { mimeType: item.mediaType, dialogTitle });
+}
+
+const joinDeps: JoinDeps = {
+  store: fileLocker,
+  join: async (request) => {
+    if (!SaakshiEvidence) throw new Error('The SaakshiEvidence native module is not available in this build.');
+    return SaakshiEvidence.joinToMp4(request);
+  },
+  hash: hashFile,
+  signer: deviceSigner(fileLocker),
+  sha256Hex,
+  newId: randomUUID,
+  device: deviceInfo,
+  app: appInfo,
+  now: () => new Date(),
+};
+
+/** Shares a record's files joined into one MP4 copy (made the first time; fix round 1, group 3). */
+export async function shareJoinedCopy(sessionId: string, dialogTitle: string): Promise<void> {
+  const uri = await makeJoinedCopy(joinDeps, sessionId);
+  await Sharing.shareAsync(uri, { mimeType: 'video/mp4', UTI: 'public.mpeg-4', dialogTitle });
 }
