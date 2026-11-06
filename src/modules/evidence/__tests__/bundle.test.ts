@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, generateKeyPairSync } from 'node:crypto';
 import { closeSync, mkdirSync, mkdtempSync, openSync, rmSync, unlinkSync, writeFileSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -359,6 +359,78 @@ describe('evidence bundle', () => {
       const { code, out } = runVerifier(path);
       expect(code).toBe(1);
       expect(out).toContain(`FAIL ${name}: in the ZIP twice`);
+    });
+
+    it('refuses ZIP tricks that would unpack a doctored copy at the readable name', async () => {
+      const { files } = await bundleFiles();
+      const doctored = files.get(name)!.slice();
+      doctored[100] ^= 1;
+      const modified = new Date(2026, 9, 20, 15, 45);
+      const zipOf = async (extra: [string, Uint8Array][], patch?: (bytes: Buffer) => Buffer) => {
+        const dir = mkdtempSync(join(tmpdir(), 'saakshi-trick-'));
+        cleanup.push(dir);
+        const path = join(dir, 'trick.zip');
+        const chunks: Uint8Array[] = [];
+        await writeZip({ write: async (b) => void chunks.push(b) }, [...files, ...extra].map(([n, b]) => bytesEntry(n, b, modified)));
+        const bytes = Buffer.concat(chunks);
+        writeFileSync(path, patch ? patch(bytes) : bytes);
+        return runVerifier(path);
+      };
+
+      // "." segments, which unzip tools drop.
+      for (const trick of [`./${name}`, name.replace('/', '/./')]) {
+        const { code, out } = await zipOf([[trick, doctored]]);
+        expect(code).toBe(1);
+        expect(out).toContain(`FAIL ${JSON.stringify(trick)}: not a plain name inside the bundle`);
+      }
+
+      // A local header naming the readable name, on an entry the central directory names otherwise.
+      const decoy = `__MACOSX/${'x'.repeat(Buffer.byteLength(name) - 9)}`;
+      const shadow = await zipOf([[decoy, doctored]], (bytes) => {
+        const at = bytes.indexOf(Buffer.from(decoy));
+        Buffer.from(name).copy(bytes, at);
+        return bytes;
+      });
+      expect(shadow.code).toBe(1);
+      expect(shadow.out).toContain(`FAIL ${decoy}: its local header names it ${JSON.stringify(name)}`);
+    });
+
+    it('refuses the Unicode Path extra field, which some unzip tools take as the name', async () => {
+      const { files } = await bundleFiles();
+      const folder = writeFolder(files);
+      const dir = mkdtempSync(join(tmpdir(), 'saakshi-upath-'));
+      cleanup.push(folder, dir);
+      const path = join(dir, 'upath.zip');
+      // Python's zipfile writes the bundle again, stored, with a 0x7075 field on one extra entry.
+      const script = [
+        'import os, struct, sys, zipfile, zlib',
+        'src, out, target = sys.argv[1], sys.argv[2], sys.argv[3].encode()',
+        'with zipfile.ZipFile(out, "w", zipfile.ZIP_STORED) as z:',
+        '    for root, _, names in sorted(os.walk(src)):',
+        '        for n in sorted(names):',
+        '            full = os.path.join(root, n)',
+        '            z.write(full, os.path.relpath(full, src))',
+        '    info = zipfile.ZipInfo("__MACOSX/evil.bin")',
+        '    info.extra = struct.pack("<HHBI", 0x7075, 5 + len(target), 1, zlib.crc32(b"__MACOSX/evil.bin")) + target',
+        '    z.writestr(info, b"doctored")',
+      ].join('\n');
+      const made = spawnSync('python3', ['-I', '-c', script, folder, path, name], { encoding: 'utf8' });
+      expect(made.stderr).toBe('');
+      const { code, out } = runVerifier(path);
+      expect(code).toBe(1);
+      expect(out).toContain('FAIL __MACOSX/evil.bin: has an extra field (0x7075) that some unzip tools read as another name');
+    });
+
+    it('checks a key.pem left in the bundle', async () => {
+      const { files } = await bundleFiles();
+      // Someone else's key, which would make a forged record print "Verified OK" by hand.
+      const other = generateKeyPairSync('ec', { namedCurve: 'P-256' }).publicKey.export({ type: 'spki', format: 'pem' });
+      files.set('key.pem', new TextEncoder().encode(String(other)));
+      const folder = writeFolder(files);
+      cleanup.push(folder);
+      const { code, out } = runVerifier(folder);
+      expect(code).toBe(1);
+      expect(out).toContain('FAIL key.pem: not the public key in device-key.json');
     });
 
     it('lets the reader keep key.pem in the folder, as the README asks', async () => {

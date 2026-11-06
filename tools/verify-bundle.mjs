@@ -76,9 +76,14 @@ function expectedNames(records) {
   return names;
 }
 
-/** Files a computer adds when a bundle is unzipped or opened (macOS .DS_Store, ._ and __MACOSX). */
+/**
+ * Files a computer adds when a bundle is unzipped or opened, and nothing else: macOS's .DS_Store,
+ * ._ files and __MACOSX/ folder, and Windows's Thumbs.db and desktop.ini. Only plain names count.
+ */
 function ignored(name) {
-  return name.startsWith('__MACOSX/') || name.split('/').some((part) => part.startsWith('.'));
+  if (!plainPath(name.endsWith('/') ? name.slice(0, -1) : name)) return false;
+  const base = name.split('/').filter(Boolean).at(-1) ?? '';
+  return name.startsWith('__MACOSX/') || base === '.DS_Store' || base.startsWith('._') || base === 'Thumbs.db' || base === 'desktop.ini';
 }
 
 /** A plain path inside the bundle: no "..", no leading "/", no backslash, no empty part. */
@@ -94,7 +99,7 @@ function folderSource(dir) {
   return {
     has: (name) => existsSync(join(dir, name)),
     names: () => listFolder(dir, ''),
-    repeated: () => [],
+    problems: () => [],
     read: (name) => readFileSync(join(dir, name)),
     sha256: (name) => hashStream(createReadStream(join(dir, name))),
     stream: (name) => createReadStream(join(dir, name)),
@@ -142,44 +147,105 @@ function zipSource(path) {
 
   const dir = read(dirOffset, dirSize);
   const entries = new Map();
-  // A name in the ZIP twice: unzip tools differ on which copy they keep.
-  const repeated = new Set();
+  // Ways the ZIP could unpack differently from what is checked. The app writes plain ZIPs: each
+  // entry once, stored, its local header the same as its central one, one after another with
+  // nothing between, and no extra fields but ZIP64's. So anything else is refused here.
+  const problems = [];
+  const MAX32 = 0xffffffff;
+  // ZIP64; and timestamps and owners, which other zip tools add and which name nothing.
+  const HARMLESS_EXTRA = new Set([0x0001, 0x000a, 0x5455, 0x7875]);
+
+  /** The ZIP64 values an extra field gives, in the order APPNOTE 4.5.3 sets; also its other ids. */
+  const readExtra = (extra, want) => {
+    const out = { ids: [] };
+    for (let e = 0; e + 4 <= extra.length; ) {
+      const id = extra.readUInt16LE(e);
+      const length = extra.readUInt16LE(e + 2);
+      out.ids.push(id);
+      if (id === 0x0001) {
+        let f = e + 4;
+        for (const key of want) {
+          out[key] = u64(extra, f);
+          f += 8;
+        }
+      }
+      e += 4 + length;
+    }
+    return out;
+  };
+
   let at = 0;
+  const list = [];
   for (let i = 0; i < count; i++) {
     if (dir.readUInt32LE(at) !== 0x02014b50) throw new Error('Bad central directory');
+    const flags = dir.readUInt16LE(at + 8);
     const method = dir.readUInt16LE(at + 10);
+    const crc = dir.readUInt32LE(at + 16);
+    let compressed = dir.readUInt32LE(at + 20);
     let size = dir.readUInt32LE(at + 24);
     const nameLength = dir.readUInt16LE(at + 28);
     const extraLength = dir.readUInt16LE(at + 30);
     const commentLength = dir.readUInt16LE(at + 32);
     let localOffset = dir.readUInt32LE(at + 42);
     const name = dir.subarray(at + 46, at + 46 + nameLength).toString('utf8');
-    const extra = dir.subarray(at + 46 + nameLength, at + 46 + nameLength + extraLength);
-    for (let e = 0; e < extra.length; ) {
-      const id = extra.readUInt16LE(e);
-      const length = extra.readUInt16LE(e + 2);
-      if (id === 0x0001) {
-        let f = e + 4;
-        if (size === 0xffffffff) {
-          size = u64(extra, f);
-          f += 16; // uncompressed then compressed size
-        }
-        if (localOffset === 0xffffffff) localOffset = u64(extra, f);
-      }
-      e += 4 + length;
+    const want = [size === MAX32 && 'size', compressed === MAX32 && 'compressed', localOffset === MAX32 && 'localOffset'].filter(Boolean);
+    const extra = readExtra(dir.subarray(at + 46 + nameLength, at + 46 + nameLength + extraLength), want);
+    if (extra.size !== undefined) size = extra.size;
+    if (extra.compressed !== undefined) compressed = extra.compressed;
+    if (extra.localOffset !== undefined) localOffset = extra.localOffset;
+    for (const id of extra.ids) {
+      if (!HARMLESS_EXTRA.has(id)) problems.push(`${name}: has an extra field (0x${id.toString(16).padStart(4, '0')}) that some unzip tools read as another name`);
     }
-    if (entries.has(name)) repeated.add(name);
-    entries.set(name, { name, method, size, localOffset });
+    if (!plainPath(name.endsWith('/') ? name.slice(0, -1) : name)) problems.push(`${JSON.stringify(name)}: not a plain name inside the bundle`);
+    if (entries.has(name)) problems.push(`${name}: in the ZIP twice; unzip tools differ on which copy they keep`);
+    const entry = { name, flags, method, crc, compressed, size, localOffset };
+    entries.set(name, entry);
+    list.push(entry);
     at += 46 + nameLength + extraLength + commentLength;
   }
 
-  const dataOffset = (entry) => {
+  // Each local header must say what the central directory says, since tools that read a ZIP front
+  // to back go by it; and the entries must follow one another exactly, so none is hidden between.
+  list.sort((a, b) => a.localOffset - b.localOffset);
+  let expectedOffset = 0;
+  for (const entry of list) {
+    if (entry.localOffset !== expectedOffset) {
+      problems.push(`${entry.name}: starts at byte ${entry.localOffset}, not right after the entry before it (${expectedOffset})`);
+    }
     const header = read(entry.localOffset, 30);
-    if (header.readUInt32LE(0) !== 0x04034b50) throw new Error('Bad local header');
-    // Tools that read the ZIP front to back use this name, not the central directory's.
-    const localName = read(entry.localOffset + 30, header.readUInt16LE(26)).toString('utf8');
-    if (localName !== entry.name) throw new Error(`${entry.name}: its local header names it ${JSON.stringify(localName)}`);
-    return entry.localOffset + 30 + header.readUInt16LE(26) + header.readUInt16LE(28);
+    if (header.readUInt32LE(0) !== 0x04034b50) {
+      problems.push(`${entry.name}: its local header is missing`);
+      entry.dataOffset = null;
+      continue;
+    }
+    const nameLength = header.readUInt16LE(26);
+    const extraLength = header.readUInt16LE(28);
+    const localName = read(entry.localOffset + 30, nameLength).toString('utf8');
+    let localCompressed = header.readUInt32LE(18);
+    let localSize = header.readUInt32LE(22);
+    const want = [localSize === MAX32 && 'size', localCompressed === MAX32 && 'compressed'].filter(Boolean);
+    const extra = readExtra(read(entry.localOffset + 30 + nameLength, extraLength), want);
+    if (extra.size !== undefined) localSize = extra.size;
+    if (extra.compressed !== undefined) localCompressed = extra.compressed;
+    for (const id of extra.ids) {
+      if (!HARMLESS_EXTRA.has(id)) problems.push(`${entry.name}: its local header has an extra field (0x${id.toString(16).padStart(4, '0')}) that some unzip tools read as another name`);
+    }
+    if (localName !== entry.name) problems.push(`${entry.name}: its local header names it ${JSON.stringify(localName)}`);
+    const descriptor = (entry.flags & 0x0008) !== 0;
+    if (header.readUInt16LE(6) !== entry.flags || header.readUInt16LE(8) !== entry.method) {
+      problems.push(`${entry.name}: its local header differs from the central directory`);
+    } else if (!descriptor && (header.readUInt32LE(14) !== entry.crc || localSize !== entry.size || localCompressed !== entry.compressed)) {
+      problems.push(`${entry.name}: its local header gives another size or CRC`);
+    }
+    if (descriptor) problems.push(`${entry.name}: written with a data descriptor; unzip the bundle and pass the folder instead`);
+    entry.dataOffset = entry.localOffset + 30 + nameLength + extraLength;
+    expectedOffset = entry.dataOffset + entry.compressed;
+  }
+  if (list.length && expectedOffset !== dirOffset) problems.push(`the central directory starts at byte ${dirOffset}, not right after the last entry (${expectedOffset})`);
+
+  const dataOffset = (entry) => {
+    if (entry.dataOffset === null) throw new Error(`${entry.name}: its local header is missing`);
+    return entry.dataOffset;
   };
   const entry = (name) => {
     const e = entries.get(name);
@@ -191,7 +257,7 @@ function zipSource(path) {
   return {
     has: (name) => entries.has(name),
     names: () => [...entries.keys()],
-    repeated: () => [...repeated],
+    problems: () => problems,
     read: (name) => {
       const e = entry(name);
       return read(dataOffset(e), e.size);
@@ -273,6 +339,16 @@ export async function verifyBundle(path) {
     if (Buffer.from(keyFile.publicKeySpki, 'base64').compare(spki) !== 0) {
       fail('device-key.json: publicKeySpki and publicKeyPem differ');
     }
+    // README.txt's step 1 has the reader save the key as key.pem; one already there must be it.
+    if (source.has('key.pem')) {
+      let same = false;
+      try {
+        same = createPublicKey(source.read('key.pem').toString('utf8')).export({ type: 'spki', format: 'der' }).equals(spki);
+      } catch {
+        // Not a key: reported below.
+      }
+      if (!same) fail('key.pem: not the public key in device-key.json; make it again from "publicKeyPem"');
+    }
     notes.push(`Signing key ${keyFile.keyId} (${keyFile.platform}, ${keyFile.storage})`);
     notes.push(
       keyFile.attestation
@@ -300,7 +376,7 @@ export async function verifyBundle(path) {
     // One layout per bundle, and nothing outside it: a file in a look-alike folder ("ORIGINAL
     // FILES/", a Cyrillic "О") or at the top could be taken for evidence without being checked.
     const names = source.names().filter((name) => !ignored(name) && !name.endsWith('/'));
-    for (const name of source.repeated()) fail(`${name}: in the ZIP twice; unzip tools differ on which copy they keep`);
+    for (const problem of source.problems()) fail(problem);
     const layout = names.some((name) => name.startsWith(NEW_RECORDS)) ? 'new' : 'old';
     const folders = layout === 'new' ? [NEW_MEDIA, NEW_RECORDS] : ['media/', 'records/'];
     const top = layout === 'new' ? NEW_TOP : OLD_TOP;
