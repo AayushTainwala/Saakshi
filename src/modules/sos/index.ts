@@ -10,6 +10,7 @@ import { type ContactUse, forUse, type TrustedContact } from './contacts/store';
 
 export { alertController, startNeedHelp, useAlertState } from './alert/instance';
 export { liveInvite, liveInviteNow, startLiveLocation, stopLiveLocation } from './alert/live';
+export { lowBatterySaving } from './alert/saving';
 export { canTextWithoutTap, textTrustedContacts, type TextOutcome } from './alert/text';
 export type { AlertOutcome, AlertState, StartOptions } from './alert/controller';
 export type { ContactUse, TrustedContact } from './contacts/store';

@@ -62,6 +62,8 @@ export type RecorderEndReason =
   | 'piece-complete'
   | 'camera-lost'
   | 'error'
+  // From 0.9: closed cleanly at 5% battery, and a new file of the same clip follows.
+  | 'low-battery'
   // iPhone body-cam only:
   | 'app-left'
   | 'camera-in-use'
@@ -137,7 +139,7 @@ export type SoundClosedEvent = {
   index: number;
   startedAt: string;
   endedAt: string;
-  endReason: 'stopped' | 'audio-interrupted' | 'error';
+  endReason: 'stopped' | 'audio-interrupted' | 'error' | 'low-battery';
   gapBeforeMs: number | null;
   recording: string;
   finalSize: number | null;

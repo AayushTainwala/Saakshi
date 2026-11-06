@@ -1,10 +1,13 @@
 import type { CaptureSession, EndReason } from '@/modules/evidence';
+import type { BatteryAction } from '@/platform/battery';
 
 import { WitnessThrottle } from './witness';
 
 export type BugEngine = {
   session: CaptureSession;
   stop: (reason?: EndReason) => Promise<void>;
+  /** The low-battery handover: the file closes as "low-battery" and a new one continues. */
+  handOver: () => Promise<void>;
 };
 
 /**
@@ -21,7 +24,14 @@ export type SignedPoint = {
 
 export type BugDeps = {
   /** Starts recording; `onProblem` hears what goes wrong while it records. */
-  startEngine: (onProblem: (message: string) => void) => Promise<BugEngine>;
+  startEngine: (onProblem: (message: string) => void, options: { startedFrom: StartedFrom }) => Promise<BugEngine>;
+  /**
+   * Watches the battery while recording (round 2, group 1.5): the warnings, the 5% handover and
+   * the end of saving mode on charging. Returns the function that stops watching.
+   */
+  watchBattery?: (onAction: (action: BatteryAction) => void) => () => void;
+  /** Saving mode on or off: live location sends every 5 minutes while it is on. */
+  savingMode?: (on: boolean) => void;
   /** Texts the message to trusted contacts with no tap; resolves to how many texts went, or 0. */
   witness: (message: string) => Promise<number>;
   /** How many texts a witness message costs now (one per contact), or 0 if it can't go. */
@@ -54,6 +64,10 @@ export type BugState = {
   startedFrom: StartedFrom | null;
   /** Whether Saakshi's Live Activity is shown for this recording. */
   liveActivity: boolean;
+  /** At 5% battery: the file closed and a new one carries on, in saving mode until charging. */
+  saving: boolean;
+  /** The last battery warning, as a percentage, or null. */
+  batteryWarning: number | null;
   startedAt: string | null;
   sessionId: string | null;
   /** Checkpoints signed while the file was being written. */
@@ -75,6 +89,8 @@ const IDLE: BugState = {
   running: false,
   startedFrom: null,
   liveActivity: false,
+  saving: false,
+  batteryWarning: null,
   startedAt: null,
   sessionId: null,
   checkpoints: 0,
@@ -107,6 +123,7 @@ export class BugModeController {
   private throttle = new WitnessThrottle();
   private lastActivityUpdate: number | null = null;
   private starting: Promise<void> | null = null;
+  private unwatchBattery: (() => void) | null = null;
   private work: Promise<void> = Promise.resolve();
 
   constructor(private readonly deps: BugDeps) {}
@@ -143,6 +160,9 @@ export class BugModeController {
     const engine = this.engine;
     if (!engine) return;
     this.engine = null;
+    this.unwatchBattery?.();
+    this.unwatchBattery = null;
+    if (this.current.saving) this.deps.savingMode?.(false);
     try {
       await engine.stop(reason);
     } finally {
@@ -165,9 +185,12 @@ export class BugModeController {
     this.newest = null;
     this.lastActivityUpdate = null;
     try {
-      const engine = await this.deps.startEngine((message) => {
-        if (this.current.running) this.set({ ...this.current, problem: { message, at: this.deps.now().toISOString() } });
-      });
+      const engine = await this.deps.startEngine(
+        (message) => {
+          if (this.current.running) this.set({ ...this.current, problem: { message, at: this.deps.now().toISOString() } });
+        },
+        { startedFrom: options.startedFrom },
+      );
       this.engine = engine;
       this.set({
         ...IDLE,
@@ -178,11 +201,31 @@ export class BugModeController {
         sessionId: engine.session.id,
       });
       this.unsubscribe = engine.session.subscribe(() => this.scan(engine.session));
+      this.unwatchBattery = this.deps.watchBattery?.((action) => this.onBattery(action)) ?? null;
       if (options.liveActivity) await this.deps.liveActivity.start().catch(() => undefined);
     } catch (error) {
       this.set({ ...IDLE, error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
+  }
+
+  /**
+   * Low battery (SPEC E1, E8; round 2, group 1.5): warnings at 10% and 5%; at 5% the file closes
+   * cleanly and a new one continues until the phone dies, with saving mode on; charging ends it.
+   * Nothing stops the recording.
+   */
+  private onBattery(action: BatteryAction): void {
+    const engine = this.engine;
+    if (!engine || !this.current.running) return;
+    if (action.type === 'warn') return this.set({ ...this.current, batteryWarning: action.percent });
+    if (action.type === 'low') {
+      this.set({ ...this.current, saving: true, batteryWarning: 5 });
+      void engine.handOver().catch(() => undefined);
+      this.deps.savingMode?.(true);
+      return;
+    }
+    this.set({ ...this.current, saving: false });
+    this.deps.savingMode?.(false);
   }
 
   /** Picks out checkpoints and files that have just been signed, and files that failed. */

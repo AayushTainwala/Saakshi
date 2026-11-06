@@ -57,6 +57,20 @@ class SaakshiEvidenceModule : Module() {
 
     Function("bodyCamRunning") { BodyCamService.running }
 
+    // The low-battery handover at 5% (round 2, group 1.5): the file being written closes as
+    // "low-battery" and a new one continues; with `saving`, at 480p and 15 frames a second.
+    AsyncFunction("bodyCamHandOver") { reason: String, saving: Boolean ->
+      CameraRecorder.handOver(reason, saving)
+    }
+
+    // Saving mode off (the phone is charging): the next file is at the normal quality.
+    AsyncFunction("bodyCamSetSaving") { saving: Boolean ->
+      CameraRecorder.setSaving(saving)
+    }
+
+    // iPhone only: Pocket recording's handover is in the saakshi-sos module on Android.
+    AsyncFunction("soundHandOver") { _: String -> Unit }
+
     // Android: an MP4 copy of an MPEG-TS recording, made without re-encoding (spec decision of 22 Oct).
     AsyncFunction("remuxToMp4") Coroutine { input: String, output: String, rotationDegrees: Int? ->
       withContext(Dispatchers.IO) {

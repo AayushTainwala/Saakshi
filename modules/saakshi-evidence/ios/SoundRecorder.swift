@@ -1,7 +1,7 @@
 import AVFoundation
 import UIKit
 
-/// Bug mode on iPhone (spec E8; fix round 1, as for body-cam): sound only, one continuous file from
+/// Pocket recording (bug mode until round 2) on iPhone (spec E8; fix round 1, as for body-cam): sound only, one continuous file from
 /// Start to Stop, cut-off safe and checkpointed.
 ///
 /// - `AVAudioEngine`'s input node, started on screen when bug mode starts. With the app's `audio`
@@ -178,6 +178,18 @@ final class SoundRecorder {
         teardown()
         completion(events)
       }
+    }
+  }
+
+  /**
+   * The low-battery handover at 5% (round 2, group 1.5; bundle format 0.9): the file being written
+   * closes cleanly with `reason`, and the next sound, a buffer later, starts the next file of the
+   * same clip. The same path as the fail-safe new file, so the sound has no gap between the two.
+   */
+  func handOver(reason: String) {
+    queue.async { [self] in
+      guard isRunning, !stopping, let current = file else { return }
+      close(current, reason: reason)
     }
   }
 

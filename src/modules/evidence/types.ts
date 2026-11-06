@@ -31,6 +31,9 @@ export type EndReason =
   | 'error';
 
 /** A file the camera has just closed, before it is hashed or moved. */
+/** How a sound-only recording was started (bundle format 0.9, `capture.startedFrom`). */
+export type StartedFrom = 'pocket' | 'phone-taken';
+
 export type ClosedFile = {
   uri: string;
   kind: MediaKind;
@@ -52,6 +55,8 @@ export type ClosedFile = {
   recording?: string | null;
   /** The recorder's own fingerprint of every byte it wrote, to compare with the file as hashed. */
   written?: { size: number; sha256: string } | null;
+  /** Pocket recording only (format 0.9): started on its own or by "My phone is being taken". */
+  startedFrom?: StartedFrom;
 };
 
 /**
@@ -74,6 +79,8 @@ export type CheckpointInput = {
   startedAt: Date;
   location: LocationSnapshot;
   mode?: CaptureMode;
+  /** Pocket recording only (format 0.9). */
+  startedFrom?: StartedFrom;
 };
 
 export type CheckpointItem = {

@@ -38,7 +38,8 @@
     "shareUntil": "I'm sharing my location with you until {{time}}.",
     "shareOpen": "I'm sharing my location with you until I stop.",
     "shareBattery": "Battery {{percent}}%.",
-    "shareFollow": "Follow it here: {{link}}"
+    "shareFollow": "Follow it here: {{link}}",
+    "saving": "Saakshi: my battery is at 5%. To save power, my location now updates every 5 minutes."
   },
   "contacts": {
     "title": "Trusted contacts",
@@ -134,7 +135,7 @@
     "activityTitle": "Recording sound",
     "activityStarting": "Pocket recording is on",
     "activitySigned": "Signed up to {{time}}",
-    "witness": "Saakshi bug mode: recording since {{from}}, signed up to {{to}}. SHA-256: {{hash}}"
+    "witness": "Saakshi pocket recording: recording since {{from}}, signed up to {{to}}. SHA-256: {{hash}}"
   },
   "trigger": {
     "title": "Quick trigger",

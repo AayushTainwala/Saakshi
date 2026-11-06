@@ -58,6 +58,10 @@ function fakeNative() {
     async stop() {
       return native.stopResult;
     },
+    handOvers: [] as string[],
+    async handOver(reason: 'low-battery') {
+      native.handOvers.push(reason);
+    },
     checkpoint: (event: SoundCheckpoint) => handlers?.checkpoint(event),
     closed: (event: SoundClosed) => handlers?.closed(event),
   };
@@ -293,6 +297,36 @@ describe('startSoundRecording (bug mode, one continuous file with checkpoints)',
     ];
     await handle.stop('low-battery');
     expect(locker.store.readSession(session.id!)!.items[0].endReason).toBe('low-battery');
+  });
+
+  it('hands over at low battery, and records how Pocket recording was started (round 2, group 1.5)', async () => {
+    const { session, native, media, locker } = setup();
+    const handle = await startSoundRecording({
+      mode: 'bug',
+      startedFrom: 'phone-taken',
+      native,
+      location: () => location,
+      session,
+      store: locker.store,
+      partSeconds: () => 60,
+    });
+    await handle.handOver();
+    expect(native.handOvers).toEqual(['low-battery']);
+    const base = native.started[0].outputDir;
+    const bytes = new Uint8Array([1, 2, 3]);
+    media.set(`${base}/bug-0-0.aac`, bytes);
+    media.set(`${base}/bug-0-1.aac`, bytes);
+    const event = { clip: 0, startedAt: at(0), endedAt: at(5), gapBeforeMs: null, finalSize: 3, finalSha256: sha(bytes) };
+    native.closed({ ...event, uri: `${base}/bug-0-0.aac`, index: 0, endReason: 'low-battery', recording: 'a' });
+    native.stopResult = [{ ...event, uri: `${base}/bug-0-1.aac`, index: 1, endReason: 'stopped', gapBeforeMs: 0, recording: 'b' }];
+    await handle.stop();
+    const items = locker.store.readSession(session.id!)!.items;
+    expect(items.map((i) => [i.segment, i.endReason])).toEqual([
+      [{ clip: 0, index: 0 }, 'low-battery'],
+      [{ clip: 0, index: 1 }, 'stopped'],
+    ]);
+    const record = JSON.parse(locker.records.get(`${session.id}/${items[0].record!.file}`)!.body);
+    expect(record.capture).toMatchObject({ mode: 'bug', startedFrom: 'phone-taken', endReason: 'low-battery' });
   });
 
   it('cleans up and rethrows when the microphone cannot start', async () => {

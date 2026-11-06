@@ -18,7 +18,7 @@ function timeIST(iso: string, seconds = false): string {
 
 /** Bug mode (E8): what it does, start and stop, and how far it has got. */
 export function BugModeScreen() {
-  const { t } = useTranslation('sos');
+  const { t } = useTranslation(['sos', 'record']);
   const state = useBugMode();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +77,12 @@ export function BugModeScreen() {
             <AppText color="danger">{t('bug.problem', { time: timeIST(state.problem.at, true), detail: state.problem.message })}</AppText>
           ) : null}
           {state.lastWitnessAt ? <AppText>{t('bug.witnessed', { time: timeIST(state.lastWitnessAt) })}</AppText> : null}
+          {/* Low battery (round 2, group 1.5): it carries on in a new file at 5%; nothing stops. */}
+          {state.saving ? (
+            <AppText color="warning">{t('battery.handedOverSound', { ns: 'record' })}</AppText>
+          ) : state.batteryWarning ? (
+            <AppText color="warning">{t('battery.handoverSoon', { ns: 'record', percent: state.batteryWarning })}</AppText>
+          ) : null}
           <Button variant="danger" label={t('bug.stop')} busy={busy} onPress={() => void stop()} />
         </Card>
       ) : (

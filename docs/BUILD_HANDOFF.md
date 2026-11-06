@@ -4,7 +4,7 @@ The pickup file for build sessions. Each stream keeps its own section current: s
 
 ## Where things stand (21 Oct 2026; fix round 1 from 5 Nov; round 2 decided 6 Nov)
 
-- **Round 2 (6 Nov 2026):** Part 1 under way (groups 1.1 to 1.4 built): see "Round 2" below.
+- **Round 2 (6 Nov 2026):** Part 1 built (groups 1.1 to 1.5, five stacked pull requests, #31 to #36), not yet run on a phone: see "Round 2" below.
 - **Merged into `main`:** #1–#9. That is R1 and R2 as planned, apart from E3 and E7, plus the law checks against the Gazette of India (#9). Since then: the owner's docs and briefs (#10–#15), and fix round 1, groups 1, 2 and 2a (#16–#18; see "Fix round 1" below). Typecheck, lint, all tests and both native builds pass on `main`.
 - **Pace:** no 24-hour deadline (owner, 21 Oct). The next goal is a beta for about 50 testers on iPhone and Android; see BUILD_PLAN.md, section 1, "Road to the beta".
 - **First Release run (21 Oct, iOS only):** the owner set up iOS credentials and the App Store Connect API key with EAS (role App Manager). The EAS build succeeded; the **Submit to TestFlight step failed**. Its log is visible only to someone signed in to GitHub, so the cause isn't known yet. The owner is submitting that build from his Mac with `eas submit --platform ios --latest`. **Stream D:** find the cause and fix the workflow.
@@ -20,8 +20,8 @@ The owner's decisions after his SOS test are in `docs/SPEC.md` (sections 4, 5, 6
 | 1.1 Contacts keyboard bug | Built: https://github.com/AayushTainwala/Saakshi/pull/31. Not yet run on a phone. |
 | 1.2 Secret code, Settings | Built: https://github.com/AayushTainwala/Saakshi/pull/32 (on top of 1.1). Not yet run on a phone. |
 | 1.3 SOS swipes, Pocket recording, "My phone is being taken" | Split in two, as the brief allows. **A** (the page, the move, the quick trigger): https://github.com/AayushTainwala/Saakshi/pull/33. **B** ("My phone is being taken", Stop gating, the server migration): https://github.com/AayushTainwala/Saakshi/pull/34. Not yet run on a phone. |
-| 1.4 Alerts (both links, battery level, calm Share my location) | Built: branch `round-2/1-4-alerts`, on top of 1.3B. Not yet run on a phone. |
-| 1.5 Low battery at 5%, bundle format 0.9 | Not started |
+| 1.4 Alerts (both links, battery level, calm Share my location) | Built: https://github.com/AayushTainwala/Saakshi/pull/35 (on top of 1.3B). Not yet run on a phone. |
+| 1.5 Low battery at 5%, bundle format 0.9 | Built: branch `round-2/1-5-low-battery`, on top of 1.4. Not yet run on a phone. |
 | 2.1–2.3 E7, Google Drive | Not started (needs the owner's Google Cloud project; owner's guide "Round 2 setup guide" is in his vault) |
 | 3.1 Protocol `docs/spec/alerts.md` | Not started. **Documents only; needs the owner's review before Part 3 code.** May start with Part 1. |
 | 3.2–3.5 Server, pairing, receiving, silence alarm | Not started (needs the Apple push key and Google's notification service) |
@@ -203,6 +203,49 @@ Questions for the owner from this round go in "Owner questions" as `- [ ] (Round
 **Not verified:** on a phone. How Messages and SMS apps split and show a 2-part alert. Whether iPhone's background location task gets a battery reading every time (if not, that position has none, and the viewer shows the last one known with its age).
 
 **NEEDS OWNER REVIEW:** the new wording in `sos.json` (`message.accuracy`, `message.battery`, `message.batteryUnknown`, `message.share*`) and the viewer's battery line, in English and Hindi. The Hindi share message is written to need no gendered verb ("मेरी लोकेशन … शेयर हो रही है").
+
+### Group 1.5: low battery at 5%, and bundle format 0.9
+
+**What was built:**
+- **At 5% battery, in body-cam and in Pocket recording** (so also in "My phone is being taken"), the file being written is closed cleanly with `capture.endReason: "low-battery"` and sealed as usual, and **a new file of the same recording carries on** (the next `segment.index`, with `gapBeforeMs`), until the phone dies. It is the same path as the fail-safe new file. The records list says "Battery low: this file was closed and saved."
+- **Body-cam's new file is 480p at 15 frames a second** (1 Mbit/s), on iPhone and Android. The screen says so: "Battery at 5%: recording carries on in a new file, at 480p and 15 frames a second, to save power." Pocket recording's screen says the same without the picture.
+- **The 3% stop-and-save is gone, for every mode** (body-cam, Pocket recording and the evidence camera). The warnings at 10% and 5% stay, once each. In body-cam the 10% warning says what happens at 5%; in the evidence camera it says the camera keeps recording until the user stops it or the phone switches off.
+- **Saving mode** (`src/platform/battery/saving.ts`): it starts with the handover and ends when the phone is charging or the recording stops. While it is on:
+  - a live-location share sends its positions in one burst every 5 minutes, not as they come (below, "the battery cost");
+  - the people ticked for live location are told once per share: "Saakshi: my battery is at 5%. To save power, my location now updates every 5 minutes." Only where the phone texts with no tap (the Android APK), since the phone is usually locked by then and nobody can tap Send. Everywhere, the live page says so itself when the newest battery level is 5% or less: "The battery is low: positions may come only every 5 minutes" (English and Hindi).
+  - Uploads (group 2.3) don't exist yet; the 5-minute burst is where they will join.
+- **Plugging in** ends saving mode: live location sends as positions come again, and the next file is at the normal quality. Unplugged again while still at 5% or less, the handover happens again (a new file at lower quality); the contacts aren't told twice for the same share.
+- **Bundle format 0.9** (`docs/spec/evidence-bundle.md`, sections 4, 4a, 12):
+  - `FORMAT_VERSION` is `"0.9"`; the version strings in the tests named in the brief are updated.
+  - `capture.batteryPercent` (a whole number from 0 to 100) in every file and checkpoint record, read as the record is made. Left out when the phone doesn't say, and for a file sealed after a cut-off (the level when Saakshi next opens isn't the level when the recording ended).
+  - `capture.startedFrom` (`"pocket"` or `"phone-taken"`) in sound-only records only.
+  - "Pocket recording" replaces "Bug mode" in bundle names (`Saakshi 2026-11-06 10-40 IST Pocket recording.zip`), the manifest's `name`, the README's Record line, the witness message's Record line (it uses the same name) and the automatic witness text ("Saakshi pocket recording: recording since …"). The README's English and Hindi text had no "Bug mode" in it; it takes the name from the record, so nothing else in it changed. Old bundles keep their names and stay valid.
+  - `tools/verify-bundle.mjs` reads 0.1 to 0.9, and checks the new members: `batteryPercent` a whole number from 0 to 100, `startedFrom` one of the two values and only in a sound-only record. A 0.8 bundle still verifies (test).
+- **Native code:** iPhone `BodyCamRecorder.swift` (handover, 480p and 15 frames a second in the writer), `SoundRecorder.swift` (handover); Android `CameraRecorder.kt` (handover, 480p and 15 frames a second, the session rebuilt), `BugRecorder.kt` (handover); the two modules' bridges. If a 480p file can't be started, the new file starts at the normal quality instead: saving power never stops the recording.
+
+**Checked before building** (the brief asked; none of it is measured on a phone yet):
+- **How short the gap is at the handover.** Each new file's record says exactly, in `capture.gapBeforeMs`, so the owner's test will show the real number.
+  - iPhone, Pocket recording: none expected. The file closes and the very next piece of sound, a fraction of a second later, starts the next file; no sound is dropped between them.
+  - iPhone, body-cam: none for the sound, at most one frame for the picture. It is the path a fixed-length piece used: the frame that closes one file opens the next.
+  - Android, Pocket recording: the time Android takes to stop one sound recorder and start the next. The new recorder is started before the old file is fingerprinted, so the hashing adds nothing. I don't know how long that is on a real phone; I expect well under a second.
+  - Android, body-cam: the time to stop one recorder and start the next, plus, for the change to 480p, rebuilding the camera session (below). The sound starts with the new recorder; the picture may start a little later inside the new file, once the session is ready. I don't know how long; it needs the owner's phone.
+- **Whether a resolution change needs a new recorder session:**
+  - iPhone: **no.** The camera keeps running as it was (720p, or 1080p if chosen, at 30 frames a second). The new file's writer scales each frame to 480 on the short side and keeps every other frame. So the encoder and the storage do less work; the camera itself doesn't.
+  - Android: **yes.** The recording goes through a surface whose size is fixed when it is made, and a camera session's outputs are fixed when the session is made. So at the handover the surface is made again at 480p and the session rebuilt. The camera is asked for 15 frames a second where it offers that; where it doesn't, it sends its usual rate and the file's rate depends on the phone (untested).
+- **The battery cost of the 5-minute saving mode:** not measured. What it changes: the phone still finds its position as often as before; only sending to the server is held back to once every 5 minutes, so the mobile radio wakes less often. Changing how often the phone finds its position would mean restarting location updates, and at 5% the app is usually in the background, where it may not restart them (Android refuses to start a foreground service from the background, and iPhone doesn't let an app start location updates there). How much this saves, I don't know. Question below.
+- **Plugging in:** above. Saving mode ends, sending goes back to normal, and the next file is at the normal quality. Body-cam and Pocket recording are now one continuous file, so "the next file" is the next handover or the next recording; the file being written when the phone is plugged in stays at 480p. Question below.
+
+**Built so, please confirm:**
+- Contacts are texted about saving mode only from the Android APK; on iPhone and the Play Store build, only the live page says it (above).
+- The battery level is left out of a file sealed after a cut-off.
+
+**Tests (17 more, 507 in all):** the battery monitor (warnings once each at 10% and 5%, the handover once at 5%, never a stop, starting low, plugging in and out, an unknown level); the handover in body-cam and in Pocket recording with a fake battery drop (the file closed as low-battery, the next one following with its gap, saving mode on and off); the 3% stop gone; the new members in file and checkpoint records, left out when the battery is unknown and after a cut-off, `startedFrom` only in sound-only records; a 0.9 bundle verifying, named "Pocket recording" in its file name, README and manifest; the verifier failing malformed new members; a 0.8 bundle still verifying; live location's 5-minute bursts; the contacts told once; the live page's low-battery line; the end-reason words in English and Hindi.
+
+**Not verified:** nothing has run on a phone. The Swift and Kotlin changes compile only in the Native build workflow. Most important to test: the handover itself on both phones (the gap in `gapBeforeMs`, and that the 480p file plays and is really 15 frames a second); Android's session rebuild while recording, on a real phone; the evidence camera no longer stopping at 3%. To test without waiting for a real 5%, a phone can be run down to about 6% and recorded on from there.
+
+**The README must be checked against the owner's bundle walkthrough.** Only the record name changed in it, but the walkthrough is the reference.
+
+**NEEDS OWNER REVIEW:** the new and changed wording, in English and Hindi: `record.json` (`battery.warn`, `battery.handoverSoon`, `battery.handedOverVideo`, `battery.handedOverSound`, `battery.charging`, `ended.lowBattery`), `sos.json` (`message.saving`, `bug.witness`), and the live page's low-battery line.
 
 ## Fix round 1 (iPhone test round 1, A–C)
 
@@ -658,6 +701,9 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [ ] (Round 2) **"My phone is being taken" after setting a code** (built so): if no code is set, the swipe asks for one, and once it is set the mode starts at once, since the swipe already said what the user wants. Right, or should it ask for a second swipe?
 - [ ] (Round 2) **Stopping "My phone is being taken" stops everything it runs**, including a Pocket recording or a location share that was already running before it started (built so). Right?
 - [ ] (Round 2) **Battery level with each position, not as a new argument to `live_push`** (group 1.4). The brief says "an optional argument to `live_push`". A new argument would mean replacing the function in a way that, for a while, stops the app already on phones from sending positions, so the level travels inside each position instead. It does the same job, and stays with the right position when positions wait for signal. Right?
+- [ ] (Round 2) **Saving mode sends location every 5 minutes, but the phone still finds it every 30 seconds** (group 1.5). The brief says "location every 5 minutes". At 5% Saakshi is usually in the background, where it may not restart location updates at a slower rate (Android refuses to start a foreground service from the background; iPhone doesn't let an app start location updates there), and a failed restart would stop live location altogether. So positions are found as before and sent in one burst every 5 minutes, which saves the mobile radio but not the GPS. The saving isn't measured. I recommend keeping it as built and measuring on a phone first. Or should the app also try the slower rate when it happens to be on screen at 5%?
+- [ ] (Round 2) **Plugging in at 5% doesn't start a new file** (group 1.5, built so). Saving mode ends and the next file is at the normal quality, but body-cam is one continuous file, so the 480p file carries on until the user stops, or until a later handover. I recommend leaving it: a plug-in can be brief, and each new file is another short gap on Android. Or should plugging in start a normal-quality file at once?
+- [ ] (Round 2) **The "battery at 5%" text to contacts goes only from the Android APK** (group 1.5, built so). On iPhone and the Play Store build, a text needs a tap on Send, and at 5% the phone is usually locked; the live page says it instead. Right?
 - [ ] (Stream C) **Helpline list updates.** The Help tab fetches `helplines/helplines.json` from raw.githubusercontent.com each time it opens (a plain GET; nothing of the user's is sent, but GitHub sees the phone's IP address). Keep it automatic, or only on a "Check for updates" tap? And should the list be signed, so that a compromised `main` branch can't change numbers on every phone? Today it is only schema-checked.
 - [ ] (Stream C) **Lawyers and medics list.** The schema (`src/modules/helplines/schema.ts`, `helplines/README.md`) shows name, phone, city, state and languages, and records the registration number, consent date and an expiry (`listedUntil`) in the public file. Is publishing the registration number right, or should it be checked and kept off GitHub? Who collects the written consent, and where is it kept?
 - [ ] (Stream C) **"What police may ask of a phone"** (SPEC G5) is left out of the guide: `docs/research/law.md` has nothing on demands to unlock a phone or give a passcode. It needs its own research from statutes and judgments first. Shall I do that next?
