@@ -180,7 +180,7 @@ describe('checkpoints in the chain (format 0.5)', () => {
     ]);
     const first = checkpoints[0].record;
     expect(first.type).toBe('saakshi.evidence.checkpoint');
-    expect(first.version).toBe('0.5');
+    expect(first.version).toBe('0.6');
     expect(first.previous).toBeNull();
     expect(first.file).toEqual({ mediaType: 'video/mp4', size: 7_520, sha256: state.checkpoints![0].sha256 });
     expect(first.capture.checkpointAt).toBe('2026-11-05T05:10:10.000Z');
@@ -228,7 +228,7 @@ describe('checkpoints in the chain (format 0.5)', () => {
     expect(report).toContain('Checkpoints:     3 signed while it was being recorded (records/0000.json to records/0003.json);');
     expect(report).toContain('covers its first 22,560 bytes');
     const manifest = JSON.parse(new TextDecoder().decode(files.get('manifest.json')));
-    expect(manifest.version).toBe('0.5');
+    expect(manifest.version).toBe('0.6');
     expect(manifest.checkpoints).toHaveLength(4);
     expect(manifest.checkpoints[0]).toMatchObject({ record: 'records/0000.json', recording: 'rec-a', checkpoint: 0, size: 7_520 });
   });

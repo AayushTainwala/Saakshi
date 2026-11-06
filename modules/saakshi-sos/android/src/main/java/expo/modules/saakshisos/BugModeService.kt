@@ -51,7 +51,7 @@ class BugModeService : Service() {
       BugRecorder.Config(
         outputDir = File(intent.getStringExtra(EXTRA_OUTPUT_DIR)!!),
         pendingDir = File(intent.getStringExtra(EXTRA_PENDING_DIR)!!),
-        pieceMillis = intent.getLongExtra(EXTRA_PIECE_MILLIS, 120_000L),
+        checkpointMillis = intent.getLongExtra(EXTRA_CHECKPOINT_MILLIS, 10_000L),
         clip = intent.getIntExtra(EXTRA_CLIP, 0)
       )
     )
@@ -107,7 +107,7 @@ class BugModeService : Service() {
     const val ACTION_STOP = "expo.modules.saakshisos.BUGMODE_STOP"
     const val EXTRA_OUTPUT_DIR = "outputDir"
     const val EXTRA_PENDING_DIR = "pendingDir"
-    const val EXTRA_PIECE_MILLIS = "pieceMillis"
+    const val EXTRA_CHECKPOINT_MILLIS = "checkpointMillis"
     const val EXTRA_CLIP = "clip"
     const val EXTRA_TITLE = "title"
     const val EXTRA_TEXT = "text"

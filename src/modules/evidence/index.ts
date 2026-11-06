@@ -16,7 +16,16 @@ export { BodyCamScreen } from './bodycam/BodyCamScreen';
 export { setBodyCamPartListener, type UploadPart } from './bodycam/parts';
 export { CaptureScreen } from './capture/CaptureScreen';
 export { createEvidenceSession } from './capture/deps';
-export { type AudioPiecesHandle, piecePaths, startAudioPieces } from './capture/pieces';
+/** Bug mode (E8): one continuous, checkpointed sound file per recording. */
+export {
+  type SoundCheckpoint,
+  type SoundClosed,
+  type SoundHandlers,
+  type SoundRecorderNative,
+  type SoundRecordingHandle,
+  soundRecorder,
+  startSoundRecording,
+} from './sound/recording';
 export { CertificateForm } from './ui/CertificateForm';
 export { RecordHome } from './ui/RecordHome';
 export { SessionDetail } from './ui/SessionDetail';

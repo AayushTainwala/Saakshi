@@ -1,13 +1,14 @@
 /**
- * Bug mode (spec section 4: E8): sound recorded in fixed pieces until stopped or the battery runs
- * out, carrying on with the screen locked. Each piece is sealed through the evidence module's
- * public API, witnessed by SMS where the phone can send with no tap, and handed to the cloud
- * uploader (E7) once there is one. Owner: Stream B.
+ * Bug mode (spec section 4: E8): sound recorded as one continuous, cut-off-safe file until stopped
+ * or the battery runs out, carrying on with the screen locked. The file is checkpointed and signed
+ * about every 10 seconds through the evidence module's public API, the newest chain head is
+ * witnessed by SMS where the phone can send with no tap (at most every 10 minutes), and upload parts
+ * are handed to E7 once it exists. Owner: Stream B.
  *
  * Public API of this module. Other code imports only from `@/modules/bugmode`, never from files
  * inside it.
  */
-export { BUG_PIECE_SECONDS, type BugState, type PieceUploader } from './controller';
+export type { BugState } from './controller';
 export { MicrophoneDeniedError } from './engines';
-export { bugMode, setPieceUploader, useBugMode } from './instance';
+export { bugMode, setBugModePartListener, useBugMode } from './instance';
 export { BugModeScreen } from './ui/BugModeScreen';

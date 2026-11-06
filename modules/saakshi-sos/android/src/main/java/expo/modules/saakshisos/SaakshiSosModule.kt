@@ -26,7 +26,7 @@ class SaakshiSosModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("SaakshiSos")
 
-    Events("onBugPieceClosed", "onBugRecorderError")
+    Events("onBugPieceClosed", "onBugCheckpoint", "onBugRecorderError", "onBugRecorderStopped")
 
     OnCreate {
       BugRecorder.listener = { name, body -> sendEvent(name, body) }
@@ -82,13 +82,17 @@ class SaakshiSosModule : Module() {
       QuickTrigger.notificationEnabled(context)
     }
 
-    // Bug mode (spec E8): sound in pieces from a microphone foreground service.
+    // Bug mode (spec E8): one continuous sound file, with checkpoints, from a microphone foreground
+    // service.
     AsyncFunction("bugRecorderStart") { options: Map<String, Any?> ->
       val intent = Intent(context, BugModeService::class.java).apply {
         action = BugModeService.ACTION_START
         putExtra(BugModeService.EXTRA_OUTPUT_DIR, pathOf(options["outputDir"] as String))
         putExtra(BugModeService.EXTRA_PENDING_DIR, pathOf(options["pendingDir"] as String))
-        putExtra(BugModeService.EXTRA_PIECE_MILLIS, ((options["pieceSeconds"] as Number).toDouble() * 1000).toLong())
+        putExtra(
+          BugModeService.EXTRA_CHECKPOINT_MILLIS,
+          ((options["checkpointSeconds"] as? Number)?.toDouble()?.coerceAtLeast(2.0) ?: 10.0).times(1000).toLong()
+        )
         putExtra(BugModeService.EXTRA_CLIP, (options["clip"] as Number).toInt())
         putExtra(BugModeService.EXTRA_TITLE, options["notificationTitle"] as? String)
         putExtra(BugModeService.EXTRA_TEXT, options["notificationText"] as? String)

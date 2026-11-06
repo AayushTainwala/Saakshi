@@ -103,6 +103,32 @@ export type CheckpointEvent = {
   startedAt: string;
 };
 
+/** iPhone bug mode (SoundRecorder.swift): what `soundStart` takes. */
+export type SoundStartOptions = {
+  /** Folders (file:// URIs) for the files and their crash-recovery markers. */
+  outputDir: string;
+  pendingDir: string;
+  /** About this often (seconds of sound), a checkpoint of the file being written. */
+  checkpointSeconds: number;
+  clip: number;
+  mode: 'bug';
+};
+
+/** iPhone bug mode: a sound file (ADTS AAC) the recorder has closed. */
+export type SoundClosedEvent = {
+  uri: string;
+  kind: 'audio';
+  clip: number;
+  index: number;
+  startedAt: string;
+  endedAt: string;
+  endReason: 'stopped' | 'audio-interrupted' | 'error';
+  gapBeforeMs: number | null;
+  recording: string;
+  finalSize: number | null;
+  finalSha256: string | null;
+};
+
 export type SaakshiEvidenceEvents = {
   onRecorderReady: (event: { width: number; height: number }) => void;
   onRecordingStarted: (event: RecordingStartedEvent) => void;
@@ -113,6 +139,10 @@ export type SaakshiEvidenceEvents = {
   onVolumeUp: () => void;
   /** Android: body-cam was stopped from its notification's Stop button. */
   onBodyCamStopped: () => void;
+  /** iPhone bug mode: a checkpoint of the sound file being written. */
+  onSoundCheckpoint: (event: CheckpointEvent) => void;
+  onSoundClosed: (event: SoundClosedEvent) => void;
+  onSoundError: (event: { message: string }) => void;
 };
 
 export type BodyCamOptions = RecorderOptions & {

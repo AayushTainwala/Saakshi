@@ -9,9 +9,10 @@ import { canTextWithoutTap } from '@/modules/sos';
 import { MicrophoneDeniedError } from '../engines';
 import { bugMode, useBugMode } from '../instance';
 
-function timeIST(iso: string): string {
+function timeIST(iso: string, seconds = false): string {
   const d = new Date(Date.parse(iso) + 330 * 60 * 1000);
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} IST`;
+  const two = (n: number) => String(n).padStart(2, '0');
+  return `${two(d.getUTCHours())}:${two(d.getUTCMinutes())}${seconds ? `:${two(d.getUTCSeconds())}` : ''} IST`;
 }
 
 /** Bug mode (E8): what it does, start and stop, and how far it has got. */
@@ -63,7 +64,11 @@ export function BugModeScreen() {
       {state.running ? (
         <Card accessibilityLiveRegion="polite">
           {state.startedAt ? <AppText variant="label">{t('bug.recording', { time: timeIST(state.startedAt) })}</AppText> : null}
-          <AppText>{t('bug.pieces', { count: state.sealed })}</AppText>
+          <AppText>
+            {state.checkpoints > 0 && state.lastSignedAt
+              ? t('bug.checkpoints', { count: state.checkpoints, time: timeIST(state.lastSignedAt, true) })
+              : t('bug.noCheckpointYet')}
+          </AppText>
           {state.failed > 0 ? <AppText color="danger">{t('bug.failed', { count: state.failed })}</AppText> : null}
           {state.lastWitnessAt ? <AppText>{t('bug.witnessed', { time: timeIST(state.lastWitnessAt) })}</AppText> : null}
           <Button variant="danger" label={t('bug.stop')} busy={busy} onPress={() => void stop()} />

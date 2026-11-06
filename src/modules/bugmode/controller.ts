@@ -1,17 +1,23 @@
-import type { CaptureSession, EndReason, EvidenceItem } from '@/modules/evidence';
+import type { CaptureSession, EndReason } from '@/modules/evidence';
 
 import { WitnessThrottle } from './witness';
-
-/** Bug mode's pieces are this long (spec E8: 1–3 minutes). */
-export const BUG_PIECE_SECONDS = 120;
 
 export type BugEngine = {
   session: CaptureSession;
   stop: (reason?: EndReason) => Promise<void>;
 };
 
-/** Copies a sealed piece to the user's cloud (E7). Provided by the cloud module once it exists. */
-export type PieceUploader = (piece: { sessionId: string; item: EvidenceItem }) => Promise<void>;
+/**
+ * The newest signed record of a bug-mode recording: a checkpoint (about every 10 seconds while the
+ * file is written) or a file's own record (when it closes). Its SHA-256 is the chain head, which
+ * vouches for everything recorded before it.
+ */
+export type SignedPoint = {
+  sequence: number;
+  recordSha256: string;
+  /** What it covers up to: the checkpoint's time, or the file's end. */
+  at: string;
+};
 
 export type BugDeps = {
   startEngine: () => Promise<BugEngine>;
@@ -19,13 +25,14 @@ export type BugDeps = {
   witness: (message: string) => Promise<number>;
   /** How many texts a witness message costs now (one per contact), or 0 if it can't go. */
   witnessCost: () => Promise<number>;
-  witnessText: (item: EvidenceItem, pieces: number) => string;
+  /** The witness text for the newest signed record of a recording that started at `startedAt`. */
+  witnessText: (latest: SignedPoint, startedAt: string) => string;
   liveActivity: {
     start: () => Promise<void>;
-    update: (pieces: number) => Promise<void>;
+    /** `signedAt`: the time the newest signed record covers up to. */
+    update: (signedAt: string) => Promise<void>;
     end: () => Promise<void>;
   };
-  uploader: () => PieceUploader | null;
   now: () => Date;
 };
 
@@ -33,9 +40,14 @@ export type BugState = {
   running: boolean;
   startedAt: string | null;
   sessionId: string | null;
-  /** Pieces hashed, signed and chained. */
-  sealed: number;
+  /** Checkpoints signed while the file was being written. */
+  checkpoints: number;
+  /** Files closed, hashed, signed and chained. */
+  files: number;
+  /** Files that could not be signed (kept as they are). */
   failed: number;
+  /** What the newest signed record (checkpoint or file) covers up to. */
+  lastSignedAt: string | null;
   witnessed: number;
   lastWitnessAt: string | null;
   error: string | null;
@@ -45,18 +57,24 @@ const IDLE: BugState = {
   running: false,
   startedAt: null,
   sessionId: null,
-  sealed: 0,
+  checkpoints: 0,
+  files: 0,
   failed: 0,
+  lastSignedAt: null,
   witnessed: 0,
   lastWitnessAt: null,
   error: null,
 };
 
+/** The Live Activity is updated at most this often (checkpoints come every 10 seconds). */
+const ACTIVITY_UPDATE_MS = 60_000;
+
 /**
- * Bug mode (spec E8): the phone records sound in fixed pieces until stopped or the battery runs
- * out. Each piece is sealed by the evidence module as it is saved; then its chain head is texted to
- * trusted contacts where the phone can send with no tap (within Android's limit), and the piece is
- * handed to the cloud uploader (E7) when there is one.
+ * Bug mode (spec E8): the phone records sound as one continuous file until stopped or the battery
+ * runs out (fix round 1, as for body-cam). About every 10 seconds the evidence module signs a
+ * checkpoint of the file into the session's chain; when the file closes it is sealed. After a new
+ * signed record, the newest chain head is texted to trusted contacts where the phone can send with
+ * no tap, at most once every 10 minutes (WitnessThrottle). Upload parts for E7 are the engine's.
  */
 export class BugModeController {
   private current: BugState = IDLE;
@@ -64,7 +82,9 @@ export class BugModeController {
   private engine: BugEngine | null = null;
   private unsubscribe: (() => void) | null = null;
   private seen = new Set<number>();
+  private newest: SignedPoint | null = null;
   private throttle = new WitnessThrottle();
+  private lastActivityUpdate: number | null = null;
   private starting: Promise<void> | null = null;
   private work: Promise<void> = Promise.resolve();
 
@@ -77,7 +97,7 @@ export class BugModeController {
     return () => this.listeners.delete(listener);
   };
 
-  /** Starts recording. Resolves once the first piece is recording; ignored while running. */
+  /** Starts recording. Resolves once recording has started; ignored while running. */
   start(): Promise<void> {
     if (this.current.running) return Promise.resolve();
     this.starting ??= this.begin().finally(() => {
@@ -103,13 +123,15 @@ export class BugModeController {
     }
   }
 
-  /** Lets the work queued for sealed pieces (witness texts, uploads) finish. For tests. */
+  /** Lets the work queued for new signed records (witness texts, the Live Activity) finish. For tests. */
   settled(): Promise<void> {
     return this.work;
   }
 
   private async begin(): Promise<void> {
     this.seen = new Set();
+    this.newest = null;
+    this.lastActivityUpdate = null;
     try {
       const engine = await this.deps.startEngine();
       this.engine = engine;
@@ -122,35 +144,68 @@ export class BugModeController {
     }
   }
 
-  /** Picks out pieces that have just been sealed or have failed. */
+  /** Picks out checkpoints and files that have just been signed, and files that failed. */
   private scan(session: CaptureSession): void {
+    let { checkpoints, files, failed } = this.current;
+    let newest = this.newest;
+    for (const checkpoint of session.checkpoints) {
+      if (this.seen.has(checkpoint.sequence) || checkpoint.status !== 'sealed' || !checkpoint.recordSha256) continue;
+      this.seen.add(checkpoint.sequence);
+      checkpoints++;
+      if (!newest || checkpoint.sequence > newest.sequence) {
+        newest = { sequence: checkpoint.sequence, recordSha256: checkpoint.recordSha256, at: checkpoint.at };
+      }
+    }
     for (const item of session.items) {
       if (this.seen.has(item.sequence)) continue;
-      if (item.status === 'sealed') {
+      if (item.status === 'sealed' && item.recordSha256) {
         this.seen.add(item.sequence);
-        this.set({ ...this.current, sessionId: session.id, sealed: this.current.sealed + 1 });
-        const pieces = this.current.sealed;
-        this.work = this.work.then(() => this.afterSealed(session.id!, item, pieces));
+        files++;
+        if (!newest || item.sequence > newest.sequence) {
+          newest = { sequence: item.sequence, recordSha256: item.recordSha256, at: item.endedAt };
+        }
       } else if (item.status === 'failed') {
         this.seen.add(item.sequence);
-        this.set({ ...this.current, failed: this.current.failed + 1 });
+        failed++;
       }
+    }
+    const changed = newest !== this.newest;
+    if (
+      !changed &&
+      checkpoints === this.current.checkpoints &&
+      files === this.current.files &&
+      failed === this.current.failed &&
+      session.id === this.current.sessionId
+    ) {
+      return;
+    }
+    this.newest = newest;
+    this.set({ ...this.current, sessionId: session.id, checkpoints, files, failed, lastSignedAt: newest?.at ?? null });
+    if (changed && newest) {
+      const latest = newest;
+      this.work = this.work.then(() => this.afterSigned(latest));
     }
   }
 
-  private async afterSealed(sessionId: string, item: EvidenceItem, pieces: number): Promise<void> {
-    await this.deps.liveActivity.update(pieces).catch(() => undefined);
+  private async afterSigned(latest: SignedPoint): Promise<void> {
+    const now = this.deps.now().getTime();
+    if (this.lastActivityUpdate === null || now - this.lastActivityUpdate >= ACTIVITY_UPDATE_MS) {
+      this.lastActivityUpdate = now;
+      await this.deps.liveActivity.update(latest.at).catch(() => undefined);
+    }
 
+    // Cheap check first: most new checkpoints come well inside the 10 minutes.
+    if (!this.throttle.due(now)) return;
+    // A later record may have come while this waited: text the newest.
+    const newest = this.newest && this.newest.sequence > latest.sequence ? this.newest : latest;
     const cost = await this.deps.witnessCost().catch(() => 0);
     if (cost > 0 && this.throttle.allow(cost, this.deps.now().getTime())) {
-      const sent = await this.deps.witness(this.deps.witnessText(item, pieces)).catch(() => 0);
+      const text = this.deps.witnessText(newest, this.current.startedAt ?? newest.at);
+      const sent = await this.deps.witness(text).catch(() => 0);
       if (sent > 0) {
         this.set({ ...this.current, witnessed: this.current.witnessed + 1, lastWitnessAt: this.deps.now().toISOString() });
       }
     }
-
-    const upload = this.deps.uploader();
-    if (upload) await upload({ sessionId, item }).catch(() => undefined);
   }
 
   private set(state: BugState): void {

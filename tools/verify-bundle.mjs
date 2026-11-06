@@ -13,7 +13,7 @@ import { closeSync, createReadStream, existsSync, openSync, readdirSync, readFil
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 
-const SUPPORTED_VERSIONS = ['0.1', '0.2', '0.3', '0.4', '0.5'];
+const SUPPORTED_VERSIONS = ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6'];
 const RECORD_TYPE = 'saakshi.evidence.record';
 const CHECKPOINT_TYPE = 'saakshi.evidence.checkpoint';
 

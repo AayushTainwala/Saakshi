@@ -24,7 +24,7 @@ declare class SaakshiSosModule extends NativeModule<SaakshiSosEvents> {
   /** iPhone: true once if a control, the Action Button or a Shortcut asked for the code pad. */
   consumeCodePadRequest(): boolean;
 
-  /** Android: bug mode's recorder in a microphone foreground service (spec E8). */
+  /** Android: bug mode's recorder in a microphone foreground service (spec E8): one file, with checkpoints. */
   bugRecorderStart(options: BugRecorderOptions): Promise<void>;
   bugRecorderStop(): Promise<void>;
   bugRecorderRunning(): boolean;

@@ -3,19 +3,21 @@ import { useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
 
 import i18n from '@/i18n';
+import type { UploadPart } from '@/modules/evidence';
 import { canTextWithoutTap, getTrustedContacts, textTrustedContacts } from '@/modules/sos';
 
-import { BugModeController, type BugState, type PieceUploader } from './controller';
+import { BugModeController, type BugState } from './controller';
 import { startBugEngine } from './engines';
 
-let uploader: PieceUploader | null = null;
+let partListener: ((part: UploadPart) => void) | null = null;
 
 /**
- * E7 (copies to the user's cloud) plugs in here: each sealed piece is handed to the uploader as
- * soon as it is saved. Until it is set, pieces stay on the phone.
+ * E7 (copies to the user's cloud) plugs in here: each upload part of a bug-mode recording, a byte
+ * range of its one file ending on a signed checkpoint, is handed over as soon as it exists (about
+ * every minute, a setting shared with body-cam). Until it is set, everything stays on the phone.
  */
-export function setPieceUploader(next: PieceUploader | null): void {
-  uploader = next;
+export function setBugModePartListener(next: ((part: UploadPart) => void) | null): void {
+  partListener = next;
 }
 
 function formatTimeIST(iso: string): string {
@@ -27,31 +29,27 @@ const liveActivity = SaakshiSos && Platform.OS === 'ios' ? SaakshiSos : null;
 
 export const bugMode = new BugModeController({
   startEngine: () =>
-    startBugEngine({ title: i18n.t('sos:bug.noticeTitle'), text: i18n.t('sos:bug.noticeText') }),
+    startBugEngine({ title: i18n.t('sos:bug.noticeTitle'), text: i18n.t('sos:bug.noticeText') }, (part) =>
+      partListener?.(part),
+    ),
   witnessCost: async () => ((await canTextWithoutTap()) ? (await getTrustedContacts()).length : 0),
   witness: async (message) => {
     const outcome = await textTrustedContacts(message, { directOnly: true });
     return outcome.channel === 'direct' ? outcome.results.filter((r) => r.status !== 'failed').length : 0;
   },
-  witnessText: (item, pieces) =>
-    i18n.t('sos:bug.witness', {
-      n: pieces,
-      from: formatTimeIST(item.startedAt),
-      to: formatTimeIST(item.endedAt),
-      hash: item.recordSha256 ?? '',
-    }),
+  witnessText: (latest, startedAt) =>
+    i18n.t('sos:bug.witness', { from: formatTimeIST(startedAt), to: formatTimeIST(latest.at), hash: latest.recordSha256 }),
   liveActivity: {
     start: async () => {
       await liveActivity?.liveActivityStart(i18n.t('sos:bug.activityTitle'), i18n.t('sos:bug.activityStarting'));
     },
-    update: async (pieces) => {
-      await liveActivity?.liveActivityUpdate(i18n.t('sos:bug.activityPieces', { count: pieces }));
+    update: async (signedAt) => {
+      await liveActivity?.liveActivityUpdate(i18n.t('sos:bug.activitySigned', { time: formatTimeIST(signedAt) }));
     },
     end: async () => {
       await liveActivity?.liveActivityEnd();
     },
   },
-  uploader: () => uploader,
   now: () => new Date(),
 });
 

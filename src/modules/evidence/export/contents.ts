@@ -209,8 +209,8 @@ This bundle holds photos and videos recorded with the Saakshi app, a signed reco
 and the public key that checks the signatures. Nothing in it has been edited.
 
   media/          the original files, exactly as the phone saved them
-  records/        one record per file (.json) and its signature (.json.sig); for body-cam, also
-                  checkpoints signed every 10 seconds while each file was being recorded
+  records/        one record per file (.json) and its signature (.json.sig); for body-cam and bug
+                  mode, also checkpoints signed every 10 seconds while each file was being recorded
   device-key.json the phone's public key and its hardware attestation
   manifest.json   list of the contents
   hash-report.txt sizes and SHA-256, SHA-1 and MD5 fingerprints of every file
