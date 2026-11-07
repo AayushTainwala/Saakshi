@@ -62,6 +62,35 @@ describe('the battery level in every location update (round 2, group 1.4)', () =
   });
 });
 
+describe('saving mode at 5% battery (round 2, group 1.5)', () => {
+  it('sends positions in one burst every 5 minutes, and as they come again once it ends', async () => {
+    const { live, server, setClock, saved } = setup();
+    await live.start(4, notice);
+    await live.receive([point(0)]);
+    expect(server.push).toHaveBeenCalledTimes(1);
+    await live.setSaving(true);
+    expect(saved().active.saving).toBe(true);
+
+    setClock('2026-10-20T09:02:00Z');
+    await live.receive([point(2)]);
+    setClock('2026-10-20T09:04:00Z');
+    await live.receive([point(4)]);
+    // Held: less than 5 minutes since the last send.
+    expect(server.push).toHaveBeenCalledTimes(1);
+    expect(saved().active.pending).toEqual([point(2), point(4)]);
+
+    setClock('2026-10-20T09:05:30Z');
+    await live.receive([point(5)]);
+    expect(server.push).toHaveBeenCalledTimes(2);
+    expect(server.push).toHaveBeenLastCalledWith('share-1', 'ab'.repeat(32), [point(2), point(4), point(5)]);
+
+    await live.setSaving(false);
+    setClock('2026-10-20T09:06:00Z');
+    await live.receive([point(6)]);
+    expect(server.push).toHaveBeenCalledTimes(3);
+  });
+});
+
 describe('LiveShareController: "My phone is being taken" (round 2, group 1.3)', () => {
   it('starts a share with no fixed end', async () => {
     const { live, server, saved } = setup();

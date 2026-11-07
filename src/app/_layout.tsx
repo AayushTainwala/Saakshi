@@ -8,7 +8,9 @@ import { bugMode } from '@/modules/bugmode';
 import { isBodyCamRunning } from '@/modules/evidence';
 import { liveShare, registerLiveLocationTask } from '@/modules/location';
 import { registerRunningCheck } from '@/modules/secretcode';
+import { lowBatterySaving } from '@/modules/sos';
 import { phoneTaken, removeOldCodePadSetting, useQuickTriggers } from '@/modules/trigger';
+import { onSavingMode } from '@/platform/battery';
 import { PreferencesProvider } from '@/preferences/PreferencesProvider';
 import { loadPreferences } from '@/preferences/store';
 import { useTheme } from '@/theme';
@@ -25,6 +27,8 @@ registerRunningCheck('live-location', () => liveShare.getShare() !== null);
 registerRunningCheck('phone-taken', phoneTaken.isRunning);
 // "My phone is being taken" carries on after a restart: its heartbeat resumes (group 3.5).
 phoneTaken.resume();
+// At 5% battery, body-cam and Pocket recording turn on saving mode; live location follows it.
+onSavingMode((on) => void lowBatterySaving(on));
 // Round 2 removed the 3-digit code pad: its old setting, with the code in it, is deleted.
 removeOldCodePadSetting();
 

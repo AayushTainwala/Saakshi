@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
 
 import i18n from '@/i18n';
+import { setSavingMode, watchBattery } from '@/platform/battery';
 import type { UploadPart } from '@/modules/evidence';
 import { canTextWithoutTap, getTrustedContacts, textTrustedContacts } from '@/modules/sos';
 
@@ -28,12 +29,15 @@ function formatTimeIST(iso: string): string {
 const liveActivity = SaakshiSos && Platform.OS === 'ios' ? SaakshiSos : null;
 
 export const bugMode = new BugModeController({
-  startEngine: (onProblem) =>
+  startEngine: (onProblem, { startedFrom }) =>
     startBugEngine(
       { title: i18n.t('sos:bug.noticeTitle'), text: i18n.t('sos:bug.noticeText') },
       (part) => partListener?.(part),
       onProblem,
+      startedFrom,
     ),
+  watchBattery,
+  savingMode: setSavingMode,
   // The people ticked for witness messages (fix round 1, group 6).
   witnessCost: async () => ((await canTextWithoutTap()) ? (await getTrustedContacts('witness')).length : 0),
   witness: async (message) => {

@@ -136,7 +136,11 @@
     var withBattery = positions.filter(function (q) { return q.bat != null; })[0];
     if (withBattery) {
       var b = ago(withBattery.at);
-      $('battery').textContent = 'Battery ' + withBattery.bat + '% (' + b.en + ') · ' + 'बैटरी ' + withBattery.bat + '% (' + b.hi + ')';
+      $('battery').textContent = 'Battery ' + withBattery.bat + '% (' + b.en + ') · ' + 'बैटरी ' + withBattery.bat + '% (' + b.hi + ')' +
+        // At 5% the phone saves power and sends its positions every 5 minutes (round 2, group 1.5).
+        (withBattery.bat <= 5
+          ? '. The battery is low: positions may come only every 5 minutes. · बैटरी कम है: लोकेशन शायद हर 5 मिनट में ही आए।'
+          : '');
       $('battery').hidden = false;
     } else {
       $('battery').hidden = true;

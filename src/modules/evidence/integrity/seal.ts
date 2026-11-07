@@ -20,7 +20,17 @@ export type SealerDeps = {
   device: () => DeviceInfo;
   app: () => AppInfo;
   timeZone: () => string | null;
+  /** The battery level now, 0-100, or null (format 0.9). Not read for a file sealed after a cut-off. */
+  battery?: () => Promise<number | null>;
 };
+
+async function batteryNow(deps: SealerDeps): Promise<number | null> {
+  try {
+    return (await deps.battery?.()) ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Builds the record for a file, writes it in canonical form (RFC 8785), signs exactly those bytes
@@ -31,6 +41,8 @@ export function createSealer(deps: SealerDeps) {
   return async function seal(input: SealInput): Promise<SealResult> {
     const signer = await deps.signer();
     const { item, previous } = input;
+    // The level when the file closed; for a file cut off and sealed now, nobody knows it.
+    const batteryPercent = input.file.interrupted ? null : await batteryNow(deps);
 
     const record = buildRecord({
       id: deps.newId(),
@@ -50,6 +62,8 @@ export function createSealer(deps: SealerDeps) {
       interrupted: input.file.interrupted,
       gapBeforeMs: input.file.gapBeforeMs,
       rotationDegrees: input.file.rotationDegrees,
+      batteryPercent,
+      startedFrom: input.file.startedFrom,
       timeZone: deps.timeZone(),
       location: input.file.location,
       device: deps.device(),
@@ -69,6 +83,7 @@ export function createCheckpointSealer(deps: SealerDeps) {
   return async function sealCheckpoint(input: CheckpointSealInput): Promise<SealResult> {
     const signer = await deps.signer();
     const { checkpoint } = input;
+    const batteryPercent = await batteryNow(deps);
     const record = buildCheckpointRecord({
       id: deps.newId(),
       session: input.session.id,
@@ -83,6 +98,8 @@ export function createCheckpointSealer(deps: SealerDeps) {
       mode: checkpoint.mode,
       startedAt: checkpoint.startedAt,
       checkpointAt: checkpoint.at,
+      batteryPercent,
+      startedFrom: checkpoint.startedFrom,
       timeZone: deps.timeZone(),
       location: checkpoint.location,
       device: deps.device(),

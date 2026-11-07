@@ -19,7 +19,15 @@ export type LiveShare = {
   lastSentAt: string | null;
   /** Positions not yet accepted by the server (no signal), oldest first. */
   pending: LivePoint[];
+  /**
+   * Saving mode (round 2, group 1.5): at 5% battery in body-cam or Pocket recording, positions go
+   * to the server in one burst every 5 minutes, not as they come. Absent in older shares.
+   */
+  saving?: boolean;
 };
+
+/** In saving mode, positions are sent at most this often. */
+export const SAVING_SEND_MS = 5 * 60 * 1000;
 
 type Saved = {
   version: 1;
@@ -135,6 +143,19 @@ export class LiveShareController {
     });
   }
 
+  /**
+   * Saving mode on or off (round 2, group 1.5). The phone's location updates aren't restarted
+   * (a backgrounded app may not start them again: Android refuses a foreground service then, and
+   * iPhone can't start location updates); instead positions are kept and sent every 5 minutes.
+   */
+  setSaving(on: boolean): Promise<void> {
+    return this.serial(async () => {
+      const saved = this.load();
+      if (!saved.active || !!saved.active.saving === on) return;
+      this.save({ ...saved, active: { ...saved.active, saving: on } });
+    });
+  }
+
   /** New positions from the phone. Sends them with anything still waiting. */
   receive(points: LivePoint[]): Promise<void> {
     return this.serial(async () => {
@@ -144,6 +165,12 @@ export class LiveShareController {
       if (this.expired(share)) return this.end(saved);
 
       const pending = [...share.pending, ...points].slice(-MAX_PENDING);
+      // Saving mode: held until 5 minutes after the last send, then sent in one burst.
+      const sentAt = share.lastSentAt ? Date.parse(share.lastSentAt) : null;
+      if (share.saving && sentAt !== null && this.deps.now().getTime() - sentAt < SAVING_SEND_MS) {
+        this.save({ ...saved, active: { ...share, pending } });
+        return;
+      }
       let sent = 0;
       let expiresAt = share.expiresAt;
       try {

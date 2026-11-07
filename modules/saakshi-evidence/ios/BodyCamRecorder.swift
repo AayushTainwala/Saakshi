@@ -158,6 +158,14 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
   private var handOverFrom: CMTime?
   private var videoRetryAt = CMTime.invalid
   private var soundRetryAt = CMTime.invalid
+  /// Saving mode (round 2, group 1.5): from 5% battery, new video files are written at 480p and
+  /// 15 frames a second. It ends when the phone is charged; the next file is at the normal quality.
+  private var saving = false
+  /// The low-battery handover: the file being written closes cleanly with this reason, and the next
+  /// file of the same clip carries on (the same path as a piece, so nothing is lost between).
+  private var handOverReason: String?
+  /// When the last frame was written, for 15 frames a second in saving mode.
+  private var lastWrittenFrame = CMTime.invalid
 
   var isRunning: Bool {
     lock.lock()
@@ -247,6 +255,27 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
   }
 
   /// On the session queue.
+  /**
+   * The low-battery handover at 5% (round 2, group 1.5; bundle format 0.9): the file being written
+   * (video, or sound only while the app is in the background) closes cleanly with `reason`, and a
+   * new file of the same clip continues at once: the same path as a piece of fixed length, so the
+   * picture's gap is one frame and the sound has none. With `saving`, the new video file is 480p
+   * at 15 frames a second.
+   */
+  func handOver(reason: String, saving: Bool) {
+    queue.async { [self] in
+      guard isRunning, !stopping else { return }
+      self.saving = saving
+      // With no file open at this moment, the next one simply opens in saving mode.
+      if video != nil || sound != nil { handOverReason = reason }
+    }
+  }
+
+  /// Saving mode on or off (off when the phone is charged): it applies from the next file.
+  func setSaving(_ on: Bool) {
+    queue.async { [self] in saving = on }
+  }
+
   private func teardown() {
     let observed = !observers.isEmpty
     for observer in observers { NotificationCenter.default.removeObserver(observer) }
@@ -579,6 +608,12 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
       continueVideo = (file.clip, file.index + 1)
       close(file, at: pts, reason: "piece-complete", waitForAudio: true)
     }
+    if let reason = handOverReason, let file = video {
+      handOverReason = nil
+      video = nil
+      continueVideo = (file.clip, file.index + 1)
+      close(file, at: pts, reason: reason, waitForAudio: true)
+    }
     if video == nil {
       if videoRetryAt.isValid && pts < videoRetryAt { return }
       video = openVideo(sample)
@@ -594,11 +629,16 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
       file.dropped += 1
       return
     }
+    // Saving mode: 15 frames a second, every other frame of the camera's 30.
+    if file.savingMode, lastWrittenFrame.isValid, pts > lastWrittenFrame, (pts - lastWrittenFrame).seconds < Self.savingFrameSeconds {
+      return
+    }
     // Each file's own timeline starts at 0 (Apple's HLS profile writes no edit list to hide the
     // phone's clock); the file's start in the phone's time is in its record.
     guard let timed = Self.shifted(sample, by: file.start) else { return }
     if input.append(timed) {
       file.videoSamples += 1
+      lastWrittenFrame = pts
     } else {
       writerFailed(file)
     }
@@ -621,6 +661,12 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
         sound = nil
         soundStopAt = nil
         close(file, at: stopAt, reason: "video-resumed", waitForAudio: false)
+      } else if soundStopAt == nil, video == nil, let reason = handOverReason {
+        // The low-battery handover while sound records on its own: the next file of the clip
+        // starts with this sound.
+        handOverReason = nil
+        close(file, at: chunk.pts, reason: reason, waitForAudio: false)
+        sound = openSound(with: [chunk], continuing: file)
       } else if soundStopAt == nil, config.pieceSeconds > 0, (chunk.pts - file.start).seconds >= config.pieceSeconds {
         close(file, at: chunk.pts, reason: "piece-complete", waitForAudio: false)
         sound = openSound(with: [chunk], continuing: file)
@@ -676,6 +722,8 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
   private func endVideoStretch(reason: String, interruption: String?) {
     soundStopAt = nil
     continueVideo = nil
+    // A low-battery handover still due is moot: the next files open in saving mode anyway.
+    handOverReason = nil
     guard let file = video else { return }
     video = nil
     file.interruption = interruption
@@ -758,11 +806,20 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
       writer.preferredOutputSegmentInterval = CMTime(value: Self.segmentSeconds, timescale: 1)
       writer.initialSegmentStartTime = .zero
       writer.delegate = sink
-      let videoInput = AVAssetWriterInput(
-        mediaType: .video,
-        outputSettings: Self.videoSettings(width: Int(dimensions.width), height: Int(dimensions.height)),
-        sourceFormatHint: format
-      )
+      // Saving mode: 480p, scaled from the camera's frames (the capture session is unchanged). If
+      // the phone's writer won't take those settings, this file is at the normal quality instead:
+      // the recording carries on either way.
+      var settings = Self.videoSettings(width: Int(dimensions.width), height: Int(dimensions.height))
+      var lowQuality = false
+      if saving {
+        let small = Self.savingSize(width: Int(dimensions.width), height: Int(dimensions.height))
+        let savingSettings = Self.videoSettings(width: small.width, height: small.height, saving: true)
+        if writer.canApply(outputSettings: savingSettings, forMediaType: .video) {
+          settings = savingSettings
+          lowQuality = true
+        }
+      }
+      let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: settings, sourceFormatHint: format)
       videoInput.expectsMediaDataInRealTime = true
       videoInput.transform = Self.transform(for: orientation)
       guard writer.canAdd(videoInput) else { throw Failure.cannotWrite("video track") }
@@ -784,6 +841,8 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
         startedAt: Self.date(for: start), gapBeforeMs: gap
       )
       file.sink = sink
+      file.savingMode = lowQuality
+      lastWrittenFrame = .invalid
       sink.onCheckpoint = { [weak self, weak file] snapshot in
         guard let self, let file else { return }
         self.emitCheckpoint(file, snapshot)
@@ -804,13 +863,16 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
         if sound != nil { soundStopAt = start + Self.seconds(Self.overlap) }
       }
       if file.finished {
-        // It failed on its first writes, and has been reported.
+        // It failed on its first writes, and has been reported. A saving-mode file that fails is
+        // tried again at the normal quality, so that saving power never stops the picture.
+        if lowQuality { saving = false }
         videoRetryAt = start + Self.seconds(Self.retrySeconds)
         return nil
       }
       return file
     } catch {
       // Sound carries on in a sound-only file until a video file can be started again.
+      if saving { saving = false }
       try? FileManager.default.removeItem(at: url)
       videoRetryAt = start + Self.seconds(Self.retrySeconds)
       emitError("A video file could not be started: \(error.localizedDescription)")
@@ -1121,19 +1183,34 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     ]
   }
 
-  /// H.264, at the bit rates the Android recorder uses (3 Mbit/s at 720p, 6 at 1080p).
-  private static func videoSettings(width: Int, height: Int) -> [String: Any] {
-    [
+  /// Saving mode writes a frame at most this often: 15 frames a second.
+  private static let savingFrameSeconds = 1.0 / 15.0 - 0.004
+
+  /// The size of a saving-mode file: 480 on the short side, the same shape, even numbers for H.264.
+  static func savingSize(width: Int, height: Int) -> (width: Int, height: Int) {
+    let short = min(width, height)
+    guard short > 480 else { return (width, height) }
+    let scale = 480.0 / Double(short)
+    let even = { (value: Int) in Int((Double(value) * scale / 2).rounded()) * 2 }
+    return (even(width), even(height))
+  }
+
+  /// H.264, at the bit rates the Android recorder uses (3 Mbit/s at 720p, 6 at 1080p; saving mode:
+  /// 1 Mbit/s at 480p, 15 frames a second, the camera's frames scaled to fit).
+  private static func videoSettings(width: Int, height: Int, saving: Bool = false) -> [String: Any] {
+    var settings: [String: Any] = [
       AVVideoCodecKey: AVVideoCodecType.h264,
       AVVideoWidthKey: width,
       AVVideoHeightKey: height,
       AVVideoCompressionPropertiesKey: [
-        AVVideoAverageBitRateKey: min(width, height) >= 1080 ? 6_000_000 : 3_000_000,
-        AVVideoExpectedSourceFrameRateKey: 30,
-        AVVideoMaxKeyFrameIntervalKey: 60,
+        AVVideoAverageBitRateKey: saving ? 1_000_000 : min(width, height) >= 1080 ? 6_000_000 : 3_000_000,
+        AVVideoExpectedSourceFrameRateKey: saving ? 15 : 30,
+        AVVideoMaxKeyFrameIntervalKey: saving ? 30 : 60,
         AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
       ] as [String: Any],
     ]
+    if saving { settings[AVVideoScalingModeKey] = AVVideoScalingModeResizeAspect }
+    return settings
   }
 
   /// The back camera's frames are landscape, with the Home-button side on the right. The file
@@ -1256,6 +1333,8 @@ private final class OutputFile {
   var lastAudioPts = CMTime.negativeInfinity
   var lastAudioEnd: CMTime?
   var dropped = 0
+  /// Written in saving mode: 480p, 15 frames a second (round 2, group 1.5).
+  var savingMode = false
 
   /// Where this file's sound ends: the end of the last sound written, but not after the file's end.
   var soundEnd: CMTime? {

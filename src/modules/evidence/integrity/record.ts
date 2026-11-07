@@ -1,5 +1,5 @@
 import { CHECKPOINT_TYPE, FORMAT_VERSION, RECORD_TYPE } from '../constants';
-import type { CaptureMode, EndReason, FileDigests, LocationSnapshot, SegmentRef } from '../types';
+import type { CaptureMode, EndReason, FileDigests, LocationSnapshot, SegmentRef, StartedFrom } from '../types';
 
 /** The record before this one in the session's chain (a file's record or a checkpoint's). */
 export type ChainLink = { id: string; recordSha256: string; fileSha256: string };
@@ -49,6 +49,10 @@ export type EvidenceRecord = {
     hashedAt: string;
     timeZone: string | null;
     utcOffsetMinutes: number;
+    /** From 0.9, optional: the battery level, 0-100, when the file closed. Absent when not known. */
+    batteryPercent?: number;
+    /** From 0.9, optional, Pocket recording only: how it was started. */
+    startedFrom?: StartedFrom;
   };
   location: {
     latitude: number;
@@ -81,12 +85,24 @@ export type RecordInput = {
   interrupted?: boolean;
   gapBeforeMs?: number | null;
   rotationDegrees?: number | null;
+  batteryPercent?: number | null;
+  startedFrom?: StartedFrom;
   timeZone: string | null;
   location: LocationSnapshot;
   device: DeviceInfo;
   app: AppInfo;
   keyId: string;
 };
+
+/** The 0.9 members, present only when known (bundle spec section 4). */
+function newCaptureMembers(mode: CaptureMode, batteryPercent?: number | null, startedFrom?: StartedFrom) {
+  return {
+    ...(typeof batteryPercent === 'number' && Number.isInteger(batteryPercent) && batteryPercent >= 0 && batteryPercent <= 100
+      ? { batteryPercent }
+      : {}),
+    ...(mode === 'bug' && startedFrom ? { startedFrom } : {}),
+  };
+}
 
 function locationOf(location: LocationSnapshot): Pick<EvidenceRecord, 'location' | 'locationStatus'> {
   const { fix } = location;
@@ -135,6 +151,7 @@ export function buildRecord(input: RecordInput): EvidenceRecord {
       hashedAt: input.hashedAt.toISOString(),
       timeZone: input.timeZone,
       utcOffsetMinutes: -input.startedAt.getTimezoneOffset(),
+      ...newCaptureMembers(input.mode ?? 'camera', input.batteryPercent, input.startedFrom),
     },
     ...locationOf(input.location),
     device: input.device,
@@ -167,6 +184,10 @@ export type CheckpointRecord = {
     checkpointAt: string;
     timeZone: string | null;
     utcOffsetMinutes: number;
+    /** From 0.9, optional: the battery level, 0-100, when the checkpoint was made. */
+    batteryPercent?: number;
+    /** From 0.9, optional, Pocket recording only. */
+    startedFrom?: StartedFrom;
   };
   location: EvidenceRecord['location'];
   locationStatus: EvidenceRecord['locationStatus'];
@@ -189,6 +210,8 @@ export type CheckpointRecordInput = {
   mode?: CaptureMode;
   startedAt: Date;
   checkpointAt: Date;
+  batteryPercent?: number | null;
+  startedFrom?: StartedFrom;
   timeZone: string | null;
   location: LocationSnapshot;
   device: DeviceInfo;
@@ -214,6 +237,7 @@ export function buildCheckpointRecord(input: CheckpointRecordInput): CheckpointR
       checkpointAt: input.checkpointAt.toISOString(),
       timeZone: input.timeZone,
       utcOffsetMinutes: -input.startedAt.getTimezoneOffset(),
+      ...newCaptureMembers(input.mode ?? 'body-cam', input.batteryPercent, input.startedFrom),
     },
     ...locationOf(input.location),
     device: input.device,

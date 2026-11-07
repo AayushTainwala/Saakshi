@@ -28,6 +28,8 @@ declare class SaakshiSosModule extends NativeModule<SaakshiSosEvents> {
   bugRecorderStart(options: BugRecorderOptions): Promise<void>;
   bugRecorderStop(): Promise<void>;
   bugRecorderRunning(): boolean;
+  /** Android: the low-battery handover (round 2, group 1.5): the file closes with `reason`, the next continues. */
+  bugRecorderHandOver(reason: string): Promise<void>;
 
   /**
    * iPhone: marks a folder and everything in it as excluded from iCloud device backup (or not).

@@ -85,6 +85,22 @@ public class SaakshiEvidenceModule: Module {
     // On Android bug mode records in the SaakshiSos module.
     Function("soundRunning") { SoundRecorder.shared.isRunning }
 
+    // The low-battery handover at 5% (round 2, group 1.5): the file being written closes as
+    // "low-battery" and a new one continues; with `saving`, body-cam's new video is 480p at 15
+    // frames a second.
+    AsyncFunction("bodyCamHandOver") { (reason: String, saving: Bool) in
+      BodyCamRecorder.shared.handOver(reason: reason, saving: saving)
+    }
+
+    // Saving mode off (the phone is charging): the next body-cam file is at the normal quality.
+    AsyncFunction("bodyCamSetSaving") { (saving: Bool) in
+      BodyCamRecorder.shared.setSaving(saving)
+    }
+
+    AsyncFunction("soundHandOver") { (reason: String) in
+      SoundRecorder.shared.handOver(reason: reason)
+    }
+
     AsyncFunction("soundStart") { (options: SoundStartOptions, promise: Promise) in
       guard let outputDir = URL(string: options.outputDir), outputDir.isFileURL,
         let pendingDir = URL(string: options.pendingDir), pendingDir.isFileURL

@@ -20,10 +20,14 @@ export function stampIST(iso: string, withSeconds = false): string {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${time}`;
 }
 
-/** What a record is, in English, for names: "Body-cam", "Bug mode", "Photo", "Videos", "Camera". */
+/**
+ * What a record is, in English, for names: "Body-cam", "Pocket recording", "Photo", "Videos",
+ * "Camera". From bundle format 0.9, Pocket recording (it was "Bug mode" up to 0.8; the records keep
+ * `capture.mode: "bug"`).
+ */
 export function recordKindName(summary: RecordSummary): string {
   if (summary.kind === 'body-cam') return 'Body-cam';
-  if (summary.kind === 'bug') return 'Bug mode';
+  if (summary.kind === 'bug') return 'Pocket recording';
   if (summary.photos && summary.videos) return 'Camera';
   if (summary.videos) return summary.videos === 1 ? 'Video' : 'Videos';
   return summary.photos === 1 ? 'Photo' : 'Photos';

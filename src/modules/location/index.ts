@@ -17,5 +17,6 @@ export {
 } from './current';
 export { LIVE_HOURS_CHOICES, type LiveHours } from './live/config';
 export { DEFAULT_LIVE_HOURS, liveLength, LiveLengthStore, useLiveLength } from './live/length';
+export { SAVING_SEND_MS } from './live/share';
 export type { LiveShare, TrackerNotice } from './live/share';
 export { liveShare, LocationDeniedError, registerLiveLocationTask, useLiveShare } from './live/task';

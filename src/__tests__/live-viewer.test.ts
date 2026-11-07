@@ -91,6 +91,15 @@ describe('the live-location page (round 2)', () => {
     expect(page.el('battery').textContent).toBe('Battery 40% (10 minutes ago) · बैटरी 40% (10 मिनट पहले)');
   });
 
+  it('says positions may come only every 5 minutes when the battery is at 5% or below (group 1.5)', async () => {
+    const low = await open(`#${TOKEN}`, { expiresAt: minutesAgo(-120), positions: [position(2, 5)] });
+    expect(low.el('battery').textContent).toBe(
+      'Battery 5% (2 minutes ago) · बैटरी 5% (2 मिनट पहले). The battery is low: positions may come only every 5 minutes. · बैटरी कम है: लोकेशन शायद हर 5 मिनट में ही आए।',
+    );
+    const above = await open(`#${TOKEN}`, { expiresAt: minutesAgo(-120), positions: [position(2, 6)] });
+    expect(above.el('battery').textContent).toBe('Battery 6% (2 minutes ago) · बैटरी 6% (2 मिनट पहले)');
+  });
+
   it('shows no battery line when the phone never said', async () => {
     const page = await open(`#${TOKEN}`, { expiresAt: minutesAgo(-120), positions: [position(1)] });
     expect(page.el('battery').hidden).toBe(true);

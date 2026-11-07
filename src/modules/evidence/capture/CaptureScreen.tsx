@@ -250,17 +250,13 @@ export function CaptureScreen() {
     setRecording(false);
   }, []);
 
-  // Spec E1: warn at 10% and 5%; at 3%, stop and save so a dying battery never cuts the file off.
+  // SPEC E1 (owner, 6 Nov 2026): the evidence camera warns at 10% and 5% and never stops by itself.
   const [batteryNote, setBatteryNote] = useState<string | null>(null);
   const onBattery = useCallback(
     (action: BatteryAction) => {
-      if (action.type === 'warn') {
-        setBatteryNote(t('battery.warn', { percent: action.percent }));
-      } else {
-        void stopRecording('low-battery').then(() => setBatteryNote(t('battery.stopped')));
-      }
+      if (action.type === 'warn') setBatteryNote(t('battery.warn', { percent: action.percent }));
     },
-    [stopRecording, t],
+    [t],
   );
   useLowBattery(recording, onBattery);
 
