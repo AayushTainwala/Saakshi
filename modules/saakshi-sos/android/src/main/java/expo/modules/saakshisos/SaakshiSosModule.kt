@@ -111,8 +111,8 @@ class SaakshiSosModule : Module() {
     // iPhone only. Android's backup is off for the whole app (android:allowBackup="false").
     AsyncFunction("setExcludedFromBackup") { _: String, _: Boolean -> 0 }
 
-    // iPhone only: the widget and the notification here open saakshi://codepad directly.
-    Function("consumeCodePadRequest") { false }
+    // iPhone only: the widget and the notification here open saakshi://sos directly.
+    Function("consumeSosRequest") { false }
 
     // iPhone only (bug mode's Live Activity); Android shows the recording notification instead.
     AsyncFunction("liveActivityStart") { _: String, _: String -> false }

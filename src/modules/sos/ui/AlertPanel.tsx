@@ -1,47 +1,27 @@
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 
 import { AppText, Button, Card } from '@/components';
 import { spacing, useTheme } from '@/theme';
 
-import type { TrustedContact } from '../contacts/store';
-import { phoneChannels } from '../alert/channels';
 import type { AlertController, AlertOutcome, AlertState } from '../alert/controller';
 
 type Props = {
   controller: AlertController;
   state: AlertState;
-  contacts: readonly TrustedContact[];
 };
 
-/** The alert button, and what happens after it is pressed. */
-export function AlertPanel({ controller, state, contacts }: Props) {
+/**
+ * What happens after "I need help" is swiped (round 2: the swipe replaces the alert button, so at
+ * rest this shows nothing).
+ */
+export function AlertPanel({ controller, state }: Props) {
   const { t } = useTranslation('sos');
-  const direct = useDirectAllowed(state.phase);
 
   switch (state.phase) {
     case 'idle':
-      return (
-        <View style={styles.block}>
-          <Button
-            variant="primary"
-            label={t('alert.button')}
-            accessibilityHint={
-              direct
-                ? t('alert.hintDirect', { count: contacts.length })
-                : t('alert.hintComposer', { count: contacts.length })
-            }
-            onPress={() => void controller.start()}
-          />
-          <AppText color="textMuted">
-            {direct
-              ? t('alert.hintDirect', { count: contacts.length })
-              : t('alert.hintComposer', { count: contacts.length })}
-          </AppText>
-        </View>
-      );
+      return null;
     case 'countdown':
       return (
         <Card accessibilityLiveRegion="assertive">
@@ -64,10 +44,15 @@ export function AlertPanel({ controller, state, contacts }: Props) {
       return (
         <Card accessibilityLiveRegion="polite">
           <AppText>
-            {state.error === 'no-sms'
-              ? t('alert.noSms')
-              : t('alert.unexpected', { detail: state.detail ?? '' })}
+            {state.error === 'no-contacts'
+              ? t('home.noContacts')
+              : state.error === 'no-sms'
+                ? t('alert.noSms')
+                : t('alert.unexpected', { detail: state.detail ?? '' })}
           </AppText>
+          {state.error === 'no-contacts' ? (
+            <Button label={t('setup.add')} onPress={() => router.push('/settings/contacts')} />
+          ) : null}
           <Button variant="secondary" label={t('alert.done')} onPress={() => controller.dismiss()} />
         </Card>
       );
@@ -132,26 +117,6 @@ function Spinner() {
   return <ActivityIndicator color={colors.text} />;
 }
 
-/** Whether the next alert will send itself; checked on focus and each time the panel is at rest. */
-function useDirectAllowed(phase: AlertState['phase']): boolean {
-  const [allowed, setAllowed] = useState(false);
-  useFocusEffect(
-    useCallback(() => {
-      if (phase !== 'idle') return;
-      let live = true;
-      phoneChannels.direct
-        .allowed()
-        .then((value) => live && setAllowed(value))
-        .catch(() => undefined);
-      return () => {
-        live = false;
-      };
-    }, [phase]),
-  );
-  return allowed;
-}
-
 const styles = StyleSheet.create({
-  block: { gap: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
 });

@@ -1,15 +1,11 @@
 /**
- * Quick trigger and code pad (spec section 5: S4) and confiscation mode. Owner: Stream B. Builds on
- * `@/modules/sos`, `@/modules/location` and `@/modules/bugmode`.
+ * The quick trigger's plumbing (SPEC 5.1): the iPhone controls, Action Button and Back Tap, and the
+ * Android widget and notification, all open the SOS screen (saakshi://sos). Round 2 removed the
+ * code pad and confiscation mode from this module. Owner: Stream B.
  *
  * Public API of this module. Other code imports only from `@/modules/trigger`, never from files
  * inside it.
  */
-export { CODE_LENGTH, REFUSED_CODES } from './code';
-export type { ConfiscationResult } from './confiscation';
-export { startConfiscationMode } from './instance';
-export { useQuickTriggers } from './listener';
-export { triggerSettings, useTriggerSettings } from './settings';
-export { CodePad } from './ui/CodePad';
-export { ConfiscationCard } from './ui/ConfiscationCard';
+export { SOS_ROUTE, useQuickTriggers } from './listener';
+export { removeOldCodePadSetting } from './migrate';
 export { TriggerSettings } from './ui/TriggerSettings';

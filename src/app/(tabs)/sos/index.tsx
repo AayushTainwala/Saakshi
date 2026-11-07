@@ -1,11 +1,5 @@
-import { SosHome, useTrustedContacts } from '@/modules/sos';
-import { ConfiscationCard } from '@/modules/trigger';
+import { SosHome } from '@/modules/sos';
 
 export default function SOSScreen() {
-  const contacts = useTrustedContacts();
-  return (
-    <SosHome>
-      <ConfiscationCard hasContacts={contacts.length > 0} />
-    </SosHome>
-  );
+  return <SosHome />;
 }

@@ -4,67 +4,23 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PermissionsAndroid, Platform } from 'react-native';
 
-import { AppText, Button, Card, OptionGroup, Screen, TextField } from '@/components';
+import { AppText, Button, Card, Screen } from '@/components';
 
-import { triggerSettings, type TriggerAction, useTriggerSettings } from '../settings';
-import { quickNotificationText } from '../listener';
+import { quickNotificationText, SOS_ROUTE } from '../listener';
 
-/** Setting the code, what it does, and how to open the pad on this phone (spec S4). */
+/**
+ * Settings → Quick trigger (SPEC 5.1): how to open the SOS screen from outside the app on this
+ * phone. Every quick trigger opens the swipe screen; no code is typed to trigger.
+ */
 export function TriggerSettings() {
   const { t } = useTranslation('sos');
-  const settings = useTriggerSettings();
-  const [code, setCode] = useState('');
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
-
-  const save = () => {
-    const problem = triggerSettings.setCode(code.trim());
-    if (problem) return setMessage({ text: problem === 'format' ? t('trigger.format') : t('trigger.emergency'), error: true });
-    setCode('');
-    setMessage({ text: t('trigger.saved'), error: false });
-  };
-
   return (
     <Screen>
       <AppText>{t('trigger.intro')}</AppText>
-
-      <Card>
-        <AppText variant="heading">{t('trigger.codeHeading')}</AppText>
-        {settings.code ? <AppText>{t('trigger.codeSet')}</AppText> : null}
-        <TextField
-          label={t('trigger.codeLabel')}
-          hint={t('trigger.codeHint')}
-          value={code}
-          onChangeText={(value) => setCode(value.replace(/\D/g, '').slice(0, 3))}
-          keyboardType="number-pad"
-          secureTextEntry
-          maxLength={3}
-          onSubmitEditing={save}
-        />
-        <Button label={t('trigger.save')} disabled={code.length === 0} onPress={save} />
-        {settings.code ? (
-          <Button variant="secondary" label={t('trigger.remove')} onPress={() => triggerSettings.clearCode()} />
-        ) : null}
-        {message ? (
-          <AppText color={message.error ? 'danger' : 'success'} accessibilityLiveRegion="polite">
-            {message.text}
-          </AppText>
-        ) : null}
-      </Card>
-
-      <OptionGroup<TriggerAction>
-        label={t('trigger.actionHeading')}
-        options={[
-          { value: 'alert', label: t('trigger.actionAlert') },
-          { value: 'confiscation', label: t('trigger.actionConfiscation') },
-        ]}
-        value={settings.action}
-        onChange={(action) => triggerSettings.setAction(action)}
-      />
-
       <Card>
         <AppText variant="heading">{t('trigger.openHeading')}</AppText>
         {Platform.OS === 'ios' ? <IosInstructions /> : <AndroidTriggers />}
-        <Button variant="secondary" label={t('trigger.try')} onPress={() => router.push('/codepad')} />
+        <Button variant="secondary" label={t('trigger.try')} onPress={() => router.navigate(SOS_ROUTE)} />
       </Card>
     </Screen>
   );
@@ -78,7 +34,7 @@ function IosInstructions() {
       <AppText>{t('trigger.iosAction')}</AppText>
       <AppText>{t('trigger.iosWidget')}</AppText>
       <AppText>{t('trigger.iosBackTap')}</AppText>
-      <AppText color="textMuted">{t('trigger.iosFaceId')}</AppText>
+      <AppText color="textMuted">{t('trigger.iosLocked')}</AppText>
     </>
   );
 }
