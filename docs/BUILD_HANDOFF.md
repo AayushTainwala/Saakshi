@@ -4,7 +4,7 @@ The pickup file for build sessions. Each stream keeps its own section current: s
 
 ## Where things stand (21 Oct 2026; fix round 1 from 5 Nov; round 2 decided 6 Nov)
 
-- **Round 2 (6 Nov 2026):** specified, not started: see "Round 2" below.
+- **Round 2 (6 Nov 2026):** Part 1 under way (group 1.1 built): see "Round 2" below.
 - **Merged into `main`:** #1–#9. That is R1 and R2 as planned, apart from E3 and E7, plus the law checks against the Gazette of India (#9). Since then: the owner's docs and briefs (#10–#15), and fix round 1, groups 1, 2 and 2a (#16–#18; see "Fix round 1" below). Typecheck, lint, all tests and both native builds pass on `main`.
 - **Pace:** no 24-hour deadline (owner, 21 Oct). The next goal is a beta for about 50 testers on iPhone and Android; see BUILD_PLAN.md, section 1, "Road to the beta".
 - **First Release run (21 Oct, iOS only):** the owner set up iOS credentials and the App Store Connect API key with EAS (role App Manager). The EAS build succeeded; the **Submit to TestFlight step failed**. Its log is visible only to someone signed in to GitHub, so the cause isn't known yet. The owner is submitting that build from his Mac with `eas submit --platform ios --latest`. **Stream D:** find the cause and fix the workflow.
@@ -17,7 +17,7 @@ The owner's decisions after his SOS test are in `docs/SPEC.md` (sections 4, 5, 6
 
 | Part and group | State |
 |---|---|
-| 1.1 Contacts keyboard bug | Not started |
+| 1.1 Contacts keyboard bug | Built: branch `round-2/1-1-contacts-keyboard`, pull request below. Not yet run on a phone. |
 | 1.2 Secret code, Settings | Not started |
 | 1.3 SOS swipes, Pocket recording, "My phone is being taken" | Not started |
 | 1.4 Alerts (both links, battery level, calm Share my location) | Not started |
@@ -36,6 +36,25 @@ Questions for the owner from this round go in "Owner questions" as `- [ ] (Round
 **Start prompt for group 3.1 only** (the alerts protocol, documents only; model Opus, effort high; can run beside Part 1):
 
 > You are the builder for Saakshi round 2, group 3.1. Read CLAUDE.md, docs/SPEC.md (sections 4, 5, 6), docs/BUILD_HANDOFF.md ("Round 2") and docs/briefs/2026-11-06-round-2.md. Do group 3.1 only: write docs/spec/alerts.md and open one pull request that changes documents only. Do not write app or server code. Mark every legal or privacy statement `NEEDS OWNER REVIEW`. Raise questions in the handoff as `- [ ] (Round 2) …`; do not change scope.
+
+### Group 1.1: the keyboard covered the contacts form
+
+**What was wrong.** Neither phone moved the page for the keyboard:
+- **Android:** Expo SDK 58 always draws edge to edge (Android 16 makes it compulsory; Expo's `withEdgeToEdge` plugin no longer lets an app turn it off). With edge-to-edge drawing, Android no longer shrinks the window when the keyboard opens, so the keyboard simply sat over the bottom of the page.
+- **iPhone:** React Native's ScrollView does nothing for the keyboard unless asked. Even when asked (`automaticallyAdjustKeyboardInsets`), it scrolls only the focused field into view, not the Add button under it (React Native 0.88, `RCTScrollViewComponentView.mm`, `_keyboardWillChangeFrame`).
+- Also: a tap on Add while the keyboard was up only closed the keyboard; it took a second tap to add.
+
+**What was built** (in the shared `Screen`, so every page with text fields gains it):
+- The page measures where the keyboard's top edge is, and pads its own end by as much as the keyboard covers. So with the keyboard up, everything on the page, the contacts list included, can still be scrolled to.
+- When a field is focused, the page scrolls so that the field, and the rest of its group (`KeyboardGroup`, new in `src/components`), are between the top of the page and the keyboard, 16 points clear of it. On the contacts screen the group is "Or type a number", the name, the number with its hint, and Add. If the group doesn't fit, as on a small phone with the name field focused, the focused field goes to the top and the group's end is cut off, never the field. It works the same for the number pad and the text keyboard (they differ in height), and for Hindi's longer labels, because it measures rather than assumes.
+- It happens again when moving from one field to the next with the keyboard already up.
+- If a phone does shrink its window for the keyboard after all, the padding comes off again.
+- A tap on a button works the first time while the keyboard is up (`keyboardShouldPersistTaps="handled"`); a tap on empty space still closes the keyboard. This matters on iPhone, whose number pad has no key to close it.
+- No new dependency, no new strings, no native code.
+
+**Tests:** the arithmetic, with a small phone (667 points tall) and a large one (932), the number pad and the text keyboard, and English and Hindi label heights (`src/components/__tests__/keyboard.test.ts`). The contacts screen itself, on iPhone and on Android, with the phone's measurements played in: the padding, where it scrolls, moving between fields, Add working with the keyboard up, and Hindi (`src/modules/sos/__tests__/contactsKeyboard.test.tsx`).
+
+**Not verified:** nothing has run on a phone. A test can't show where a real keyboard sits, so the owner's test (in the pull request) is the real check: on a small and a large phone, both keyboards, both languages. On an iPhone whose tab bar the page runs under, the padding may leave some extra empty space at the very end of the page; that is harmless.
 
 ## Fix round 1 (iPhone test round 1, A–C)
 
