@@ -153,8 +153,6 @@ export type SaakshiEvidenceEvents = {
   onRecorderError: (event: { message: string }) => void;
   /** A volume-up press, while volumeKeysStart() is in effect: two in a row unlock body-cam mode. */
   onVolumeUp: () => void;
-  /** Android: body-cam was stopped from its notification's Stop button. */
-  onBodyCamStopped: () => void;
   /** iPhone bug mode: a checkpoint of the sound file being written. */
   onSoundCheckpoint: (event: CheckpointEvent) => void;
   onSoundClosed: (event: SoundClosedEvent) => void;
@@ -169,6 +167,4 @@ export type BodyCamOptions = RecorderOptions & {
   /** The text of the notification Android shows while the service runs. */
   notificationTitle: string;
   notificationText: string;
-  /** Label of the notification's Stop button. */
-  notificationStop: string;
 };

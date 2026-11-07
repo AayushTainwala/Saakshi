@@ -9,7 +9,13 @@ export type LiveShare = {
   viewToken: string;
   link: string;
   startedAt: string;
+  /** When the server deletes it. A persistent share's end moves on with every position. */
   expiresAt: string;
+  /**
+   * "My phone is being taken" (SPEC 5.4): no fixed end; the server keeps it while the phone
+   * reports, and deletes it a week after the last position. Absent in shares saved before round 2.
+   */
+  persistent?: boolean;
   lastSentAt: string | null;
   /** Positions not yet accepted by the server (no signal), oldest first. */
   pending: LivePoint[];
@@ -70,14 +76,30 @@ export class LiveShareController {
     return () => this.listeners.delete(listener);
   };
 
-  /** Starts sharing for some hours, or returns the share already running. */
-  start(hours: number, notice: TrackerNotice): Promise<LiveShare> {
+  /**
+   * Starts sharing for some hours, or returns the share already running. With `persistent`, the
+   * share has no fixed end; a share already running is made persistent, keeping its link.
+   */
+  start(hours: number, notice: TrackerNotice, options: { persistent?: boolean } = {}): Promise<LiveShare> {
     return this.serial(async () => {
       const saved = this.load();
-      if (saved.active && !this.expired(saved.active)) return saved.active;
+      if (saved.active && !this.expired(saved.active)) {
+        const running = saved.active;
+        if (!options.persistent || running.persistent) return running;
+        const ends = await this.deps.api.keep(running.shareId, running.writeSecret);
+        if (ends !== null) {
+          const kept: LiveShare = { ...running, persistent: true, expiresAt: ends };
+          this.save({ ...saved, active: kept });
+          return kept;
+        }
+        // It had already ended on the server: start afresh below.
+        await this.deps.tracker.stop().catch(() => undefined);
+        this.save({ ...saved, active: null });
+      }
 
+      const persistent = options.persistent === true;
       const writeSecret = this.deps.randomHex(32);
-      const started = await this.deps.api.start(await this.deps.sha256Hex(writeSecret), hours);
+      const started = await this.deps.api.start(await this.deps.sha256Hex(writeSecret), hours, persistent);
       const share: LiveShare = {
         ...started,
         writeSecret,
@@ -85,8 +107,9 @@ export class LiveShareController {
         startedAt: this.deps.now().toISOString(),
         lastSentAt: null,
         pending: [],
+        ...(persistent ? { persistent: true } : {}),
       };
-      this.save({ ...saved, active: share });
+      this.save({ ...this.load(), active: share });
       try {
         await this.deps.tracker.start(notice);
       } catch (error) {
@@ -109,11 +132,14 @@ export class LiveShareController {
 
       const pending = [...share.pending, ...points].slice(-MAX_PENDING);
       let sent = 0;
+      let expiresAt = share.expiresAt;
       try {
         while (sent < pending.length) {
           const batch = pending.slice(sent, sent + BATCH);
           const ends = await this.deps.api.push(share.shareId, share.writeSecret, batch);
           if (ends === null) return this.end(saved);
+          // A persistent share's end moves on with each position.
+          expiresAt = ends;
           sent += batch.length;
         }
       } catch {
@@ -123,6 +149,7 @@ export class LiveShareController {
         ...saved,
         active: {
           ...share,
+          expiresAt,
           pending: pending.slice(sent),
           lastSentAt: sent > 0 ? this.deps.now().toISOString() : share.lastSentAt,
         },

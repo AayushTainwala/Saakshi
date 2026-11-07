@@ -81,9 +81,12 @@ describe('the quick trigger opens the SOS screen (round 2)', () => {
   });
 
   it('the trigger module no longer offers the code pad or confiscation mode', () => {
-    const api = jest.requireActual('../index') as Record<string, unknown>;
+    const api = read('src/modules/trigger/index.ts');
     for (const gone of ['CodePad', 'ConfiscationCard', 'startConfiscationMode', 'triggerSettings', 'REFUSED_CODES', 'CODE_LENGTH']) {
-      expect(api[gone]).toBeUndefined();
+      expect(api).not.toMatch(new RegExp(`\\b${gone}\\b`));
+    }
+    for (const file of ['code.ts', 'confiscation.ts', 'settings.ts', 'ui/CodePad.tsx', 'ui/ConfiscationCard.tsx']) {
+      expect(existsSync(join(ROOT, 'src/modules/trigger', file))).toBe(false);
     }
   });
 });

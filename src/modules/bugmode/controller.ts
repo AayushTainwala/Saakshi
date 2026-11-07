@@ -37,8 +37,23 @@ export type BugDeps = {
   now: () => Date;
 };
 
+/** How a recording was started (bundle format 0.9, `capture.startedFrom`; written by group 1.5). */
+export type StartedFrom = 'pocket' | 'phone-taken';
+
+export type StartOptions = {
+  startedFrom?: StartedFrom;
+  /**
+   * Saakshi's own Lock Screen Live Activity (iPhone). "My phone is being taken" turns it off, so the
+   * locked screen shows less (SPEC 5.4); iOS's orange microphone dot still shows.
+   */
+  liveActivity?: boolean;
+};
+
 export type BugState = {
   running: boolean;
+  startedFrom: StartedFrom | null;
+  /** Whether Saakshi's Live Activity is shown for this recording. */
+  liveActivity: boolean;
   startedAt: string | null;
   sessionId: string | null;
   /** Checkpoints signed while the file was being written. */
@@ -58,6 +73,8 @@ export type BugState = {
 
 const IDLE: BugState = {
   running: false,
+  startedFrom: null,
+  liveActivity: false,
   startedAt: null,
   sessionId: null,
   checkpoints: 0,
@@ -101,10 +118,21 @@ export class BugModeController {
     return () => this.listeners.delete(listener);
   };
 
-  /** Starts recording. Resolves once recording has started; ignored while running. */
-  start(): Promise<void> {
-    if (this.current.running) return Promise.resolve();
-    this.starting ??= this.begin().finally(() => {
+  /**
+   * Starts recording. Resolves once recording has started. While it already runs, nothing restarts,
+   * but `liveActivity: false` still takes the Live Activity away ("My phone is being taken" started
+   * over a Pocket recording).
+   */
+  async start(options: StartOptions = {}): Promise<void> {
+    if (this.starting) await this.starting.catch(() => undefined);
+    if (this.current.running) {
+      if (options.liveActivity === false && this.current.liveActivity) {
+        this.set({ ...this.current, liveActivity: false });
+        await this.deps.liveActivity.end().catch(() => undefined);
+      }
+      return;
+    }
+    this.starting ??= this.begin({ startedFrom: options.startedFrom ?? 'pocket', liveActivity: options.liveActivity !== false }).finally(() => {
       this.starting = null;
     });
     return this.starting;
@@ -122,8 +150,8 @@ export class BugModeController {
       await this.work;
       this.unsubscribe?.();
       this.unsubscribe = null;
-      await this.deps.liveActivity.end().catch(() => undefined);
-      this.set({ ...this.current, running: false });
+      if (this.current.liveActivity) await this.deps.liveActivity.end().catch(() => undefined);
+      this.set({ ...this.current, running: false, liveActivity: false });
     }
   }
 
@@ -132,7 +160,7 @@ export class BugModeController {
     return this.work;
   }
 
-  private async begin(): Promise<void> {
+  private async begin(options: { startedFrom: StartedFrom; liveActivity: boolean }): Promise<void> {
     this.seen = new Set();
     this.newest = null;
     this.lastActivityUpdate = null;
@@ -141,9 +169,16 @@ export class BugModeController {
         if (this.current.running) this.set({ ...this.current, problem: { message, at: this.deps.now().toISOString() } });
       });
       this.engine = engine;
-      this.set({ ...IDLE, running: true, startedAt: this.deps.now().toISOString(), sessionId: engine.session.id });
+      this.set({
+        ...IDLE,
+        running: true,
+        startedFrom: options.startedFrom,
+        liveActivity: options.liveActivity,
+        startedAt: this.deps.now().toISOString(),
+        sessionId: engine.session.id,
+      });
       this.unsubscribe = engine.session.subscribe(() => this.scan(engine.session));
-      await this.deps.liveActivity.start().catch(() => undefined);
+      if (options.liveActivity) await this.deps.liveActivity.start().catch(() => undefined);
     } catch (error) {
       this.set({ ...IDLE, error: error instanceof Error ? error.message : String(error) });
       throw error;
@@ -195,7 +230,7 @@ export class BugModeController {
 
   private async afterSigned(latest: SignedPoint): Promise<void> {
     const now = this.deps.now().getTime();
-    if (this.lastActivityUpdate === null || now - this.lastActivityUpdate >= ACTIVITY_UPDATE_MS) {
+    if (this.current.liveActivity && (this.lastActivityUpdate === null || now - this.lastActivityUpdate >= ACTIVITY_UPDATE_MS)) {
       this.lastActivityUpdate = now;
       await this.deps.liveActivity.update(latest.at).catch(() => undefined);
     }

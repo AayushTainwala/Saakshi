@@ -77,6 +77,31 @@ function setup(options: { contacts?: number } = {}) {
   return { bug: new BugModeController(deps), deps, fake, stopEngine, advance, time, problem: (m: string) => onProblem?.(m) };
 }
 
+describe('BugModeController in "My phone is being taken" (round 2, group 1.3)', () => {
+  it('records without Saakshi\'s Live Activity, and says where it was started from', async () => {
+    const { bug, deps, fake, advance, time } = setup();
+    await bug.start({ startedFrom: 'phone-taken', liveActivity: false });
+    expect(bug.getState()).toMatchObject({ running: true, startedFrom: 'phone-taken', liveActivity: false });
+    advance(10);
+    fake.checkpoint(0, time());
+    await bug.settled();
+    await bug.stop();
+    expect(deps.liveActivity.start).not.toHaveBeenCalled();
+    expect(deps.liveActivity.update).not.toHaveBeenCalled();
+    expect(deps.liveActivity.end).not.toHaveBeenCalled();
+  });
+
+  it('takes the Live Activity away from a Pocket recording already running, without restarting it', async () => {
+    const { bug, deps } = setup();
+    await bug.start();
+    expect(bug.getState()).toMatchObject({ startedFrom: 'pocket', liveActivity: true });
+    await bug.start({ startedFrom: 'phone-taken', liveActivity: false });
+    expect(deps.startEngine).toHaveBeenCalledTimes(1);
+    expect(deps.liveActivity.end).toHaveBeenCalledTimes(1);
+    expect(bug.getState()).toMatchObject({ running: true, liveActivity: false });
+  });
+});
+
 describe('BugModeController', () => {
   it('counts checkpoints and texts the newest one, at most once every 10 minutes', async () => {
     const { bug, deps, fake, advance, time } = setup();

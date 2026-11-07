@@ -8,7 +8,7 @@
  * Public API of this module. Other code imports only from `@/modules/bugmode`, never from files
  * inside it.
  */
-export type { BugState } from './controller';
+export type { BugState, StartedFrom, StartOptions as PocketStartOptions } from './controller';
 export { MicrophoneDeniedError } from './engines';
 export { bugMode, setBugModePartListener, useBugMode } from './instance';
 export { BugModeScreen } from './ui/BugModeScreen';

@@ -166,5 +166,36 @@
     "noLive": "Nobody is ticked for live location. Choose who gets it in Settings, Trusted contacts.",
     "noContacts": "You have no trusted contacts for SOS alerts yet.",
     "quickTrigger": "Quick trigger setup"
+  },
+  "taken": {
+    "label": "My phone is being taken",
+    "detail": "Records sound, shares your location, alerts your contacts",
+    "confirm": {
+      "title": "Start \"My phone is being taken\"?",
+      "body": "Saakshi records sound, shares your location until you stop it, and sends your SOS alert to your trusted contacts. It can only be stopped in Saakshi with your secret code.",
+      "action": "Start"
+    },
+    "needsCode": {
+      "heading": "A secret code is needed first",
+      "body": "\"My phone is being taken\" can only be stopped in Saakshi with your secret code, so it can't start until you have one. Set it now; then this starts.",
+      "set": "Set a secret code"
+    },
+    "on": "\"My phone is being taken\" is on",
+    "since": "Since {{time}}.",
+    "pocketOn": "Sound is being recorded (Pocket recording).",
+    "pocketStarting": "Sound recording is starting…",
+    "pocketFailed": "Sound recording couldn't start: {{detail}}",
+    "retryPocket": "Try recording again",
+    "liveOn": "Your location is being shared until you stop it.",
+    "liveStarting": "Location sharing is starting…",
+    "liveFailed": "Location sharing couldn't start: {{detail}}",
+    "retryLive": "Try sharing again",
+    "alertSending": "Your SOS alert is being sent…",
+    "alertSent": "Your SOS alert went to your trusted contacts.",
+    "alertFailed": "Your SOS alert couldn't be sent: {{detail}}",
+    "stopNote": "It can only be stopped in Saakshi with your secret code.",
+    "stop": "Stop",
+    "pocketOff": "Sound recording has stopped.",
+    "liveOff": "Location sharing has stopped."
   }
 }

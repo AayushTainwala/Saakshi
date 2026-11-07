@@ -8,7 +8,7 @@ import { bugMode } from '@/modules/bugmode';
 import { isBodyCamRunning } from '@/modules/evidence';
 import { liveShare, registerLiveLocationTask } from '@/modules/location';
 import { registerRunningCheck } from '@/modules/secretcode';
-import { removeOldCodePadSetting, useQuickTriggers } from '@/modules/trigger';
+import { phoneTaken, removeOldCodePadSetting, useQuickTriggers } from '@/modules/trigger';
 import { PreferencesProvider } from '@/preferences/PreferencesProvider';
 import { loadPreferences } from '@/preferences/store';
 import { useTheme } from '@/theme';
@@ -18,10 +18,13 @@ initI18n(initialPreferences.language);
 // Live location's background task must exist before the system delivers positions to it.
 registerLiveLocationTask();
 // What the secret code protects (SPEC 5.3). Its reset with the phone's passcode is offered only
-// while none of these runs. "My phone is being taken" joins in group 1.3.
+// while none of these runs.
 registerRunningCheck('body-cam', isBodyCamRunning);
 registerRunningCheck('pocket-recording', () => bugMode.getState().running);
 registerRunningCheck('live-location', () => liveShare.getShare() !== null);
+registerRunningCheck('phone-taken', phoneTaken.isRunning);
+// "My phone is being taken" carries on after a restart: its heartbeat resumes (group 3.5).
+phoneTaken.resume();
 // Round 2 removed the 3-digit code pad: its old setting, with the code in it, is deleted.
 removeOldCodePadSetting();
 
