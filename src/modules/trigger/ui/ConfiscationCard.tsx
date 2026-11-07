@@ -78,7 +78,7 @@ export function ConfiscationCard({ hasContacts }: { hasContacts: boolean }) {
         <Button variant="danger" label={t('confiscation.start')} busy={busy} disabled={!hasContacts} onPress={confirm} />
       )}
       <Button variant="secondary" label={t('bug.title')} onPress={() => router.push('/sos/bugmode')} />
-      <Button variant="secondary" label={t('trigger.title')} onPress={() => router.push('/sos/trigger')} />
+      <Button variant="secondary" label={t('trigger.title')} onPress={() => router.push('/settings/trigger')} />
     </Card>
   );
 }

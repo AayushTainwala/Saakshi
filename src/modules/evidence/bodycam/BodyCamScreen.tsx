@@ -22,6 +22,7 @@ import { LOCK_MESSAGE_MS } from './constants';
 import { doublePress } from './doublePress';
 import { androidBodyCam, type BodyCamEngine, iosBodyCam } from './engine';
 import { startUnlockPractice, type UnlockPractice } from './practice';
+import { setBodyCamRunning } from './running';
 import { type BodyCamSettings, loadBodyCamSettings, saveBodyCamSettings } from './settings';
 
 const KEEP_AWAKE_TAG = 'saakshi-bodycam';
@@ -92,6 +93,11 @@ export function BodyCamScreen() {
   // (iPhone), the back button (Android) and every navigation action are refused; the header with
   // its back button is hidden. The only way out is Stop.
   const recording = phase !== 'setup';
+  // The secret code's reset is offered only while nothing runs (round 2, group 1.2).
+  useEffect(() => {
+    setBodyCamRunning(recording);
+    return () => setBodyCamRunning(false);
+  }, [recording]);
   const disablePrevention = usePreventRemove(recording, () => {
     if (locked) setMessage(true);
     else setStopFirst(true);

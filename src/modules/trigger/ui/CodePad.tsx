@@ -86,7 +86,7 @@ export function CodePad() {
       ) : (
         <View style={styles.prompt}>
           <AppText>{t('pad.noCode')}</AppText>
-          <Button label={t('pad.setCode')} onPress={() => router.replace('/sos/trigger')} />
+          <Button label={t('pad.setCode')} onPress={() => router.replace('/settings/trigger')} />
         </View>
       )}
     </SafeAreaView>

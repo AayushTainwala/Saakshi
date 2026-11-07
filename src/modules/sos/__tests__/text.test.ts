@@ -4,7 +4,7 @@ import type { ComposerResult, SmsChannels } from '../alert/channels';
 import { textTrustedContacts } from '../alert/text';
 
 const all = { sos: true, live: true, witness: true };
-const contacts = () => [{ id: '1', name: 'Asha', phone: '+919876543210', uses: all }];
+const contacts = () => [{ id: '1', name: 'Asha', phone: '+919876543210', uses: all, method: 'sms' as const }];
 
 function channels(direct: boolean): SmsChannels & { composer: { send: jest.Mock } } {
   return {
@@ -49,9 +49,9 @@ describe('textTrustedContacts', () => {
 
   it('texts only the people ticked for what is being sent (fix round 1, group 6)', async () => {
     const people = () => [
-      { id: '1', name: 'Asha', phone: '+919876543210', uses: all },
-      { id: '2', name: 'Ravi', phone: '+919812345678', uses: { sos: true, live: false, witness: false } },
-      { id: '3', name: 'Meera', phone: '+919900011122', uses: { sos: false, live: true, witness: true } },
+      { id: '1', name: 'Asha', phone: '+919876543210', uses: all, method: 'sms' as const },
+      { id: '2', name: 'Ravi', phone: '+919812345678', uses: { sos: true, live: false, witness: false }, method: 'sms' as const },
+      { id: '3', name: 'Meera', phone: '+919900011122', uses: { sos: false, live: true, witness: true }, method: 'sms' as const },
     ];
     const c = channels(false);
     await textTrustedContacts('live', { use: 'live' }, { contacts: people, channels: c });

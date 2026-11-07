@@ -7,8 +7,8 @@ import { AlertController, type AlertDeps } from '../alert/controller';
 import type { TrustedContact } from '../contacts/store';
 
 const all = { sos: true, live: true, witness: true };
-const asha: TrustedContact = { id: '1', name: 'Asha', phone: '+919876543210', uses: all };
-const ravi: TrustedContact = { id: '2', name: 'Ravi', phone: '+919123456789', uses: all };
+const asha: TrustedContact = { id: '1', name: 'Asha', phone: '+919876543210', uses: all, method: 'sms' };
+const ravi: TrustedContact = { id: '2', name: 'Ravi', phone: '+919123456789', uses: all, method: 'sms' };
 
 const fixed: FixResult = {
   status: 'fixed',
