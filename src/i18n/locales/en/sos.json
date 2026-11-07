@@ -32,7 +32,13 @@
     "noLocation": "My location: not available",
     "sent": "Sent",
     "live": "Live location",
-    "liveInvite": "Saakshi: follow my live location until {{time}}: {{link}}"
+    "accuracy": "within {{meters}} m",
+    "battery": "Battery: {{percent}}%",
+    "batteryUnknown": "Battery: not known",
+    "shareUntil": "I'm sharing my location with you until {{time}}.",
+    "shareOpen": "I'm sharing my location with you until I stop.",
+    "shareBattery": "Battery {{percent}}%.",
+    "shareFollow": "Follow it here: {{link}}"
   },
   "contacts": {
     "title": "Trusted contacts",

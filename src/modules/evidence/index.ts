@@ -9,8 +9,6 @@
  */
 import type { CaptureSession } from './capture/pipeline';
 
-export type { BatteryAction } from './battery/monitor';
-export { useLowBattery } from './battery/useLowBattery';
 export { BodyCamScreen } from './bodycam/BodyCamScreen';
 /** For E7: body-cam upload parts, each a byte range ending on a signed checkpoint. */
 export { setBodyCamPartListener, type UploadPart } from './bodycam/parts';

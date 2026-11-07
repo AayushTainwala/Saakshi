@@ -6,7 +6,7 @@ import { AppText, Button, Card } from '@/components';
 import { LocationDeniedError, useLiveLength, useLiveShare } from '@/modules/location';
 import { requireSecretCode } from '@/modules/secretcode';
 
-import { liveInvite, startLiveLocation, stopLiveLocation } from '../alert/live';
+import { liveInviteNow, startLiveLocation, stopLiveLocation } from '../alert/live';
 import { textTrustedContacts } from '../alert/text';
 import { formatTimeIST } from '../alert/time';
 import { useTrustedContacts } from '../contacts/fileStore';
@@ -82,7 +82,7 @@ export function LiveLocationCard() {
         variant="secondary"
         label={t('live.sendLink')}
         disabled={ticked.length === 0}
-        onPress={() => void textTrustedContacts(liveInvite(share), { use: 'live' })}
+        onPress={() => void liveInviteNow(share).then((text) => textTrustedContacts(text, { use: 'live' }))}
       />
       <Button variant="danger" label={t('live.stop')} busy={busy} onPress={() => void stop()} />
       {problem}

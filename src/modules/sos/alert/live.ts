@@ -1,18 +1,37 @@
 import i18n from '@/i18n';
 import { type LiveShare, liveShare } from '@/modules/location';
+import { readBatteryPercent } from '@/platform/battery';
 
-import { formatTimeIST } from './time';
+import { shareMessage, type ShareLabels } from './message';
 import { textTrustedContacts, type TextOutcome } from './text';
 
-/** The text that invites contacts to follow the link. */
-export function liveInvite(share: LiveShare): string {
-  return i18n.t('sos:message.liveInvite', { time: formatTimeIST(share.expiresAt), link: share.link });
+/** The calm message's words, in the app's language at the moment it is written. */
+export function shareLabels(): ShareLabels {
+  return {
+    until: (time) => i18n.t('sos:message.shareUntil', { time }),
+    open: i18n.t('sos:message.shareOpen'),
+    battery: (percent) => i18n.t('sos:message.shareBattery', { percent }),
+    follow: (link) => i18n.t('sos:message.shareFollow', { link }),
+  };
 }
 
 /**
- * Starts live location (S3) and, unless `sendLink` is false ("My phone is being taken" puts the link
- * in the SOS text instead), texts the link to the people ticked for live location. With
- * `persistent`, the share has no fixed end (SPEC 5.4).
+ * The text that invites contacts to follow the link: the calm "Share my location" message, with
+ * the battery level (SPEC 5.2). Also sent when the link follows an alert on its own.
+ */
+export function liveInvite(share: LiveShare, battery: number | null = null): string {
+  return shareMessage(share, battery, shareLabels());
+}
+
+/** The invite with the battery level read now. */
+export async function liveInviteNow(share: LiveShare): Promise<string> {
+  return liveInvite(share, await readBatteryPercent());
+}
+
+/**
+ * Starts live location (S3) and, unless `sendLink` is false (an alert carries the link instead),
+ * texts the calm invite to the people ticked for live location. With `persistent`, the share has no
+ * fixed end (SPEC 5.4).
  */
 export async function startLiveLocation(
   hours: number,
@@ -24,7 +43,9 @@ export async function startLiveLocation(
     { persistent: options.persistent },
   );
   const sent =
-    options.sendLink === false ? null : await textTrustedContacts(liveInvite(share), { use: 'live', directOnly: options.directOnly });
+    options.sendLink === false
+      ? null
+      : await textTrustedContacts(await liveInviteNow(share), { use: 'live', directOnly: options.directOnly });
   return { share, sent };
 }
 
