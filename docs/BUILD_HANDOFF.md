@@ -17,15 +17,17 @@ The owner's decisions after his SOS test are in `docs/SPEC.md` (sections 4, 5, 6
 
 | Part and group | State |
 |---|---|
-| 1.1 Contacts keyboard bug | Built: https://github.com/AayushTainwala/Saakshi/pull/31. Not yet run on a phone. |
-| 1.2 Secret code, Settings | Built: https://github.com/AayushTainwala/Saakshi/pull/32 (on top of 1.1). Not yet run on a phone. |
-| 1.3 SOS swipes, Pocket recording, "My phone is being taken" | Split in two, as the brief allows. **A** (the page, the move, the quick trigger): https://github.com/AayushTainwala/Saakshi/pull/33. **B** ("My phone is being taken", Stop gating, the server migration): https://github.com/AayushTainwala/Saakshi/pull/34. Not yet run on a phone. |
-| 1.4 Alerts (both links, battery level, calm Share my location) | Built: https://github.com/AayushTainwala/Saakshi/pull/35 (on top of 1.3B). Not yet run on a phone. |
-| 1.5 Low battery at 5%, bundle format 0.9 | Built: https://github.com/AayushTainwala/Saakshi/pull/36 (on top of 1.4). Not yet run on a phone. |
+| 1.1 Contacts keyboard bug | Merged: https://github.com/AayushTainwala/Saakshi/pull/31. Not yet run on a phone. |
+| 1.2 Secret code, Settings | Merged: https://github.com/AayushTainwala/Saakshi/pull/32. Not yet run on a phone. |
+| 1.3 SOS swipes, Pocket recording, "My phone is being taken" | Split in two, as the brief allows. Both merged. **A** (the page, the move, the quick trigger): https://github.com/AayushTainwala/Saakshi/pull/33. **B** ("My phone is being taken", Stop gating, the server migration): https://github.com/AayushTainwala/Saakshi/pull/34. Not yet run on a phone. |
+| 1.4 Alerts (both links, battery level, calm Share my location) | Merged: https://github.com/AayushTainwala/Saakshi/pull/35. Not yet run on a phone. |
+| 1.5 Low battery at 5%, bundle format 0.9 | Merged: https://github.com/AayushTainwala/Saakshi/pull/36. Not yet run on a phone. |
 | 2.1–2.3 E7, Google Drive | Not started (needs the owner's Google Cloud project; owner's guide "Round 2 setup guide" is in his vault) |
 | 3.1 Protocol `docs/spec/alerts.md` | Not started. **Documents only; needs the owner's review before Part 3 code.** May start with Part 1. |
 | 3.2–3.5 Server, pairing, receiving, silence alarm | Not started (needs the Apple push key and Google's notification service) |
 | 4 First-open walkthrough | Not started. Research for the phone-setup page is done: `docs/research/power-off-locks.md` (#29). Ship only the rows it marks primary and tested. |
+
+**Part 1 review (7 Nov 2026).** #31 to #36 were merged into `main` on 7 Nov and reviewed there afterwards: typecheck and lint pass, 507 tests pass, CI and both native builds passed on each pull request that changed native code, and the two migrations on the live server match the repository. No legal or privacy text was changed. Nothing needs undoing. The open questions are in "Owner questions", `(Round 2)`.
 
 Questions for the owner from this round go in "Owner questions" as `- [ ] (Round 2) …`. The builders' reports go under this heading, one `### Group n.n` each.
 
@@ -939,7 +941,7 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
 - **App Review notes:** I added an optional "R2 features" block to `store/apple/review-notes.md`, covering live location's server, background audio and location, the controls, and why the Location Always string exists though it is never requested. All blocks stay under 4000 bytes (checked by the store tests).
 - **Privacy label, Play Data safety and privacy policy for an R2 build.** The policy says it will be updated before live location ships. The facts:
   - Positions (precise location) go to our Supabase server (Mumbai) only while the user shares, for App Functionality, and are deleted when sharing stops or after at most 24 hours.
-    - **Round 2 changes these facts** (groups 1.3 and 1.4): a "My phone is being taken" share has no fixed end. It is kept while the phone reports and deleted a week after its last position, or when it is stopped with the code. And each position now carries the battery level when the phone sent it, shown to whoever has the link. Both need to be in the privacy texts.
+    - **Round 2 changes these facts** (groups 1.3 and 1.4): a "My phone is being taken" share has no fixed end. It is kept while the phone reports and deleted a week after its last position, or when it is stopped with the code. And each position now carries the battery level when the phone sent it, shown to whoever has the link. Both need to be in the privacy texts. The optional R2 block in `store/apple/review-notes.md` still says "after 24 hours at most"; it needs the same change before it is used.
   - There is no account and nothing that identifies the user: the share is a random id and token.
   - Supabase's request logs probably record the phone's IP address for their own retention period. I have not checked that period.
   - Nothing else goes to us.
