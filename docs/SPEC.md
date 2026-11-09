@@ -141,7 +141,10 @@ One swipe starts everything at once (owner, 6 Nov 2026):
 - **live location until the battery dies.** Built so: the share has no fixed end; it stays alive while the phone checks in, and the server deletes it a week after the last check-in;
 - **Pocket recording with uploads** (section 4, E8 and E7), in upload parts that lengthen as the recording goes on (section 4, E7);
 - **the low-battery handover** (section 4);
-- **the silence alarm** (section 5.7).
+- **the silence alarm** (section 5.7);
+- **locking the phone's screen** (owner, 9 Nov 2026), so that force-quitting or deleting Saakshi needs the phone's passcode:
+  - **Android:** if the user has switched it on in advance, Saakshi locks the screen at once. It uses Android's device-admin permission with the force-lock policy only (no wipe, nothing else), offered as a plain opt-in in Settings and the first-open walkthrough, and switched off from Saakshi's Settings as easily as it was switched on. While it is on, Android asks for it to be switched off before Saakshi can be deleted.
+  - **iPhone, and Android without it:** no app can lock the screen, so Saakshi shows, large and first, "Now lock your phone" with which button to press.
 
 It **cannot be stopped without the secret code**. In this mode Saakshi's own Lock Screen Live Activity is dropped, so the locked screen shows less (owner).
 
