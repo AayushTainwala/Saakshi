@@ -217,6 +217,7 @@
     "nothingElse": "This permission lets Saakshi lock the screen and nothing else: it can't erase your phone or change your screen lock.",
     "deleting": "While it is on, Android asks for it to be switched off before Saakshi can be deleted.",
     "offHere": "You can switch it off here at any time, in one tap. It can also be switched off in your phone's settings.",
+    "offInSaakshi": "You can switch it off in Saakshi's Settings at any time, in one tap, or in your phone's settings.",
     "androidScreen": "Next, Android shows its own screen to confirm. To switch this on, choose to activate it there.",
     "on": "On. Saakshi locks the screen when \"My phone is being taken\" starts.",
     "off": "Off. When \"My phone is being taken\" starts, Saakshi asks you to lock the phone yourself.",

@@ -33,6 +33,9 @@ export type LockSettingState = {
   failed: boolean;
 };
 
+/** After a switch-off Android hadn't finished, the state is read again this much later. */
+export const RECHECK_MS = 2000;
+
 export class LockSetting {
   private current: LockSettingState;
   private listeners = new Set<() => void>();
@@ -51,9 +54,20 @@ export class LockSetting {
 
   /** Reads the real state again (it may have been switched off in Android's settings). */
   refresh(): void {
-    if (!this.current.supported || this.current.busy) return;
+    if (!this.current.supported) return;
     const on = this.read(() => !!this.api?.active(), this.current.on);
     if (on !== this.current.on) this.set({ on });
+  }
+
+  /**
+   * Saakshi is back on screen: Android's own screen, if one was open, has closed. Reads the state
+   * again, and ends a switch that never answered (Android can drop the answer if it closed
+   * Saakshi's screen meanwhile), so the button can't stay busy.
+   */
+  appActive(): void {
+    if (!this.current.supported) return;
+    const on = this.read(() => !!this.api?.active(), this.current.on);
+    if (on !== this.current.on || this.current.busy) this.set({ on, busy: false });
   }
 
   /** Android's "Activate device admin app?" screen, with `explanation` on it. Resolves whether it is on. */
@@ -65,9 +79,12 @@ export class LockSetting {
 
   /** Switches it off in one step. Resolves whether it is still on. */
   async switchOff(): Promise<boolean> {
-    return this.change(async (api) => {
+    const on = await this.change(async (api) => {
       await api.remove();
     });
+    // Android finishes switching it off a moment later; if it hadn't yet, look again.
+    if (on) setTimeout(() => this.refresh(), RECHECK_MS);
+    return on;
   }
 
   /**

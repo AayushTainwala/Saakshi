@@ -414,12 +414,13 @@ Questions for the owner from this round go in "Owner questions" as `- [ ] (Round
   - **Part 4's walkthrough** can use the same setting: `LockSettingsPanel` from `@/modules/trigger`.
 - **When "My phone is being taken" starts** (`trigger/phoneTaken.ts`):
   - the parts start as before;
-  - once every one of them has started or failed (sound recording, location, the alert's sending and the link that follows it), Saakshi calls `lockNow()` once, if the admin is on.
+  - once every one of them has started or failed (sound recording, location, the alert's sending and the link that follows it), Saakshi calls `lockNow()` once, if the admin is on;
+  - **but it waits for location at most 20 seconds** after the alert has gone and the recording has started (`LOCK_WAIT_MS`, built so). React Native's network calls on Android have no time limit at all ("No timeouts by default", `OkHttpClientProvider.kt`), so a stalled call on a weak signal could otherwise keep the phone unlocked for good. Location carries on starting after the lock.
   - Recording and location carry on with the screen locked: nothing in Saakshi stops a part when the screen locks or the app goes to the background (test). They already run that way: on Android in their foreground services, on iPhone with background audio and location. Not yet run on a phone.
-  - **Why it waits for everything:** an Android app in the background can't start location (the share's server call comes first, then the location updates), and a text that needs a tap needs the screen.
+  - **Why it waits for everything:** an Android app in the background can't start location (the share's server call comes first, then the location updates), and a text that needs a tap needs the screen. So when location isn't ready within the 20 seconds, it may fail once the screen is locked; the card then says so and offers "Try sharing again" after unlocking.
 - **"Now lock your phone"** (iPhone always; Android with the admin off, or if `lockNow` fails). Once everything has started, the running card moves to the top of the SOS page, headed large by "Now lock your phone", then "Press the side button." (iPhone) or "Press the power button." (Android), then "Sound recording and location sharing carry on with the screen locked." The page scrolls up to it.
   - It stays until the app goes to the background (the screen locked, or the user left Saakshi). Then the card goes back to its usual place under the swipes; the user doesn't see it move.
-  - It isn't shown if Saakshi is already in the background by then, and it doesn't come back after a restart.
+  - It is shown even if Saakshi isn't on screen at that moment: on Android, the app's state can lag behind a return from the Messages app. It then goes the next time the app goes to the background. It doesn't come back after a restart.
   - A screen reader announces it (`accessibilityRole="alert"`, an assertive live region).
 
 **3. Android's own screens** (the brief's item 7). From Android's source, read in the LineageOS mirror of AOSP: Android 16 (`lineage-23.0`) and Android 7.1 (`cm-14.1`). **No screenshots:** this cloud session has no Android emulator. Phone makers' Settings apps (Samsung, Xiaomi, Oppo, Vivo) may word it differently; I couldn't check them.
@@ -441,18 +442,30 @@ Questions for the owner from this round go in "Owner questions" as `- [ ] (Round
   - **"No reset" remains only for a phone that couldn't be asked about its screen lock** (the native module missing, in practice never in a real build). Its wording is now general, and `reset.oldAndroid` is renamed `reset.none`.
 - **iPhone saving mode keeps full accuracy.** Group 1.6's drop to about 100 m accuracy and 100 m distance is undone. Positions are found as before, at full accuracy (10 m, every 20 m or 30 seconds), and sent every 5 minutes, as on Android. The tracker no longer has a saving-mode setting (`TRACKING_OPTIONS` in `location/live/task.ts`). **To revisit** once a phone test shows what a coarser position would save (owner, 9 Nov 2026).
 
+**Limits found** (by the review below; left as built, since the brief asks for the lock after the alert's sending):
+- **Where the alert opens the Messages app** (the Play build, or the APK without SMS permission), the lock waits until the user comes back to Saakshi from Messages. If the phone is taken while Messages is open, nothing locks until someone returns to Saakshi. The Android APK sends by itself and isn't affected; on iPhone the message opens inside Saakshi.
+- **On Android, anything that covers Saakshi ends the reminder:** a permission dialog, the Messages app opened by "Try sharing again", or an incoming call. Android reports all of these as "background", the same as a locked screen. The brief's rule ("until the app goes to the background") is followed as written.
+- **An iPhone share running in group 1.6's coarser saving mode** would keep it until that share ends, because nothing now sets it back. It matters only if a 1.6 build was used at 5% battery, and the handoff records no such phone test.
+
 **Built so, please confirm:**
-- The lock waits until every part has started or failed. On a weak signal, starting the live share (its server call) can take a while, up to the phone's own network timeout, and the screen stays unlocked until then. Locking sooner would stop Android starting the location updates.
+- The lock waits until every part has started or failed, but for location at most 20 seconds after the alert has gone and the recording has started. Locking sooner would stop Android starting the location updates; waiting longer could leave the phone unlocked on a weak signal.
 - The lock happens even if a part failed (for example, the microphone was refused), once the others have started. The card says what failed when the phone is unlocked.
 - The reminder's third line, "Sound recording and location sharing carry on with the screen locked.", is mine. The brief asked only for "Now lock your phone" and the button.
 - The reminder is the running card moved to the top of the page, not a separate overlay.
 
-**Tests (30 more than on `main`, after the replaced ones; 596 pass, and one is skipped as before):**
-- The orchestrator: `lockNow` called once, after every part (a slow recording and a slow link too), only when it starts, also when a part failed; the reminder where Saakshi can't lock (iPhone, Android without the admin, a failed lock), only once everything has started, only in the foreground, gone in the background and after a restart, cleared by Stop; nothing stopped when the screen locks.
-- The setting: not offered on iPhone or without device admin; switched on through Android's screen with the explanation; cancelled; failed; switched off in one step; switched off in Android's settings and noticed (also through the real AppState listener); `lockNow` only while it is on.
+**Tests (32 more than on `main`, after the replaced ones; 598 pass, and one is skipped as before):**
+- The orchestrator: `lockNow` called once, after every part (a slow recording and a slow link too), only when it starts, also when a part failed, and after 20 seconds at most when location stalls (location then carries on); the reminder where Saakshi can't lock (iPhone, Android without the admin, a failed lock), only once everything has started, gone in the background and after a restart, cleared by Stop; nothing stopped when the screen locks.
+- The setting: not offered on iPhone or without device admin; switched on through Android's screen with the explanation (which names Saakshi's Settings, not "here"); cancelled; failed; never stuck busy when Android drops its answer; switched off in one step, and looked at again when Android hadn't finished; switched off in Android's settings and noticed (also through the real AppState listener); `lockNow` only while it is on.
 - The native sources: the policy file holds `force-lock` and nothing else; the receiver is protected by `BIND_DEVICE_ADMIN`, with its policy file and action; no new `uses-permission`, and no `LOCK_DEVICE` or `MANAGE_DEVICE_POLICY` anywhere; the explanation passed as `EXTRA_ADD_EXPLANATION`, `removeActiveAdmin`, only `lockNow`, the iPhone stubs.
 - The screens: the Settings page (explanation, switch on and off, Hindi), the Settings card and its place under Secret code on Android, the reminder on iPhone (side button) and Android (power button), none with the admin on, Hindi.
 - The follow-ups: Android 7 to 10's reset method and its reason; the recovery code shown, used and asked for there, with its own wording; the general "no reset" message; full accuracy in saving mode, and the tracker never touched for it.
+
+**An independent review** of the new code (a separate agent, before merging, as in group 1.6), read against the libraries' own sources, found no compile errors and no new permission, dependency or data leaving the phone. It found:
+- the lock could wait for ever on a stalled network call (fixed: at most 20 seconds for location);
+- the reminder could be skipped when Android's app state lagged behind a return from Messages (fixed: shown regardless);
+- the Settings switch could stay busy if Android dropped its answer, or show "On" after a slow switch-off (both fixed);
+- the explanation said "switch it off here" on Android's own screen (fixed: "in Saakshi's Settings");
+- the three limits above, left as built.
 
 **Not verified:** nothing has run on a phone. The Kotlin and Swift compile only in the Native build workflow. Most important to try, on Android:
 - the activation screen and its wording;
@@ -463,7 +476,7 @@ Questions for the owner from this round go in "Owner questions" as `- [ ] (Round
 
 On iPhone: the reminder, then the side button, with recording and location carrying on.
 
-**NEEDS OWNER REVIEW:** the opt-in explanation and the reminder, in English and Hindi (`sos.json` → `lock.*` and `taken.remind.*`); the receiver's description in Android's list (`modules/saakshi-sos/android/src/main/res/values*/strings.xml`, `saakshi_lock_admin_description`); and the new and changed `secretcode.json` wording (`reset.none`, `reset.noRecoveryOldAndroid`, `reset.explain.recoveryOldAndroid`, `reset.explain.none`, `about.recoveryOldAndroid`, `about.none`, `settings.recoveryMissingOldAndroid`, `settings.noReset`, `reminder.bodyOldAndroid`).
+**NEEDS OWNER REVIEW:** the opt-in explanation and the reminder, in English and Hindi (`sos.json` → `lock.*`, including `lock.offInSaakshi` for Android's own screen, and `taken.remind.*`); the receiver's description in Android's list (`modules/saakshi-sos/android/src/main/res/values*/strings.xml`, `saakshi_lock_admin_description`); and the new and changed `secretcode.json` wording (`reset.none`, `reset.noRecoveryOldAndroid`, `reset.explain.recoveryOldAndroid`, `reset.explain.none`, `about.recoveryOldAndroid`, `about.none`, `settings.recoveryMissingOldAndroid`, `settings.noReset`, `reminder.bodyOldAndroid`).
 
 ## Fix round 1 (iPhone test round 1, A–C)
 

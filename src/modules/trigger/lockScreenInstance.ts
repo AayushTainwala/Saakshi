@@ -21,7 +21,7 @@ export const lockSetting = new LockSetting(api);
 
 // Switched off in Android's settings: shown as off when Saakshi comes back to the screen.
 AppState.addEventListener('change', (state) => {
-  if (state === 'active') lockSetting.refresh();
+  if (state === 'active') lockSetting.appActive();
 });
 
 export function useLockSetting(): LockSettingState {

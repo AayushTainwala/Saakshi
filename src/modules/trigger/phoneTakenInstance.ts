@@ -44,7 +44,6 @@ export const phoneTaken = new PhoneTakenController({
   heartbeat: { start: () => undefined, stop: () => undefined },
   // Android, if the user switched it on in Settings: device admin's force-lock (group 1.7).
   lockScreen: () => lockSetting.lockNow(),
-  inForeground: () => AppState.currentState === 'active',
   now: () => new Date(),
 });
 

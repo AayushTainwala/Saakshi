@@ -7,7 +7,7 @@ import { Platform } from 'react-native';
 import i18n, { initI18n } from '@/i18n';
 import { PreferencesProvider } from '@/preferences/PreferencesProvider';
 
-import { type LockAdminApi, LockSetting } from '../lockScreen';
+import { type LockAdminApi, LockSetting, RECHECK_MS } from '../lockScreen';
 import { PhoneTakenStatus } from '../ui/PhoneTaken';
 import { LockSettings, LockSettingsCard } from '../ui/LockSettings';
 
@@ -98,6 +98,35 @@ describe('the lock setting (round 2, group 1.7)', () => {
     expect(listener).toHaveBeenCalledTimes(1);
     setting.refresh();
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('never stays busy if Android drops the answer, once Saakshi is back on screen', async () => {
+    const { admin, api } = fakeAdmin({ request: jest.fn(() => new Promise<boolean>(() => undefined)) });
+    const setting = new LockSetting(api);
+    void setting.switchOn('why');
+    expect(setting.getState().busy).toBe(true);
+    // The user activated it on Android's screen, but the answer never came.
+    admin.on = true;
+    setting.refresh();
+    expect(setting.getState()).toMatchObject({ busy: true, on: true });
+    setting.appActive();
+    expect(setting.getState()).toMatchObject({ busy: false, on: true });
+  });
+
+  it('looks again if Android had not finished switching it off', async () => {
+    jest.useFakeTimers();
+    try {
+      const { admin, api } = fakeAdmin({ remove: jest.fn(async () => true) });
+      admin.on = true;
+      const setting = new LockSetting(api);
+      expect(await setting.switchOff()).toBe(true);
+      expect(setting.getState().on).toBe(true);
+      admin.on = false;
+      jest.advanceTimersByTime(RECHECK_MS);
+      expect(setting.getState().on).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('locks the screen only while it is on', async () => {
@@ -252,6 +281,9 @@ describe('Settings → Lock the phone (Android)', () => {
     expect(explanation.split('\n\n')).toHaveLength(4);
     expect(explanation).toContain('Android asks for it to be switched off before Saakshi can be deleted');
     expect(explanation).toContain('nothing else');
+    // On Android's own screen, "here" would mean that screen: it names Saakshi's Settings.
+    expect(explanation).toContain("You can switch it off in Saakshi's Settings at any time");
+    expect(explanation).not.toContain('switch it off here');
     expect(await screen.findByText(/^On\./)).toBeTruthy();
 
     // Switching off is a button in the same place.
@@ -300,7 +332,6 @@ jest.mock('../phoneTakenInstance', () => {
     textLink: async () => undefined,
     heartbeat: { start: () => undefined, stop: () => undefined },
     lockScreen: (...args: []) => parts.lockScreen(...args),
-    inForeground: () => true,
     now: () => new Date('2026-11-09T05:10:00Z'),
     liveWaitMs: 10,
   });

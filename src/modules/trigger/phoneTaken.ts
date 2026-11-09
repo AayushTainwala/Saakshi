@@ -11,6 +11,8 @@
  * Once all of them have started (group 1.7), the screen is locked where the user has allowed it
  * (Android's device admin, force-lock only), so that nothing waits on an unlock. Where it can't be
  * (iPhone, or Android with it off), the page asks the user, first and large, to lock the phone.
+ * The lock waits for location only so long (`LOCK_WAIT_MS`): Android's network calls have no time
+ * limit of their own, and a stalled one must not keep the phone unlocked.
  * It needs a secret code to start, and stops only through the code screen: inside Saakshi it can
  * only be stopped with the code. (The phone's own controls remain: force-quit, switch-off, airplane
  * mode. That is what the silence alarm is for.)
@@ -18,6 +20,12 @@
 
 /** The alert won't wait longer than this for the live link. */
 export const LIVE_WAIT_MS = 8000;
+
+/**
+ * Once the alert has gone and the recording has started, the lock (or the reminder) waits at most
+ * this long for location and its link (built so, group 1.7). Location carries on starting after it.
+ */
+export const LOCK_WAIT_MS = 20_000;
 
 export type PartState = 'starting' | 'on' | 'failed' | 'off';
 export type AlertPart = 'sending' | 'sent' | 'failed' | null;
@@ -77,10 +85,9 @@ export type PhoneTakenDeps = {
    * Resolves false where it can't (iPhone, switched off): the user is then asked to lock it.
    */
   lockScreen: () => Promise<boolean>;
-  /** Whether Saakshi is on screen now: the reminder is shown only then. */
-  inForeground: () => boolean;
   now: () => Date;
   liveWaitMs?: number;
+  lockWaitMs?: number;
 };
 
 export type StartResult = 'started' | 'already' | 'no-code';
@@ -152,11 +159,17 @@ export class PhoneTakenController {
         this.fail('alert', error);
       }
 
-      await live;
-      const late = started as { link: string; invite: string } | null;
-      if (late) await this.deps.textLink(late.invite, inAlert ? 'not-alerted' : 'all').catch((error) => this.fail('link', error));
+      const liveAndLink = live.then(async () => {
+        const late = started as { link: string; invite: string } | null;
+        if (late) await this.deps.textLink(late.invite, inAlert ? 'not-alerted' : 'all').catch((error) => this.fail('link', error));
+      });
       await pocket;
+      // Location and its link, but not for ever.
+      let lockTimer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([liveAndLink, new Promise((resolve) => (lockTimer = setTimeout(resolve, this.deps.lockWaitMs ?? LOCK_WAIT_MS)))]);
+      clearTimeout(lockTimer);
       await this.lockOrRemind();
+      await liveAndLink;
       return 'started';
     } finally {
       this.busy = false;
@@ -195,7 +208,10 @@ export class PhoneTakenController {
   /**
    * Called once, after every part has started or failed (the recording, location, the alert's
    * sending and the link), so that none of them waits on an unlock: an Android app in the
-   * background can't start location, and a text that needs a tap needs the screen.
+   * background can't start location, and a text that needs a tap needs the screen. Location gets
+   * `LOCK_WAIT_MS` at most. The reminder is shown whether or not Saakshi is on screen at this
+   * moment (on Android the app's state may not have caught up yet); it goes the next time the app
+   * goes to the background.
    */
   private async lockOrRemind(): Promise<void> {
     if (!this.current.active) return;
@@ -205,7 +221,7 @@ export class PhoneTakenController {
     } catch {
       // Not locked: the user is asked to lock it.
     }
-    if (!locked && this.current.active && this.deps.inForeground()) this.update({ lockReminder: true });
+    if (!locked && this.current.active) this.update({ lockReminder: true });
   }
 
   private startPocket(): Promise<void> {

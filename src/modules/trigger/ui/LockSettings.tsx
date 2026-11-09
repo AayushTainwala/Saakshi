@@ -6,8 +6,10 @@ import { AppText, Button, Card, Screen } from '@/components';
 
 import { lockSetting, useLockSetting } from '../lockScreenInstance';
 
-/** The explanation on Saakshi's screen, also handed to Android's own screen (EXTRA_ADD_EXPLANATION). */
+/** The explanation on Saakshi's screen. */
 const EXPLANATION = ['lock.what', 'lock.nothingElse', 'lock.deleting', 'lock.offHere'] as const;
+/** The same, on Android's own screen (EXTRA_ADD_EXPLANATION), where "here" would mean that screen. */
+const ANDROID_EXPLANATION = ['lock.what', 'lock.nothingElse', 'lock.deleting', 'lock.offInSaakshi'] as const;
 
 /**
  * Settings → "Lock the phone when 'My phone is being taken' starts" (SPEC 5.4; round 2, group
@@ -26,7 +28,7 @@ export function LockSettingsPanel() {
 
   if (!state.supported) return null;
 
-  const explanation = EXPLANATION.map((key) => t(key)).join('\n\n');
+  const explanation = ANDROID_EXPLANATION.map((key) => t(key)).join('\n\n');
 
   return (
     <>
