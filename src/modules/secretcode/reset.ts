@@ -15,16 +15,28 @@ import type { RecoveryResult } from './store';
  * - iPhone: always, through a keychain item held to the passcode (`.devicePasscode`);
  * - Android 11 and later: the system prompt with the screen lock alone (`DEVICE_CREDENTIAL`);
  * - Android 7 to 10: no. The only system screens that ask for the screen lock there also take a
- *   fingerprint (and on Android 10 a face), and an app can't turn that off. So such a phone with a
- *   screen lock has no reset (built so, pending the owner's answer in the handoff).
+ *   fingerprint (and on Android 10 a face), and an app can't turn that off. So those phones get
+ *   the recovery code, as phones with no screen lock do (owner, 9 Nov 2026; group 1.7).
  */
 export type ResetMethod = 'passcode' | 'recovery' | 'none';
 
+/** What the phone says about its screen lock (`@native/saakshi-device`). */
+export type PhoneLock = { hasScreenLock: boolean; canAskPasscodeOnly: boolean };
+
 /** What this phone can reset a forgotten code with. Null: the phone couldn't be asked. */
-export function resetMethodFor(phone: { hasScreenLock: boolean; canAskPasscodeOnly: boolean } | null): ResetMethod {
+export function resetMethodFor(phone: PhoneLock | null): ResetMethod {
   if (!phone) return 'none';
-  if (!phone.hasScreenLock) return 'recovery';
-  return phone.canAskPasscodeOnly ? 'passcode' : 'none';
+  return phone.hasScreenLock && phone.canAskPasscodeOnly ? 'passcode' : 'recovery';
+}
+
+/**
+ * Why a phone resets with the recovery code, for the screens' wording: it has no screen lock, or
+ * it has one that Saakshi can't ask for alone (Android 7 to 10).
+ */
+export type RecoveryWhy = 'no-lock' | 'old-android';
+
+export function recoveryWhyFor(phone: PhoneLock | null): RecoveryWhy {
+  return phone?.hasScreenLock ? 'old-android' : 'no-lock';
 }
 
 export type ResetOutcome = 'reset' | 'running' | 'no-passcode' | 'cancelled' | 'failed' | 'unavailable';

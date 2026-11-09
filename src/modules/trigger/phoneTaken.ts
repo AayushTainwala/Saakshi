@@ -8,6 +8,9 @@
  *   - Pocket recording, without Saakshi's Lock Screen Live Activity (it carries its own low-battery
  *     handover, group 1.5, and its upload parts go to E7 once that exists);
  *   - the silence alarm's heartbeat (group 3.5), through the `heartbeat` seam below.
+ * Once all of them have started (group 1.7), the screen is locked where the user has allowed it
+ * (Android's device admin, force-lock only), so that nothing waits on an unlock. Where it can't be
+ * (iPhone, or Android with it off), the page asks the user, first and large, to lock the phone.
  * It needs a secret code to start, and stops only through the code screen: inside Saakshi it can
  * only be stopped with the code. (The phone's own controls remain: force-quit, switch-off, airplane
  * mode. That is what the silence alarm is for.)
@@ -27,9 +30,23 @@ export type PhoneTakenState = {
   pocket: PartState;
   /** What went wrong, part by part, in the order it happened (shown to the user). */
   errors: { part: 'alert' | 'live' | 'pocket' | 'link'; message: string }[];
+  /**
+   * "Now lock your phone", shown first and large once everything has started, where Saakshi didn't
+   * lock the screen itself. It goes when the app goes to the background (the screen locked, or
+   * the user left). Not kept across a restart.
+   */
+  lockReminder: boolean;
 };
 
-export const IDLE: PhoneTakenState = { active: false, startedAt: null, alert: null, live: 'off', pocket: 'off', errors: [] };
+export const IDLE: PhoneTakenState = {
+  active: false,
+  startedAt: null,
+  alert: null,
+  live: 'off',
+  pocket: 'off',
+  errors: [],
+  lockReminder: false,
+};
 
 export type PhoneTakenDeps = {
   storage: { read(): string | null; write(text: string): void };
@@ -55,6 +72,13 @@ export type PhoneTakenDeps = {
    * when the mode is stopped with the code. Until 3.5, nothing.
    */
   heartbeat: { start(): void; stop(): void };
+  /**
+   * Locks the screen now, where the user allowed it (Android, device admin with force-lock only).
+   * Resolves false where it can't (iPhone, switched off): the user is then asked to lock it.
+   */
+  lockScreen: () => Promise<boolean>;
+  /** Whether Saakshi is on screen now: the reminder is shown only then. */
+  inForeground: () => boolean;
   now: () => Date;
   liveWaitMs?: number;
 };
@@ -95,7 +119,15 @@ export class PhoneTakenController {
     try {
       if (!(await this.deps.codeIsSet().catch(() => false))) return 'no-code';
       // Saved before anything starts, so a restart knows this mode is on.
-      this.set({ active: true, startedAt: this.deps.now().toISOString(), alert: 'sending', live: 'starting', pocket: 'starting', errors: [] });
+      this.set({
+        active: true,
+        startedAt: this.deps.now().toISOString(),
+        alert: 'sending',
+        live: 'starting',
+        pocket: 'starting',
+        errors: [],
+        lockReminder: false,
+      });
       this.deps.heartbeat.start();
 
       const pocket = this.startPocket();
@@ -124,10 +156,16 @@ export class PhoneTakenController {
       const late = started as { link: string; invite: string } | null;
       if (late) await this.deps.textLink(late.invite, inAlert ? 'not-alerted' : 'all').catch((error) => this.fail('link', error));
       await pocket;
+      await this.lockOrRemind();
       return 'started';
     } finally {
       this.busy = false;
     }
+  }
+
+  /** The app went to the background (the screen locked, or the user left): the reminder goes. */
+  appInBackground(): void {
+    if (this.current.lockReminder) this.update({ lockReminder: false });
   }
 
   /** Starts a part again that failed or was stopped on its own. Harmless if it is running. */
@@ -152,6 +190,22 @@ export class PhoneTakenController {
     this.deps.heartbeat.stop();
     this.set(IDLE);
     return true;
+  }
+
+  /**
+   * Called once, after every part has started or failed (the recording, location, the alert's
+   * sending and the link), so that none of them waits on an unlock: an Android app in the
+   * background can't start location, and a text that needs a tap needs the screen.
+   */
+  private async lockOrRemind(): Promise<void> {
+    if (!this.current.active) return;
+    let locked = false;
+    try {
+      locked = await this.deps.lockScreen();
+    } catch {
+      // Not locked: the user is asked to lock it.
+    }
+    if (!locked && this.current.active && this.deps.inForeground()) this.update({ lockReminder: true });
   }
 
   private startPocket(): Promise<void> {
@@ -199,6 +253,8 @@ export class PhoneTakenController {
         live: part(raw.live),
         pocket: part(raw.pocket),
         errors: Array.isArray(raw.errors) ? raw.errors : [],
+        // A reminder belongs to the moment the mode started, not to a restart.
+        lockReminder: false,
       };
     } catch {
       return IDLE;

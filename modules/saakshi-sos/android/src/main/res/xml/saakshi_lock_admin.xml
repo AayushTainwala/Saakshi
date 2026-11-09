@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  "Lock the phone when 'My phone is being taken' starts" (SPEC 5.4; round 2, group 1.7).
+  The force-lock policy only: no wipe, no password rules, nothing else.
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-policies>
+    <force-lock />
+  </uses-policies>
+</device-admin>

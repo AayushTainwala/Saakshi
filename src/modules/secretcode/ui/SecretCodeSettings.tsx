@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AppText, Button, Card } from '@/components';
 
-import { useResetMethod, useSecretCode } from '../instance';
+import { useRecoveryWhy, useResetMethod, useSecretCode } from '../instance';
 import { openCodeScreen } from '../request';
 import { formatDayIST } from './day';
 
@@ -18,6 +18,7 @@ export function SecretCodeSettings() {
   const { t } = useTranslation('secretcode');
   const state = useSecretCode();
   const method = useResetMethod();
+  const why = useRecoveryWhy();
 
   return (
     <Card>
@@ -40,7 +41,7 @@ export function SecretCodeSettings() {
                 </AppText>
               ) : (
                 <AppText color="warning" accessibilityLiveRegion="polite">
-                  {t('settings.recoveryMissing')}
+                  {why === 'old-android' ? t('settings.recoveryMissingOldAndroid') : t('settings.recoveryMissing')}
                 </AppText>
               )}
               <Button

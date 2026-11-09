@@ -4,4 +4,5 @@
   <string name="saakshi_quick_widget_description">साक्षी की SOS स्क्रीन खोलता है</string>
   <string name="saakshi_quick_widget_text">SOS</string>
   <string name="saakshi_quick_channel">क्विक अलर्ट</string>
+  <string name="saakshi_lock_admin_description">“मेरा फ़ोन लिया जा रहा है” शुरू होने पर स्क्रीन लॉक करता है। यह और कुछ नहीं करता।</string>
 </resources>

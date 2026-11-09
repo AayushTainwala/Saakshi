@@ -8,9 +8,9 @@ import { AppText, Button, Card, TextField } from '@/components';
 import { spacing, useTheme } from '@/theme';
 
 import { checkNewCode, type CodeProblem } from '../code';
-import { resetWithPhonePasscode, resetWithRecoveryCode, secretCode, useResetMethod, useSecretCode } from '../instance';
+import { resetWithPhonePasscode, resetWithRecoveryCode, secretCode, useRecoveryWhy, useResetMethod, useSecretCode } from '../instance';
 import { formatRecoveryCode, spellRecoveryCode } from '../recovery';
-import type { ResetMethod } from '../reset';
+import type { RecoveryWhy, ResetMethod } from '../reset';
 import { type CodeScreenMode, settleCodeRequest } from '../request';
 import { type Protected, whatIsRunning } from '../running';
 import type { RecoveryResult, SecretCodeState, VerifyResult } from '../store';
@@ -55,8 +55,18 @@ function useNow(until: number | null): number {
 }
 
 /** What the screen says a forgotten code can be reset with, on this phone. */
-function aboutKey(method: ResetMethod): 'about.passcode' | 'about.recovery' | 'about.none' {
-  return method === 'passcode' ? 'about.passcode' : method === 'recovery' ? 'about.recovery' : 'about.none';
+function aboutKey(method: ResetMethod, why: RecoveryWhy): 'about.passcode' | 'about.recovery' | 'about.recoveryOldAndroid' | 'about.none' {
+  if (method === 'recovery') return why === 'old-android' ? 'about.recoveryOldAndroid' : 'about.recovery';
+  return method === 'passcode' ? 'about.passcode' : 'about.none';
+}
+
+/** How the reset is explained under "Forgot the code?" and on the recovery-code step. */
+function explainKey(
+  method: ResetMethod,
+  why: RecoveryWhy,
+): 'reset.explain.passcode' | 'reset.explain.recovery' | 'reset.explain.recoveryOldAndroid' | 'reset.explain.none' {
+  if (method === 'recovery') return why === 'old-android' ? 'reset.explain.recoveryOldAndroid' : 'reset.explain.recovery';
+  return method === 'passcode' ? 'reset.explain.passcode' : 'reset.explain.none';
 }
 
 /**
@@ -64,7 +74,8 @@ function aboutKey(method: ResetMethod): 'about.passcode' | 'about.recovery' | 'a
  * enter the code, set it, change it, remove it, or make a new recovery code. What it shows follows
  * the stored state at once.
  *
- * On a phone with no screen lock, setting the code also makes a recovery code, shown here once
+ * On a phone with no screen lock, or on Android 7 to 10 (group 1.7), setting the code also makes a
+ * recovery code, shown here once
  * (except when the code is set to start "My phone is being taken": nobody should have to copy a
  * code down then; Saakshi asks for one later, `RecoveryCodeReminder`).
  */
@@ -81,6 +92,8 @@ export function SecretCodeScreen({
   const { colors } = useTheme();
   const state = useSecretCode();
   const method = useResetMethod();
+  const why = useRecoveryWhy();
+  const noRecovery = why === 'old-android' ? 'reset.noRecoveryOldAndroid' : 'reset.noRecovery';
   const [chosenStep, setStep] = useState<Step | null>(null);
   const [current, setCurrent] = useState<string | null>(null);
   const [first, setFirst] = useState<string | null>(null);
@@ -104,8 +117,8 @@ export function SecretCodeScreen({
   // No reset while something runs: whoever holds the phone and its passcode could otherwise reset
   // the code and switch the protection off.
   const canReset = step === 'current' && mode !== 'recovery' && whatIsRunning().length === 0;
-  // A new code on a phone with no screen lock comes with a recovery code, except when it is set to
-  // start "My phone is being taken" at once.
+  // A new code on a phone that resets with a recovery code (no screen lock, or Android 7 to 10)
+  // comes with one, except when it is set to start "My phone is being taken" at once.
   const makesRecovery = method === 'recovery' && !(mode === 'set' && reason === 'phone-taken');
 
   const refused = (problem: CodeProblem | 'already-set'): string =>
@@ -124,7 +137,7 @@ export function SecretCodeScreen({
 
   const recoveryRefused = (result: Exclude<RecoveryResult, { ok: true }>): Message => {
     if (result.reason === 'format') return { text: t('recovery.format'), tone: 'danger' };
-    if (result.reason === 'no-recovery') return { text: t('reset.noRecovery'), tone: 'danger' };
+    if (result.reason === 'no-recovery') return { text: t(noRecovery), tone: 'danger' };
     return failed(result, 'recovery');
   };
 
@@ -205,9 +218,9 @@ export function SecretCodeScreen({
     });
 
   const forgot = () => {
-    if (method === 'none') return setMessage({ text: t('reset.oldAndroid'), tone: 'danger' });
+    if (method === 'none') return setMessage({ text: t('reset.none'), tone: 'danger' });
     if (method === 'recovery') {
-      if (!state.recovery) return setMessage({ text: t('reset.noRecovery'), tone: 'danger' });
+      if (!state.recovery) return setMessage({ text: t(noRecovery), tone: 'danger' });
       setMessage(null);
       return setStep('recovery-entry');
     }
@@ -277,7 +290,7 @@ export function SecretCodeScreen({
           <AppText variant="heading" accessibilityRole="header">
             {t('recovery.enter.heading')}
           </AppText>
-          <AppText color="textMuted">{t('reset.explain.recovery')}</AppText>
+          <AppText color="textMuted">{t(explainKey('recovery', why))}</AppText>
           <TextField
             label={t('recovery.enter.label')}
             hint={t('recovery.enter.hint')}
@@ -328,13 +341,13 @@ export function SecretCodeScreen({
         {mode === 'confirm' && !state.set ? <AppText>{t('setFirst.body')}</AppText> : null}
         {mode === 'recovery' ? <AppText>{t('recovery.make.body')}</AppText> : null}
         {(mode === 'set' || (mode === 'confirm' && !state.set)) && step !== 'current' ? (
-          <AppText color="textMuted">{t(aboutKey(method))}</AppText>
+          <AppText color="textMuted">{t(aboutKey(method, why))}</AppText>
         ) : null}
         <AppText variant="label">{prompt}</AppText>
         {shownMessage}
         <CodeKeys onComplete={(code) => void complete(code)} disabled={busy || waiting} />
         {canReset ? <Button variant="secondary" label={t('reset.button')} disabled={busy} onPress={forgot} /> : null}
-        {canReset ? <AppText color="textMuted">{t(`reset.explain.${method}`)}</AppText> : null}
+        {canReset ? <AppText color="textMuted">{t(explainKey(method, why))}</AppText> : null}
       </ScrollView>
     </SafeAreaView>
   );

@@ -46,6 +46,14 @@ public class SaakshiSosModule: Module {
       await BugModeActivity.end()
     }
 
+    // Android only: device admin's force-lock (round 2, group 1.7). No iPhone app can lock the
+    // screen, so Saakshi shows "Now lock your phone" instead.
+    Function("lockAdminSupported") { () -> Bool in false }
+    Function("lockAdminActive") { () -> Bool in false }
+    AsyncFunction("lockAdminRequest") { (_: String) -> Bool in false }
+    AsyncFunction("lockAdminRemove") { () -> Bool in false }
+    AsyncFunction("lockNow") { () -> Bool in false }
+
     // Android only: the quick-alert notification. iPhone uses the controls above.
     Function("quickNotificationShow") { (_: String, _: String, _: String) in }
     Function("quickNotificationHide") { () in }

@@ -6,6 +6,7 @@ import { AppText, Button, Card, OptionGroup, Screen } from '@/components';
 import { LIVE_HOURS_CHOICES, type LiveHours, liveLength, useLiveLength } from '@/modules/location';
 import { SecretCodeSettings } from '@/modules/secretcode';
 import { useTrustedContacts } from '@/modules/sos';
+import { LockSettingsCard } from '@/modules/trigger';
 import { usePreferences } from '@/preferences/PreferencesProvider';
 import type { LanguagePreference, ThemePreference } from '@/preferences/store';
 
@@ -52,6 +53,9 @@ export default function SettingsScreen() {
       />
 
       <SecretCodeSettings />
+
+      {/* Android only (round 2, group 1.7). */}
+      <LockSettingsCard />
 
       <Card>
         <AppText variant="heading">{t('trigger.heading')}</AppText>

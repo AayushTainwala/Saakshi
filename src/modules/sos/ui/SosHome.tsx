@@ -13,14 +13,26 @@ import { LiveLocationCard } from './LiveLocationCard';
  * The SOS page (SPEC 5.1; round 2): three swipes (Call 112, I need help, My phone is being taken),
  * Share my location as a plain button under them, then only what is running and a link to
  * Settings → Quick trigger. `phoneTaken` is the third swipe and `running` its state; both come from
- * the route, since "My phone is being taken" builds on this module.
+ * the route, since "My phone is being taken" builds on this module. `first` goes above everything,
+ * and while `firstShown` is true the page scrolls to it (group 1.7: "Now lock your phone").
  */
-export function SosHome({ phoneTaken, running }: { phoneTaken?: ReactNode; running?: ReactNode }) {
+export function SosHome({
+  phoneTaken,
+  running,
+  first,
+  firstShown = false,
+}: {
+  phoneTaken?: ReactNode;
+  running?: ReactNode;
+  first?: ReactNode;
+  firstShown?: boolean;
+}) {
   const { t } = useTranslation('sos');
   const state = useAlertState();
 
   return (
-    <Screen>
+    <Screen scrollToTop={firstShown}>
+      {first}
       <SwipeControl
         testID="swipe-112"
         tone="danger"

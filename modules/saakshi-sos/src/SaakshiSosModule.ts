@@ -21,6 +21,20 @@ declare class SaakshiSosModule extends NativeModule<SaakshiSosEvents> {
   quickNotificationShow(title: string, text: string, action: string): void;
   quickNotificationHide(): void;
   quickNotificationEnabled(): boolean;
+  /**
+   * Android: device admin with the force-lock policy only (round 2, group 1.7), so that "My phone
+   * is being taken" can lock the screen. iPhone: always false (no app can lock the screen).
+   */
+  lockAdminSupported(): boolean;
+  /** True while the user has it switched on; it can also be switched off in Android's settings. */
+  lockAdminActive(): boolean;
+  /** Opens Android's "Activate device admin app?" screen with `explanation` on it; resolves whether it is on. */
+  lockAdminRequest(explanation: string): Promise<boolean>;
+  /** Switches it off (removeActiveAdmin) and waits for Android; resolves whether it is still on. */
+  lockAdminRemove(): Promise<boolean>;
+  /** Locks the screen now; resolves false if the admin isn't on. */
+  lockNow(): Promise<boolean>;
+
   /** iPhone: true once if a control, the Action Button or a Shortcut asked for the SOS screen. */
   consumeSosRequest(): boolean;
 

@@ -16,6 +16,18 @@ jest.mock('@/modules/location', () => {
   return { ...actual, liveLength: store, useLiveLength: () => useSyncExternalStore(store.subscribe, store.get) };
 });
 
+// The lock setting (round 2, group 1.7) is Android only; its own tests are in the trigger module.
+const mockLockCard = { android: false };
+jest.mock('@/modules/trigger', () => {
+  const { Text } = jest.requireActual('react-native');
+  return {
+    LockSettingsCard: () =>
+      mockLockCard.android ? (
+        <Text accessibilityRole="header">Lock the phone when &quot;My phone is being taken&quot; starts</Text>
+      ) : null,
+  };
+});
+
 describe('Settings screen', () => {
   beforeAll(() => {
     initI18n('en');
@@ -61,6 +73,7 @@ describe('Settings screen', () => {
       </PreferencesProvider>,
     );
     const headings = screen.getAllByRole('header').map((h) => h.props.children);
+    // iPhone: no lock setting.
     expect(headings.slice(0, 5)).toEqual(['Trusted contacts', 'Live-location length', 'Secret code', 'Quick trigger', 'Language']);
 
     await fireEvent.press(screen.getByRole('button', { name: 'Manage trusted contacts' }));
@@ -73,5 +86,26 @@ describe('Settings screen', () => {
     await fireEvent.press(screen.getByRole('radio', { name: '8 hours' }));
     expect(screen.getByRole('radio', { name: '8 hours' }).props.accessibilityState.checked).toBe(true);
     expect(liveLength.get()).toBe(8);
+  });
+
+  it('on Android, puts "Lock the phone" after the secret code (round 2, group 1.7)', async () => {
+    mockLockCard.android = true;
+    try {
+      await render(
+        <PreferencesProvider initial={{ language: 'en', theme: 'system' }}>
+          <SettingsScreen />
+        </PreferencesProvider>,
+      );
+      const headings = screen.getAllByRole('header').map((h) => h.props.children);
+      expect(headings.slice(0, 5)).toEqual([
+        'Trusted contacts',
+        'Live-location length',
+        'Secret code',
+        'Lock the phone when "My phone is being taken" starts',
+        'Quick trigger',
+      ]);
+    } finally {
+      mockLockCard.android = false;
+    }
   });
 });

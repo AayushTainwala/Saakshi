@@ -72,42 +72,15 @@ describe('the battery level in location updates (round 2, groups 1.4 and 1.6)', 
   });
 });
 
-describe("saving mode's GPS (round 2, group 1.6)", () => {
-  it('asks the tracker to slow the running updates, and to go back, once each', async () => {
+describe('saving mode keeps the position updates as they are (round 2, group 1.7)', () => {
+  it('never stops, restarts or changes the running updates', async () => {
     const { live, deps } = setup();
-    const setSaving = jest.fn(async () => true);
-    deps.tracker.setSaving = setSaving;
     await live.start(4, notice);
-    await live.setSaving(true);
     await live.setSaving(true);
     await live.setSaving(false);
-    expect(setSaving.mock.calls).toEqual([[true], [false]]);
-    // Never stopped or restarted for it.
     expect(deps.tracker.stop).not.toHaveBeenCalled();
     expect(deps.tracker.start).toHaveBeenCalledTimes(1);
-  });
-
-  it('carries on sharing if the tracker can not slow down', async () => {
-    const { live, deps, server, saved, setClock } = setup();
-    deps.tracker.setSaving = jest.fn(async () => {
-      throw new Error('refused');
-    });
-    await live.start(4, notice);
-    await live.receive([point(0)]);
-    await live.setSaving(true);
-    expect(saved().active.saving).toBe(true);
-    setClock('2026-10-20T09:05:30Z');
-    await live.receive([point(5)]);
-    expect(server.push).toHaveBeenCalledTimes(2);
-    expect(deps.tracker.stop).not.toHaveBeenCalled();
-  });
-
-  it('asks nothing of the tracker when nothing is shared', async () => {
-    const { live, deps } = setup();
-    const setSaving = jest.fn(async () => true);
-    deps.tracker.setSaving = setSaving;
-    await live.setSaving(true);
-    expect(setSaving).not.toHaveBeenCalled();
+    expect(Object.keys(deps.tracker).sort()).toEqual(['start', 'stop']);
   });
 });
 

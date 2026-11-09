@@ -1,7 +1,7 @@
 import type { ScreenLockResult } from '@native/saakshi-device';
 
 import { memoryCodeStore } from './memory';
-import { resetMethodFor, resetWithPhonePasscode, resetWithRecoveryCode } from '../reset';
+import { recoveryWhyFor, resetMethodFor, resetWithPhonePasscode, resetWithRecoveryCode } from '../reset';
 import { clearRunningChecks, registerRunningCheck, whatIsRunning } from '../running';
 
 function deps(overrides: Partial<Parameters<typeof resetWithPhonePasscode>[0]> = {}) {
@@ -83,8 +83,14 @@ describe('which reset a phone has (round 2, group 1.6)', () => {
     expect(resetMethodFor({ hasScreenLock: false, canAskPasscodeOnly: false })).toBe('recovery');
   });
 
-  it('none on Android 7 to 10 with a screen lock, never a prompt that takes a fingerprint or face', () => {
-    expect(resetMethodFor({ hasScreenLock: true, canAskPasscodeOnly: false })).toBe('none');
+  it('a recovery code on Android 7 to 10 with a screen lock, never a prompt that takes a fingerprint or face (group 1.7)', () => {
+    expect(resetMethodFor({ hasScreenLock: true, canAskPasscodeOnly: false })).toBe('recovery');
+    expect(recoveryWhyFor({ hasScreenLock: true, canAskPasscodeOnly: false })).toBe('old-android');
+    expect(recoveryWhyFor({ hasScreenLock: false, canAskPasscodeOnly: false })).toBe('no-lock');
+    expect(recoveryWhyFor({ hasScreenLock: false, canAskPasscodeOnly: true })).toBe('no-lock');
+  });
+
+  it('none only where the phone could not be asked', () => {
     expect(resetMethodFor(null)).toBe('none');
   });
 });

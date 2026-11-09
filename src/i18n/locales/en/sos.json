@@ -202,6 +202,27 @@
     "stopNote": "It can only be stopped in Saakshi with your secret code.",
     "stop": "Stop",
     "pocketOff": "Sound recording has stopped.",
-    "liveOff": "Location sharing has stopped."
+    "liveOff": "Location sharing has stopped.",
+    "remind": {
+      "title": "Now lock your phone",
+      "ios": "Press the side button.",
+      "android": "Press the power button.",
+      "carriesOn": "Sound recording and location sharing carry on with the screen locked."
+    }
+  },
+  "lock": {
+    "title": "Lock the phone",
+    "heading": "Lock the phone when \"My phone is being taken\" starts",
+    "what": "When you swipe \"My phone is being taken\", Saakshi first starts recording sound, sharing your location and sending your alert. Then it locks the screen, as the power button does. You unlock it as usual.",
+    "nothingElse": "This permission lets Saakshi lock the screen and nothing else: it can't erase your phone or change your screen lock.",
+    "deleting": "While it is on, Android asks for it to be switched off before Saakshi can be deleted.",
+    "offHere": "You can switch it off here at any time, in one tap. It can also be switched off in your phone's settings.",
+    "androidScreen": "Next, Android shows its own screen to confirm. To switch this on, choose to activate it there.",
+    "on": "On. Saakshi locks the screen when \"My phone is being taken\" starts.",
+    "off": "Off. When \"My phone is being taken\" starts, Saakshi asks you to lock the phone yourself.",
+    "switchOn": "Switch on",
+    "switchOff": "Switch off",
+    "failed": "That didn't work. Please try again.",
+    "open": "Open"
   }
 }

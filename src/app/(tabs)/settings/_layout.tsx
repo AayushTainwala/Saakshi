@@ -9,6 +9,7 @@ export default function SettingsLayout() {
       {/* Moved from the SOS tab in round 2 (SPEC 5.8). */}
       <Stack.Screen name="contacts" options={{ title: t('contacts.title', { ns: 'sos' }), headerLargeTitle: false }} />
       <Stack.Screen name="trigger" options={{ title: t('trigger.title', { ns: 'sos' }), headerLargeTitle: false }} />
+      <Stack.Screen name="lock" options={{ title: t('lock.title', { ns: 'sos' }), headerLargeTitle: false }} />
     </Stack>
   );
 }

@@ -68,12 +68,6 @@ export type Tracker = {
   /** Starts position updates that continue with the screen locked. */
   start(notice: TrackerNotice): Promise<void>;
   stop(): Promise<void>;
-  /**
-   * Saving mode's GPS (round 2, group 1.6): slows the position updates already running, where the
-   * phone can do it without stopping and restarting them (iPhone only; see task.ts). Never starts
-   * updates that aren't running. Resolves whether it changed anything.
-   */
-  setSaving?(on: boolean): Promise<boolean>;
 };
 
 export type LiveDeps = {
@@ -155,18 +149,17 @@ export class LiveShareController {
   }
 
   /**
-   * Saving mode on or off (round 2, groups 1.5 and 1.6). Positions are kept and sent every 5
-   * minutes. The phone's location updates are never stopped and restarted for it (a backgrounded
-   * app may not start them again: Android refuses a foreground service then, and iPhone can't
-   * start location updates); where the phone can slow the updates already running without that
-   * (iPhone), the tracker does so. A failure there changes nothing: live location carries on.
+   * Saving mode on or off (round 2, group 1.5). Positions are found as before, at full accuracy,
+   * and kept and sent every 5 minutes, on both phones (owner, 9 Nov 2026; group 1.7 undid 1.6's
+   * coarser iPhone positions). The phone's location updates are never touched for it: a
+   * backgrounded app may not start them again (Android refuses a foreground service then, and
+   * iPhone can't start location updates).
    */
   setSaving(on: boolean): Promise<void> {
     return this.serial(async () => {
       const saved = this.load();
       if (!saved.active || !!saved.active.saving === on) return;
       this.save({ ...saved, active: { ...saved.active, saving: on } });
-      await this.deps.tracker.setSaving?.(on).catch(() => false);
     });
   }
 
