@@ -305,7 +305,9 @@ Questions for the owner from this round go in "Owner questions" as `- [ ] (Round
   - 1 Mbit/s, the old 480p rate, would leave each 720p frame about a third fewer bits than it had at the normal rate.
   - The power saved comes mostly from the encoder doing half the frames; the bit rate mainly saves storage and upload.
 - **The frame rate:** 15 a second comes from the capture request's frame-rate range, as before, and only where the camera offers a range that tops out at 15. The recorder is told 15 only then, else 30, so that the encoder spreads the bit rate over the frames it really gets. The range follows the file being written (`fileSaving`), so a zoom or a charger in the middle of a file doesn't change it.
-- **A small fix:** a new recording now always starts at the normal quality. Before, saving mode left over from a recording stopped at 5% carried into the next one.
+- **Two small fixes in the handover:**
+  - Saving mode now ends with the recording (`stopRecording`, `close`), so the next recording starts at the normal quality. Before, saving mode left over from a recording stopped at 5% carried into the next one. A handover that comes before the recording's start (the battery already at 5%) still applies to its first file.
+  - Whatever fails at the handover, a new file is started, in saving mode if it can be, else at the normal settings, and the camera is sent to it. Before, a failure while closing the old file could leave the recording stopped.
 - **The screen text is true on each phone:**
   - iPhone, unchanged: "at 480p and 15 frames a second" (`battery.handedOverVideoIos`).
   - Android: "Battery at 5%: recording carries on in a new file with less data, and 15 frames a second where the camera allows, to save power." (`battery.handedOverVideoAndroid`).
@@ -352,7 +354,12 @@ Questions for the owner from this round go in "Owner questions" as `- [ ] (Round
   - With a foreground service the library refuses it in the background (`ForegroundServiceStartNotAllowedException` when the app isn't on screen).
   - So Android is left as built: positions are found as before and sent every 5 minutes.
 
-**Tests (58 more, 565 in all):**
+**An independent review of the new native code** (a separate agent, before merging, as in fix round 1) found no compile errors and three problems, all fixed in this pull request:
+- **iPhone:** Expo runs every module's async functions on one shared serial queue (`expo-modules-core`, `AsyncFunctionDefinition.swift`: `defaultQueue`). The passcode prompt blocks its keychain read for as long as the prompt is up, so it would have held up every other module's async calls. It now has its own queue (`PasscodeGate.queue`).
+- **Android:** my first version reset saving mode when a recording started. Body-cam's start reaches the camera thread later, through its service, so a 5% handover that came first would have been undone. The reset is now at the recording's end.
+- **Android, older code:** a failure while closing the old file at the handover could stop the recording (above).
+
+**Tests (59 more, 566 in all):**
 - The passcode reset's outcomes; which reset each kind of phone gets; the recovery-code reset and its rules (running before and after, shared waits).
 - The recovery code: alphabet, uniform draw, format, slow hash and its salt; checked in any case; kept only as a hash; made anew only after the code; kept on change, gone on remove and reset; a code stored before this group.
 - The screens:

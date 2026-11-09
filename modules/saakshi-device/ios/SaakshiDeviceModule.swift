@@ -19,10 +19,12 @@ public class SaakshiDeviceModule: Module {
       true
     }
 
-    // The title is iOS's reason line in the passcode prompt; iOS shows no subtitle.
+    // The title is iOS's reason line in the passcode prompt; iOS shows no subtitle. On its own
+    // queue: the keychain read blocks for as long as the prompt is up, and Expo's default queue for
+    // async functions is one serial queue shared by every module.
     AsyncFunction("confirmScreenLock") { (title: String, _: String) -> String in
       PasscodeGate.confirm(reason: title)
-    }
+    }.runOnQueue(PasscodeGate.queue)
 
     AsyncFunction("pbkdf2Sha256") { (password: String, saltHex: String, iterations: Int, length: Int) throws -> String in
       try SlowHash.pbkdf2Sha256Hex(password: password, saltHex: saltHex, iterations: iterations, length: length)

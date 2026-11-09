@@ -13,10 +13,12 @@ import Security
  * the passcode. Each time, a fresh random value is written and must be read back, so a pass means
  * the passcode was entered just now.
  *
- * The read blocks while iOS shows its prompt, so this runs off the main thread (an Expo
- * AsyncFunction runs on the module's queue).
+ * The read blocks while iOS shows its prompt, so it runs on its own serial queue, off the main
+ * thread and off the queue Expo shares between every module's async functions. Being serial, two
+ * resets can't race on the item.
  */
 enum PasscodeGate {
+  static let queue = DispatchQueue(label: "in.aayushtainwala.saakshi.passcode-gate", qos: .userInitiated)
   private static let service = "in.aayushtainwala.saakshi.passcode-gate"
   private static let account = "reset"
 

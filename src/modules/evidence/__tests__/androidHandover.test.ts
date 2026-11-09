@@ -51,8 +51,24 @@ describe('body-cam at 5% on Android, without rebuilding the camera (round 2, gro
     expect(kotlinFunction(recorder, 'applyRepeatingRequest')).toContain('if (fileSaving && recorder != null) savingFpsRange()');
   });
 
-  it('starts every new recording at the normal quality', () => {
-    expect(kotlinFunction(recorder, 'startRecording')).toContain('lowPower = false');
+  it('ends saving mode with the recording, so the next starts at the normal quality, but keeps a handover that came before the start', () => {
+    expect(kotlinFunction(recorder, 'stopRecording')).toContain('lowPower = false');
+    expect(kotlinFunction(recorder, 'close')).toContain('lowPower = false');
+    // Body-cam's start reaches the camera thread later, through its service: a handover at 5%
+    // that arrives first must still apply to the first file.
+    expect(kotlinFunction(recorder, 'startRecording')).not.toContain('lowPower = false');
+  });
+
+  it('starts a new file and sends the camera to it, whatever fails at the handover', () => {
+    const handOver = kotlinFunction(recorder, 'handOver');
+    const closeOld = handOver.indexOf('finishCurrent(reason)');
+    const startNew = handOver.indexOf('startFile()');
+    const sendCamera = handOver.lastIndexOf('applyRepeatingRequest()');
+    // Closing the old file has its own try, so a failure there doesn't skip the new file.
+    expect(handOver.slice(closeOld, startNew)).toMatch(/catch \(e: Exception\)/);
+    // The camera is sent to the new file outside the new file's try.
+    expect(sendCamera).toBeGreaterThan(handOver.lastIndexOf('startFile()'));
+    expect(handOver.slice(handOver.lastIndexOf('startFile()'), sendCamera + 'applyRepeatingRequest()'.length)).toMatch(/\}\s*\n\s*try \{\s*\n\s*applyRepeatingRequest\(\)/);
   });
 });
 

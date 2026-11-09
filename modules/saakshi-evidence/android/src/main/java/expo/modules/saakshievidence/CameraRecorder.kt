@@ -246,6 +246,7 @@ object CameraRecorder {
     post {
       openToken++
       finishCurrent("stopped")
+      lowPower = false
       checkpointThread?.quitSafely()
       checkpointThread = null
       checkpointHandler = null
@@ -415,29 +416,41 @@ object CameraRecorder {
   fun handOver(reason: String, saving: Boolean) {
     post {
       if (recorder == null) {
+        // Not recording yet (the service's start is still on its way): the first file follows it.
         lowPower = saving
         return@post
       }
+      // Saving power must never stop the recording. Whatever fails here, a new file is started
+      // (in saving mode if it can be, else at the normal settings) and the camera is sent to it.
       try {
         session?.stopRepeating()
         finishCurrent(reason)
-        lowPower = saving
-        pieceIndex++
-        startFile()
-        applyRepeatingRequest()
       } catch (e: Exception) {
-        emit("onRecorderError", mapOf("message" to "The low-battery handover failed: ${e.message ?: e}"))
-        // Saving power must never stop the recording: if the new file couldn't start in saving
-        // mode, it starts at the normal settings instead.
-        if (recorder == null && config != null && lowPower) {
-          try {
-            lowPower = false
-            startFile()
-            applyRepeatingRequest()
-          } catch (again: Exception) {
-            emit("onRecorderError", mapOf("message" to "Recording could not carry on after the low-battery handover: ${again.message ?: again}"))
+        // finishCurrent lets go of the recorder before anything in it can throw; the old file's
+        // marker is then sealed as cut off when the app next opens.
+        emit("onRecorderError", mapOf("message" to "The file before the low-battery handover didn't close cleanly: ${e.message ?: e}"))
+      }
+      lowPower = saving
+      pieceIndex++
+      if (recorder == null && config != null) {
+        try {
+          startFile()
+        } catch (e: Exception) {
+          emit("onRecorderError", mapOf("message" to "The low-battery handover failed: ${e.message ?: e}"))
+          if (recorder == null && lowPower) {
+            try {
+              lowPower = false
+              startFile()
+            } catch (again: Exception) {
+              emit("onRecorderError", mapOf("message" to "Recording could not carry on after the low-battery handover: ${again.message ?: again}"))
+            }
           }
         }
+      }
+      try {
+        applyRepeatingRequest()
+      } catch (e: Exception) {
+        emit("onRecorderError", mapOf("message" to "The camera couldn't be sent to the new file: ${e.message ?: e}"))
       }
     }
   }
@@ -453,9 +466,8 @@ object CameraRecorder {
     post {
       if (recorder != null) return@post
       this.config = config
-      // A new recording starts at the normal quality; saving mode left over from the last one
-      // (stopped while in it) doesn't carry into this one.
-      lowPower = false
+      // lowPower is not reset here: a handover that came before this start (the battery already at
+      // 5%) applies to the first file. It is reset when a recording ends (stopRecording, close).
       pieceIndex = 0
       lastEndedAt = null
       config.outputDir.mkdirs()
@@ -470,6 +482,8 @@ object CameraRecorder {
     post {
       handler?.removeCallbacksAndMessages(PIECE_TOKEN)
       finishCurrent("stopped")
+      // The next recording starts at the normal quality: saving mode doesn't carry into it.
+      lowPower = false
       applyRepeatingRequest()
       config = null
     }
