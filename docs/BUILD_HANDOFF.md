@@ -4,7 +4,7 @@ The pickup file for build sessions. Each stream keeps its own section current: s
 
 ## Where things stand (21 Oct 2026; fix round 1 from 5 Nov; round 2 decided 6 Nov)
 
-- **Round 2 (6 Nov 2026):** Part 1 built (groups 1.1 to 1.5, five stacked pull requests, #31 to #36), not yet run on a phone: see "Round 2" below.
+- **Round 2 (6 Nov 2026):** Part 1 built (groups 1.1 to 1.5, five stacked pull requests, #31 to #36), not yet run on a phone. Group 1.6, the owner's follow-ups of 9 Nov, built in https://github.com/AayushTainwala/Saakshi/pull/41. See "Round 2" below.
 - **Merged into `main`:** #1–#9. That is R1 and R2 as planned, apart from E3 and E7, plus the law checks against the Gazette of India (#9). Since then: the owner's docs and briefs (#10–#15), and fix round 1, groups 1, 2 and 2a (#16–#18; see "Fix round 1" below). Typecheck, lint, all tests and both native builds pass on `main`.
 - **Pace:** no 24-hour deadline (owner, 21 Oct). The next goal is a beta for about 50 testers on iPhone and Android; see BUILD_PLAN.md, section 1, "Road to the beta".
 - **First Release run (21 Oct, iOS only):** the owner set up iOS credentials and the App Store Connect API key with EAS (role App Manager). The EAS build succeeded; the **Submit to TestFlight step failed**. Its log is visible only to someone signed in to GitHub, so the cause isn't known yet. The owner is submitting that build from his Mac with `eas submit --platform ios --latest`. **Stream D:** find the cause and fix the workflow.
@@ -22,7 +22,7 @@ The owner's decisions after his SOS test are in `docs/SPEC.md` (sections 4, 5, 6
 | 1.3 SOS swipes, Pocket recording, "My phone is being taken" | Split in two, as the brief allows. Both merged. **A** (the page, the move, the quick trigger): https://github.com/AayushTainwala/Saakshi/pull/33. **B** ("My phone is being taken", Stop gating, the server migration): https://github.com/AayushTainwala/Saakshi/pull/34. Not yet run on a phone. |
 | 1.4 Alerts (both links, battery level, calm Share my location) | Merged: https://github.com/AayushTainwala/Saakshi/pull/35. Not yet run on a phone. |
 | 1.5 Low battery at 5%, bundle format 0.9 | Merged: https://github.com/AayushTainwala/Saakshi/pull/36. Not yet run on a phone. |
-| 1.6 Follow-ups (passcode-only reset; battery only at 20% or less; Android 5% without a camera rebuild; recovery code; swipe distance; saving-mode GPS) | Not started |
+| 1.6 Follow-ups (passcode-only reset; battery only at 20% or less; Android 5% without a camera rebuild; recovery code; swipe distance; saving-mode GPS) | Built: https://github.com/AayushTainwala/Saakshi/pull/41 (branch `round-2/1-6-follow-ups`, on `main`). Not yet run on a phone. |
 | 2.1–2.3 E7, Google Drive and iCloud Drive | Not started (needs the owner's Google Cloud project; owner's guide "Round 2 setup guide" is in his vault) |
 | 3.1 Protocol `docs/spec/alerts.md` | Not started. **Documents only; needs the owner's review before Part 3 code.** May start with Part 1. |
 | 3.2–3.5 Server, pairing, receiving, silence alarm | Not started (needs the Apple push key and Google's notification service) |
@@ -253,6 +253,124 @@ Questions for the owner from this round go in "Owner questions" as `- [ ] (Round
 **The README must be checked against the owner's bundle walkthrough.** Only the record name changed in it, but the walkthrough is the reference.
 
 **NEEDS OWNER REVIEW:** the new and changed wording, in English and Hindi: `record.json` (`battery.warn`, `battery.handoverSoon`, `battery.handedOverVideo`, `battery.handedOverSound`, `battery.charging`, `ended.lowBattery`), `sos.json` (`message.saving`, `bug.witness`), and the live page's low-battery line.
+
+### Group 1.6: follow-ups to Part 1 (owner, 9 Nov 2026)
+
+**1. The code is reset with the phone's passcode only, never a face or fingerprint** (SPEC 5.3).
+- **A small native module of our own**, `modules/saakshi-device` (Swift and Kotlin, MIT, no new dependency). `expo-local-authentication` is removed; nothing else used it.
+- **iPhone:**
+  - Each reset writes a fresh random value to a keychain item and reads it back. The item's access control is `.devicePasscode` ("Constraint to access an item with a passcode", [Apple](https://developer.apple.com/documentation/security/secaccesscontrolcreateflags/devicepasscode)), kept as `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly`.
+  - The read makes iOS ask for the passcode, with Saakshi's reason (`LAContext.localizedReason` through `kSecUseAuthenticationContext`; `kSecUseOperationPrompt` is deprecated, [Apple](https://developer.apple.com/documentation/security/ksecuseoperationprompt)).
+  - Apple doesn't say in so many words that Face ID can't open such an item. It says `.userPresence` "is equivalent to specifying biometryAny, or, and devicePasscode" ([Apple](https://developer.apple.com/documentation/security/secaccesscontrolcreateflags/userpresence)), so biometry is a separate flag that Saakshi doesn't set. The owner's test (pull request, A) checks it on a phone.
+  - "Has a passcode" is `LAContext.canEvaluatePolicy(.deviceOwnerAuthentication)`, which fails with `passcodeNotSet` without one ([Apple](https://developer.apple.com/documentation/localauthentication/lapolicy/deviceownerauthentication)).
+  - A "when passcode set" item is deleted when the passcode is turned off ([Apple](https://developer.apple.com/documentation/security/ksecattraccessiblewhenpasscodesetthisdeviceonly)); the code handles that as "no screen lock".
+- **Android 11 and later:**
+  - The framework's `BiometricPrompt` with `setAllowedAuthenticators(DEVICE_CREDENTIAL)` alone, from API 30 ([Android](https://developer.android.com/reference/android/hardware/biometrics/BiometricPrompt.Builder#setAllowedAuthenticators(int))), and no negative button (Android refuses one with a device credential).
+  - With the credential alone, Android's BiometricService shows only the PIN, pattern or password and starts no sensor: "If it's only device credential, we don't need to wait…", then `STATE_SHOWING_DEVICE_CREDENTIAL` ([BiometricService.java, Android 11, LineageOS mirror](https://github.com/LineageOS/android_frameworks_base/blob/lineage-18.1/services/core/java/com/android/server/biometrics/BiometricService.java#L1811)).
+  - It needs `USE_BIOMETRIC`, a normal permission granted without asking: `authenticate` is `@RequiresPermission(USE_BIOMETRIC)`, and AuthService enforces it ([AuthService.java#L404](https://github.com/LineageOS/android_frameworks_base/blob/lineage-18.1/services/core/java/com/android/server/biometrics/AuthService.java#L404)). It is the only permission the module adds.
+  - `USE_FINGERPRINT`, which came with `expo-local-authentication`, is gone.
+- **Android 7 to 10: it can't be done, so no passcode reset there** (the brief: "never fall back to a fingerprint or face"). `KeyguardManager.createConfirmDeviceCredentialIntent` opens Settings' confirm screen, and for any app that screen also takes the fingerprint:
+  - **Android 7.1:** `ConfirmDeviceCredentialActivity` launches it as external (`true /* isExternal */`, [L97](https://github.com/LineageOS/android_packages_apps_Settings/blob/cm-14.1/src/com/android/settings/ConfirmDeviceCredentialActivity.java#L97)), and the helper sets `ALLOW_FP_AUTHENTICATION, external` ([L246](https://github.com/LineageOS/android_packages_apps_Settings/blob/cm-14.1/src/com/android/settings/ChooseLockSettingsHelper.java#L246)).
+  - **Android 8.1 and 9:** the same ([8.1](https://github.com/LineageOS/android_packages_apps_Settings/blob/lineage-15.1/src/com/android/settings/password/ChooseLockSettingsHelper.java#L266), [9](https://github.com/LineageOS/android_packages_apps_Settings/blob/lineage-16.0/src/com/android/settings/password/ChooseLockSettingsHelper.java#L286)).
+  - **Android 10:** a biometric prompt (fingerprint or face) comes first, with the PIN as its fallback (`if (isBiometricAllowed(...)) { ... showBiometricPrompt(bpBundle);`, [L218](https://github.com/LineageOS/android_packages_apps_Settings/blob/lineage-17.1/src/com/android/settings/password/ConfirmDeviceCredentialActivity.java#L218)).
+  - **No app can turn the fingerprint off:** only two extras are copied from the caller's intent (`copyOptionalExtras`), and the inner screens aren't exported. Only device-admin policies or "strong auth required" switch it off.
+  - Phone makers' own Settings apps may differ; I couldn't check them.
+  - So on those versions "Forgot the code?" says the code can't be reset there, and the screens say so before a code is chosen. Question below.
+- **The rest is as built:** the reset only while nothing is running, checked before and after the prompt.
+- **The Face ID permission text is removed:** `app.json` (`expo-local-authentication`'s plugin goes; `expo-secure-store` gets `faceIDPermission: false`, since its plugin would otherwise write its own default Face ID text), `src/i18n/native/*.json`, and the optional Face ID block of `store/apple/review-notes.md`. `store/__tests__` checks that no Face ID text or block is left. The built app's Info.plist has no `NSFaceIDUsageDescription` (checked with `npx expo config --type introspect`).
+
+**2. The battery level only at 20% or less** (SPEC 5.2).
+- **The rule lives in one place:** `src/platform/battery/share.ts`, `batteryToShare`. Above 20%, or when the level can't be read:
+  - no position carries `bat`;
+  - the alert has no battery line ("Battery: not known" and its string are gone);
+  - the calm message and "Send the link again" leave it out.
+- **The live page** shows the line only when the newest position carries a level, so a level from an older position, perhaps long out of date, isn't shown. The server is unchanged.
+- **Evidence records** still carry `capture.batteryPercent` at any level. They stay on the phone, and the brief names only what is sent.
+- **The SMS budget is unchanged.** The longest battery line is now "20%" rather than "100%":
+
+  | Message | English | Hindi |
+  |---|---|---|
+  | "I need help" | at most 2 parts; 257 of 306 characters | at most 5 parts; 4 for a usual alert |
+  | "Share my location" | 1 part; 150 of 160 characters | at most 3 parts |
+
+**3. Android body-cam at 5% without rebuilding the camera** (SPEC section 4, low battery).
+- **What stays:** the recording size, the persistent input surface and the capture session. `ensureSizeForPower` and the 480p size are removed.
+- **What changes:** the new file's `MediaRecorder` gets **half the normal video bit rate**: 1.5 Mbit/s at 720p and 3 Mbit/s at 1080p (normally 3 and 6).
+  - **Why half:** at 15 frames a second rather than 30, each frame then gets as many bits as before. So a frame is about as sharp as before (faces, plates), and the file, and later its upload, is half the size.
+  - 1 Mbit/s, the old 480p rate, would leave each 720p frame about a third fewer bits than it had at the normal rate.
+  - The power saved comes mostly from the encoder doing half the frames; the bit rate mainly saves storage and upload.
+- **The frame rate:** 15 a second comes from the capture request's frame-rate range, as before, and only where the camera offers a range that tops out at 15. The recorder is told 15 only then, else 30, so that the encoder spreads the bit rate over the frames it really gets. The range follows the file being written (`fileSaving`), so a zoom or a charger in the middle of a file doesn't change it.
+- **A small fix:** a new recording now always starts at the normal quality. Before, saving mode left over from a recording stopped at 5% carried into the next one.
+- **The screen text is true on each phone:**
+  - iPhone, unchanged: "at 480p and 15 frames a second" (`battery.handedOverVideoIos`).
+  - Android: "Battery at 5%: recording carries on in a new file with less data, and 15 frames a second where the camera allows, to save power." (`battery.handedOverVideoAndroid`).
+  - The bundle spec's line on `"low-battery"` now says the same; no member changed, so it stays 0.9.
+- **The gap at the handover** on Android is now only the time to stop one recorder and start the next on the same surface, as for a fail-safe new file. It is still not measured; `capture.gapBeforeMs` will show it.
+
+**4. A recovery code on a phone with no passcode** (SPEC 5.3).
+- **When it is made:** setting the code on a phone with no screen lock makes a recovery code at the same moment and shows it once (`Your recovery code`, then "I have written it down"). The advice: write it on paper, keep it away from the phone and not as a photo on it, and anyone who has it can reset the code too.
+  - It is never stored, logged or sent; the screen holds it only until that button.
+  - A screen reader reads it character by character.
+- **The code itself:** 12 characters from 31 (the digits 2 to 9, and the capitals without I, L and O), about 2^59 possible codes. Bytes are drawn so every character is equally likely. It is shown as `7KQM-4WXH-9RTD` and typed in any case, with or without the dashes.
+- **What is kept:** a random 16-byte salt and PBKDF2-HMAC-SHA256 with 100,000 iterations (32 bytes), in the same secure-storage item as the code.
+  - The hash runs in native code: CommonCrypto on iPhone; on Android, PBKDF2 written out over the platform's `HmacSHA256`, because Android's own `PBKDF2WithHmacSHA256` exists only from Android 8 and the app supports 7.
+  - The Android code is checked on the JVM against RFC 7914's vectors and against Node's `pbkdf2Sync` (`modules/saakshi-device/verify/pbkdf2.sh`).
+  - The iteration count is stored with the hash, so a later version can raise it.
+- **The reset with it:** "Forgot the code?", then the recovery code. The rules are those of the passcode reset: only while nothing runs, checked before and after.
+  - A wrong recovery code counts towards the same waits as a wrong secret code, and none is taken during a wait.
+  - Something that can't be a recovery code (the wrong length or letters) is refused without counting, since its form is no secret.
+- **It works once (built so):** a reset removes it, and the new code comes with a new recovery code. Changing the code keeps it; removing the code removes it.
+- **A new one:** Settings → Secret code shows, on a phone with no screen lock, when the recovery code was made, and "Make a new recovery code". That asks for the secret code; the old recovery code stops working.
+- **A phone that loses its passcode later**, or a code set without one: a card on the Record page, where Saakshi opens, asks for a recovery code to be made.
+  - **When it shows:** when the code is set, the phone has no screen lock and no recovery code is kept. "Not now" hides it until Saakshi next opens.
+  - **A card, not a dialog:** nothing stands in the way when the SOS screen opens from the quick trigger. It isn't shown while anything runs, and not on the SOS page, which shows only what is running.
+- **Not shown when the code is set to start "My phone is being taken" (built so):** the mode starts at once, and the card asks later.
+- No server, no account, nothing sent.
+
+**5. How far a swipe must go** (SPEC 5.1).
+- **The rule:** the swipe counts when the handle is let go past 85% of its track, or as soon as it reaches the end (built so: at once, before the finger lifts). Let go short of 85%, it springs back.
+  - Only where the handle is counts, never how fast the finger moved, so a flick that falls short does nothing.
+  - The number is `SWIPE_CONFIRM_FRACTION` in `src/components/swipe.ts`. It replaces 1.3A's "6 points from the end".
+- **The tap:** a light one as the handle enters the region, and again if it leaves and comes back.
+  - iPhone: `UIImpactFeedbackGenerator(.light)`.
+  - Android: the window's own touch feedback (`GESTURE_THRESHOLD_ACTIVATE` from Android 14, `CLOCK_TICK` before). It follows the phone's touch-vibration setting and needs no `VIBRATE` permission, which stays blocked.
+- One finger's swipe acts once: a finger kept down at the end and moved again doesn't act a second time.
+
+**6. Saving mode's GPS** (the owner's question of 9 Nov). Read in expo-location 58's source:
+- **iPhone: yes, without a restart.**
+  - Calling `startLocationUpdatesAsync` again for the running task only updates its options (`EXTaskService registerTaskWithName`: "Task already exists. Let's just update its options."). The consumer then sets `desiredAccuracy` and `distanceFilter` on the same running `CLLocationManager` (`EXLocationTaskConsumer setOptions`); nothing is stopped.
+  - It works in the background, where the call checks only permissions it already has.
+  - Built: in saving mode the updates go to about 100 m accuracy (`Accuracy.Balanced`, at which iOS may find the position from Wi-Fi and cell towers rather than the GPS) and a new position after about 100 m. They go back to the normal 10 m and 20 m when saving mode ends.
+  - Saakshi never starts updates this way that aren't running, and a failure changes nothing. The battery saved isn't measured.
+- **Android: no.**
+  - The same call stops and restarts the updates (`LocationTaskConsumer.setOptions`: "Restart location updates", `removeLocationUpdates` then `requestLocationUpdates`).
+  - With a foreground service the library refuses it in the background (`ForegroundServiceStartNotAllowedException` when the app isn't on screen).
+  - So Android is left as built: positions are found as before and sent every 5 minutes.
+
+**Tests (58 more, 565 in all):**
+- The passcode reset's outcomes; which reset each kind of phone gets; the recovery-code reset and its rules (running before and after, shared waits).
+- The recovery code: alphabet, uniform draw, format, slow hash and its salt; checked in any case; kept only as a hash; made anew only after the code; kept on change, gone on remove and reset; a code stored before this group.
+- The screens:
+  - the recovery code shown once, and not when set for "My phone is being taken";
+  - the reset with it, and a new one after; the reminder card;
+  - no reset while running; the Android 7 to 10 message; the passcode-only wording.
+- No Face ID text or block left (store tests).
+- The battery: the 20% rule, positions, alert, calm message, controller, the viewer's newest position, and the budget.
+- The Android handover from the recorder's source (no size change or rebuild, half the bit rate, the frame rate), and the handover wording per platform in both languages.
+- The swipe: 85%, the end at once, a flick, the tap, a small and a large phone.
+- Saving mode's GPS on each platform.
+
+**Not verified:** nothing has run on a phone; the Swift and Kotlin compile only in the Native build workflow. Most important to try:
+- the passcode prompt on an iPhone with Face ID set up, and on Android 11 or later with a fingerprint;
+- the recovery code on a phone with no screen lock;
+- the Android handover at 5% (the gap, the second file's size and frame rate);
+- the swipe with a hurried thumb on a small and a large phone, both hands;
+- iPhone saving mode keeping live location going.
+
+**NEEDS OWNER REVIEW:** the new and changed wording, in English and Hindi:
+- `secretcode.json`: `about.*`, `reset.*` (`explain.*`, `noPasscode`, `failed`, `unavailable`, `noRecovery`, `oldAndroid`, `promptDetail`), `heading.recovery*`, `recovery.*` (the recovery-code screens), `settings.recovery*`, `settings.noReset` and `reminder.*`;
+- `record.json`: `battery.handedOverVideoIos` and `battery.handedOverVideoAndroid`;
+- the recovery-code screen itself.
 
 ## Fix round 1 (iPhone test round 1, A–C)
 
@@ -711,6 +829,8 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [x] (Round 2) **Saving mode sends location every 5 minutes, but the phone still finds it every 30 seconds** (group 1.5). The brief says "location every 5 minutes". At 5% Saakshi is usually in the background, where it may not restart location updates at a slower rate (Android refuses to start a foreground service from the background; iPhone doesn't let an app start location updates there), and a failed restart would stop live location altogether. So positions are found as before and sent in one burst every 5 minutes, which saves the mobile radio but not the GPS. The saving isn't measured. I recommend keeping it as built and measuring on a phone first. Or should the app also try the slower rate when it happens to be on screen at 5%? *Answered 9 Nov:* keep as built and measure on a phone; slow the GPS only if that can't stop live location (group 1.6).
 - [x] (Round 2) **Plugging in at 5% doesn't start a new file** (group 1.5, built so). Saving mode ends and the next file is at the normal quality, but body-cam is one continuous file, so the 480p file carries on until the user stops, or until a later handover. I recommend leaving it: a plug-in can be brief, and each new file is another short gap on Android. Or should plugging in start a normal-quality file at once? *Answered 9 Nov:* yes, as built.
 - [x] (Round 2) **The "battery at 5%" text to contacts goes only from the Android APK** (group 1.5, built so). On iPhone and the Play Store build, a text needs a tap on Send, and at 5% the phone is usually locked; the live page says it instead. Right? *Answered 9 Nov:* as built for texts (iPhone lets no app send a text without the user's tap; the Play build waits for Google's SMS permission). Contacts who have Saakshi get it as a notification (owner, 9 Nov; group 3.1), and the Play build texts it once Google grants the SMS permission.
+- [ ] (Round 2) **Android 7 to 10: no way to reset a forgotten code** (group 1.6). Those versions can't ask for the screen lock alone: their only system screen for it also takes a fingerprint (and on Android 10 a face), and an app can't turn that off. Built so: such a phone with a screen lock has no reset, and Saakshi says so before a code is chosen and on "Forgot the code?". Someone who forgets the code there can't stop anything running, and can't change or remove the code. I recommend giving these phones the recovery code, as for a phone with no screen lock: it weakens nothing, sends nothing, and is a one-line change (`resetMethodFor` in `src/modules/secretcode/reset.ts`). Yes?
+- [ ] (Round 2) **iPhone saving mode's location: about 100 m** (group 1.6, built so). In saving mode the running updates go to about 100 m accuracy and a new position after about 100 m moved, back to 10 m and 20 m when it ends. iOS has no time interval to slow, only the accuracy and distance, and the accuracy is what lets it leave the GPS off. Contacts then see a coarser position at 5% battery. Right, or keep the GPS's accuracy and send every 5 minutes only?
 - [ ] (Stream C) **Helpline list updates.** The Help tab fetches `helplines/helplines.json` from raw.githubusercontent.com each time it opens (a plain GET; nothing of the user's is sent, but GitHub sees the phone's IP address). Keep it automatic, or only on a "Check for updates" tap? And should the list be signed, so that a compromised `main` branch can't change numbers on every phone? Today it is only schema-checked.
 - [ ] (Stream C) **Lawyers and medics list.** The schema (`src/modules/helplines/schema.ts`, `helplines/README.md`) shows name, phone, city, state and languages, and records the registration number, consent date and an expiry (`listedUntil`) in the public file. Is publishing the registration number right, or should it be checked and kept off GitHub? Who collects the written consent, and where is it kept?
 - [ ] (Stream C) **"What police may ask of a phone"** (SPEC G5) is left out of the guide: `docs/research/law.md` has nothing on demands to unlock a phone or give a passcode. It needs its own research from statutes and judgments first. Shall I do that next?
