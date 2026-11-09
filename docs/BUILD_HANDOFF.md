@@ -23,6 +23,7 @@ The owner's decisions after his SOS test are in `docs/SPEC.md` (sections 4, 5, 6
 | 1.4 Alerts (both links, battery level, calm Share my location) | Merged: https://github.com/AayushTainwala/Saakshi/pull/35. Not yet run on a phone. |
 | 1.5 Low battery at 5%, bundle format 0.9 | Merged: https://github.com/AayushTainwala/Saakshi/pull/36. Not yet run on a phone. |
 | 1.6 Follow-ups (passcode-only reset; battery only at 20% or less; Android 5% without a camera rebuild; recovery code; swipe distance; saving-mode GPS) | Not started |
+| 1.7 Lock the phone when "My phone is being taken" starts (Android device admin, force-lock only; on-screen reminder) | Not started (after 1.6) |
 | 2.1–2.3 E7, Google Drive and iCloud Drive | Not started (needs the owner's Google Cloud project; owner's guide "Round 2 setup guide" is in his vault) |
 | 3.1 Protocol `docs/spec/alerts.md` | Not started. **Documents only; needs the owner's review before Part 3 code.** May start with Part 1. |
 | 3.2–3.5 Server, pairing, receiving, silence alarm | Not started (needs the Apple push key and Google's notification service) |
@@ -39,6 +40,10 @@ Questions for the owner from this round go in "Owner questions" as `- [ ] (Round
 **Start prompt for group 1.6** (follow-ups to Part 1; model Opus, effort high):
 
 > You are the builder for Saakshi round 2, group 1.6. Read CLAUDE.md, docs/SPEC.md (sections 4, 5), docs/BUILD_HANDOFF.md ("Round 2", with the Part 1 reports) and docs/briefs/2026-11-06-round-2.md, group 1.6. Do group 1.6 only, on branch `round-2/1-6-follow-ups` from the latest `main`, in one pull request. It needs tests, green typecheck, lint and tests, green native builds, an updated handoff and plain test steps for the owner in the description. Raise questions in the handoff as `- [ ] (Round 2) …` and do not change scope.
+
+**Start prompt for group 1.7** (after 1.6 is merged; model Opus, effort high):
+
+> You are the builder for Saakshi round 2, group 1.7. Read CLAUDE.md, docs/SPEC.md (section 5.4), docs/BUILD_HANDOFF.md ("Round 2") and docs/briefs/2026-11-06-round-2.md, group 1.7. Start with its step 1 (Google Play's policy on device admin) and stop if a rule forbids this use. Then do group 1.7 only, on branch `round-2/1-7-lock-screen` from the latest `main`, in one pull request. It needs tests, green typecheck, lint and tests, green native builds, an updated handoff and plain test steps for the owner in the description. Raise questions in the handoff as `- [ ] (Round 2) …` and do not change scope.
 
 **Start prompt for group 3.1 only** (the alerts protocol, documents only; model Opus, effort high; can run beside Part 1):
 
@@ -730,6 +735,7 @@ Things that must be done or decided before a release goes public. Streams add it
 - [ ] (Stream D, beta) **Dependency audit:** `npm ci` reports 61 known vulnerabilities in build tools. Triage which, if any, reach the app; don't run `npm audit fix --force`.
 - [ ] (Stream D, beta) **TestFlight public link** (Apple's beta review) and **Play closed test** (12 or more testers for 14 days).
 - [ ] (Review, beta) **Rights and safety guides (G1, G2):** the owner decides whether they join the beta.
+- [ ] (Round 2, release) **Device admin on Android (group 1.7):** say in the Play listing and the review notes why Saakshi asks for it (force-lock only, opt-in, switched off in Settings), and in the privacy policy that it reads nothing. If Play's review objects, the Play build can ship without it.
 - [ ] (Round 2, release) **Power-off lock requests.** Draft and file the requests to Apple (Feedback Assistant), Google and phone makers asking for a power-off lock; the release notes say a power-off lock is an essential safety feature, which phones offer it, that we have asked, and how readers can ask too (SPEC G5). **At release, not now.**
 - [ ] (Round 2, release, start early) **Google Play's SMS permission:** apply under "Apps that send SMS alerts in emergency situations" so the Play version sends by itself.
 - [ ] (Round 2, release, start early) **Google's review of email sending** (after round 2, for email contacts).
