@@ -60,7 +60,7 @@ In v1.1, C2PA Content Credentials and motion, compass and network readings are a
 **E6. Rights prompts while recording.** Short on-screen prompts of what to say, such as asking for the grounds of arrest in writing. Drawn on screen only, never burned into the video.
 
 **E7. Copies to the user's cloud.** The user connects their own cloud account, and each finished file or segment uploads when there is signal. Links can be sent to emergency contacts.
-- Google Drive first, using Drive's narrowest permission (only files the app creates). Other providers follow. **Built in round 2 (owner, 6 Nov 2026).** The owner's one-time setup is a Google Cloud project, shared with Android notifications (BUILD_PLAN section 5).
+- **Any cloud service the owner designates (owner, 9 Nov 2026).** The upload side is built so that a service can be added without changing the recorders or the upload queue. **Round 2 builds Google Drive and iCloud Drive.** Google Drive uses Drive's narrowest permission (only files the app creates); the owner's one-time setup is a Google Cloud project, shared with Android notifications. iCloud Drive is for iPhone only and uses the phone's own Apple account, so there is no sign-in in Saakshi; the owner's one-time setup is an iCloud container (BUILD_PLAN section 5). Other services follow as the owner designates them.
 - **Upload parts lengthen as the recording goes on (owner's design, 6 Nov 2026).** A recording is uploaded in byte ranges that start and end on checkpoints: **10-second parts for the first minute, then 30-second parts for the next five minutes, then one-minute parts.** The reason: someone who has not switched the phone off in the first minutes has probably not thought of it, so the early minutes are the ones most worth getting off the phone at once. The parts still rejoin byte for byte (section 4, body-cam, upload parts). **No live audio streaming.** Built so: body-cam uses the same schedule, replacing the 5 Nov "a minute or two".
 - **Saving mode** (below, low battery): uploads go in the same bursts as the location updates.
 - Whether the on-phone copy is encrypted is the user's choice.
@@ -90,7 +90,7 @@ In v1.1, C2PA Content Credentials and motion, compass and network readings are a
 **Low battery (owner, 6 Nov 2026).** At **5%** battery, in **Pocket recording** (and so in "My phone is being taken") and in **body-cam**:
 - the current file closes cleanly with the end reason `low-battery`, and a **new file continues** until the phone dies;
 - **saving mode**: location every 5 minutes, and uploads in the same bursts; the contacts are told "battery at 5%, location now every 5 minutes";
-- **body-cam continues at 480p, 15 frames a second** after 5%, in the new file;
+- **body-cam's new file uses less power** (owner, 9 Nov 2026): on iPhone, 480p at 15 frames a second, made in the file writer without touching the camera; on Android, the same picture size at 15 frames a second and a lower data rate, so the camera is never rebuilt in the middle of a recording;
 - the **evidence camera never stops by itself**: warnings at 10% and 5% only.
 This replaces the 3% stop-and-save of 21–22 Oct for every mode. The bundle format records the handover (bundle spec 0.9).
 
@@ -116,17 +116,17 @@ With a screen reader on, each swipe can be done by activating it and confirming 
 
 ### 5.2 What each action does
 
-- **I need help.** One alert to the people ticked for SOS alerts. It carries the time, the **battery level**, the **live-location link** and the **current-location map link** (Google Maps), and live location starts, for the length set in Settings (default **4 hours**).
-- **Share my location.** Live location only, to the people ticked for live location. The message is calm, for example "I'm sharing my location with you", with the link and the battery level. It is not worded or sent as an alert.
+- **I need help.** One alert to the people ticked for SOS alerts. It carries the time, the **battery level when it is 20% or less**, the **live-location link** and the **current-location map link** (Google Maps), and live location starts, for the length set in Settings (default **4 hours**).
+- **Share my location.** Live location only, to the people ticked for live location. The message is calm, for example "I'm sharing my location with you", with the link, and the battery level when it is 20% or less. It is not worded or sent as an alert.
 - **My phone is being taken.** Section 5.4.
-- Every alert and every location update carries the battery level (owner, 6 Nov 2026).
+- **The battery level is sent and shown only when it is 20% or less** (owner, 9 Nov 2026, narrowing 6 Nov). Above that, or when the phone can't read it, the phone leaves it out of alerts, messages and location updates, so nothing unneeded leaves the phone.
 - The feature is worded as alerting trusted contacts, never as an emergency service. 112 stays one swipe away.
 
 ### 5.3 One secret code
 
 - **One secret code of 4 digits**, set in Settings, used to **turn off anything that was turned on**: body-cam, "My phone is being taken", live location and Pocket recording (owner, 6 Nov 2026). Nothing else in the app uses a code.
 - **Waits get longer after each wrong try** (owner). Built so: two wrong tries cost nothing; then 30 seconds, 1, 2, 5, 15, 30 minutes, and 1 hour from there. The count survives closing the app and restarting the phone. The code is kept only as a salted hash in the phone's secure storage.
-- **A forgotten code is reset with the phone's own passcode** (owner). Built so: only while nothing is running, because whoever holds the phone and its passcode could otherwise reset the code and switch off "My phone is being taken". While something is running, the code screen offers no reset.
+- **A forgotten code is reset with the phone's own passcode, and only the passcode** (owner; no face or fingerprint, owner, 9 Nov 2026). Built so: only while nothing is running, because whoever holds the phone and its passcode could otherwise reset the code and switch off "My phone is being taken". While something is running, the code screen offers no reset.
 - **No Stop control outside the app's code screen** (owner, 6 Nov 2026). Every Stop in the app opens the code screen; Android's body-cam notification loses its Stop button.
 - Built so: obviously guessable codes (one digit repeated, straight runs) are refused with a plain reason.
 
@@ -134,7 +134,7 @@ With a screen reader on, each swipe can be done by activating it and confirming 
 
 One swipe starts everything at once (owner, 6 Nov 2026):
 
-- **the alert** to the people ticked for SOS alerts, with both links and the battery level;
+- **the alert** to the people ticked for SOS alerts, with both links (and the battery level when it is 20% or less);
 - **live location until the battery dies.** Built so: the share has no fixed end; it stays alive while the phone checks in, and the server deletes it a week after the last check-in;
 - **Pocket recording with uploads** (section 4, E8 and E7), in upload parts that lengthen as the recording goes on (section 4, E7);
 - **the low-battery handover** (section 4);
@@ -157,7 +157,7 @@ Round 2 builds SMS and the Saakshi app. After it: Telegram, email, a phone test 
 
 **S2. SOS sends itself on Android.** In the Android APK, SMS goes out with no tap. The Play build keeps tap-to-send until Play approves the emergency-alert exception: the owner applies under "Apps that send SMS alerts in emergency situations" so that the Play version also sends by itself (owner, 6 Nov 2026). On iPhone the user taps Send once, until the Shortcut test shows otherwise.
 
-**S3. Live location by link.** Contacts get a web link that opens in any browser, so they need no app. A small server of ours holds the location only while sharing is on and deletes it when sharing ends. The viewer page shows the battery level, and (section 5.7) the silence warning.
+**S3. Live location by link.** Contacts get a web link that opens in any browser, so they need no app. A small server of ours holds the location only while sharing is on and deletes it when sharing ends. The viewer page shows the battery level when it is 20% or less, and (section 5.7) the silence warning.
 
 **S4. Quick trigger.** Section 5.1.
 
@@ -166,7 +166,7 @@ Round 2 builds SMS and the Saakshi app. After it: Telegram, email, a phone test 
 - Contacts who have Saakshi get alerts **in the app**, not by SMS.
 - **Pairing without accounts**, for example by a QR code that each phone shows and the other scans. Nobody signs up, and we hold no list of users.
 - Alerts reach the contact's phone as a **notification through our server** (Apple's push service and Google's notification service). The alert's content is **encrypted so that only the contact's phone can read it**; the notification itself carries nothing readable. The owner's one-time setup is the Apple push key and the Google Cloud project (BUILD_PLAN section 5).
-- **Received-alerts page.** Who has alerted you; their locations with times on a map (live, or the last five to ten); and the link to their recordings.
+- **Received-alerts page.** Who has alerted you; their locations with times on a map (live, or the last five to ten); and the link to their recordings. **No paid maps** (owner, 9 Nov 2026): the map in the app is free and open source (MapLibre, with OpenFreeMap's free public tiles, made from OpenStreetMap data), with "Open in Maps" beside it.
 - Testing needs a second phone with the TestFlight build (a friend).
 - The protocol is written down before it is built: `docs/spec/alerts.md`, by the Part 3 builder, reviewed before any code.
 
