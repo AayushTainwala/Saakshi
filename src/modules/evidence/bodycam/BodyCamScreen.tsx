@@ -21,6 +21,7 @@ import type { EndReason } from '../types';
 import { LOCK_MESSAGE_MS } from './constants';
 import { doublePress } from './doublePress';
 import { androidBodyCam, type BodyCamEngine, iosBodyCam } from './engine';
+import { handoverNoteKey } from './handover';
 import { startUnlockPractice, type UnlockPractice } from './practice';
 import { setBodyCamRunning } from './running';
 import { type BodyCamSettings, loadBodyCamSettings, saveBodyCamSettings } from './settings';
@@ -258,16 +259,16 @@ export function BodyCamScreen() {
     await stop();
   }, [stop]);
 
-  // SPEC E1, low battery (owner, 6 Nov 2026): a warning at 10%; at 5% the file closes cleanly and a
-  // new one carries on at 480p and 15 frames a second, in saving mode; charging ends saving mode.
-  // Nothing stops by itself.
+  // SPEC E1, low battery (owner, 6 and 9 Nov 2026): a warning at 10%; at 5% the file closes cleanly
+  // and a new one carries on at lower power, in saving mode (iPhone: 480p at 15 frames a second;
+  // Android: the same size with less data); charging ends saving mode. Nothing stops by itself.
   const [batteryNote, setBatteryNote] = useState<string | null>(null);
   const onBattery = useCallback(
     (action: BatteryAction) => {
       if (action.type === 'warn') {
         if (action.percent > 5) setBatteryNote(t('battery.handoverSoon', { percent: action.percent }));
       } else if (action.type === 'low') {
-        setBatteryNote(t('battery.handedOverVideo'));
+        setBatteryNote(t(handoverNoteKey(Platform.OS)));
         void engine.current?.handOver(true);
         setSavingMode(true);
       } else {

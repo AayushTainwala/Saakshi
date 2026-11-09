@@ -26,7 +26,6 @@ export const alertController = new AlertController({
     accuracy: (meters) => i18n.t('sos:message.accuracy', { meters }),
     live: i18n.t('sos:message.live'),
     battery: (percent) => i18n.t('sos:message.battery', { percent }),
-    batteryUnknown: i18n.t('sos:message.batteryUnknown'),
     sent: i18n.t('sos:message.sent'),
   }),
   battery: () => readBatteryPercent(),

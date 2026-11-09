@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type AccessibilityActionEvent, Animated, Modal, PanResponder, StyleSheet, View } from 'react-native';
 
+import { tapLight } from '@/platform/haptics';
 import { spacing, useTheme } from '@/theme';
 
 import { AppText } from './AppText';
 import { Button } from './Button';
 import { Card } from './Card';
-import { isFullSwipe, swipePosition, swipeTravel } from './swipe';
+import { inConfirmRegion, isFullSwipe, reachedEnd, swipePosition, swipeTravel } from './swipe';
 
 export type SwipeTone = 'danger' | 'primary' | 'secondary';
 
@@ -28,35 +29,53 @@ export type SwipeControlProps = {
 };
 
 /**
- * One swipe's gesture: follows the finger along the track; a full swipe confirms, anything less
- * springs back. Made once per control, so a re-render in the middle of a swipe can't hand the
- * finger to a new responder.
+ * One swipe's gesture: follows the finger along the track. It confirms when the handle is let go
+ * past 85% of the track, or as soon as it reaches the end; anything less springs back (swipe.ts).
+ * Only where the handle is counts, never how fast the finger moved, so a flick that doesn't carry
+ * the handle there does nothing. A light tap marks the handle entering the confirm region. Made
+ * once per control, so a re-render in the middle of a swipe can't hand the finger to a new
+ * responder.
  */
 class SwipeGesture {
   readonly position = new Animated.Value(0);
   private travel = 0;
+  /** From a confirm until the handle is back at the start: no new swipe is taken. */
   private locked = false;
+  /** This finger's swipe has confirmed: nothing more it does counts. */
+  private done = false;
+  /** Whether the handle is in the confirm region, to tap once as it enters. */
+  private inRegion = false;
   private onConfirm: () => void = () => undefined;
   private disabled = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor(private readonly haptic: () => void = tapLight) {}
 
   readonly responder = PanResponder.create({
     onStartShouldSetPanResponder: () => !this.disabled && !this.locked,
     onMoveShouldSetPanResponder: () => !this.disabled && !this.locked,
     // Keep the swipe once it has started, even if the page would like to scroll.
     onPanResponderTerminationRequest: () => false,
-    onPanResponderMove: (_event, move) => this.position.setValue(swipePosition(move.dx, this.travel)),
-    onPanResponderRelease: (_event, move) => {
-      if (isFullSwipe(move.dx, this.travel)) {
-        this.locked = true;
-        this.position.setValue(this.travel);
-        this.onConfirm();
-        this.timer = setTimeout(() => this.springBack(), 700);
-      } else {
-        this.springBack();
-      }
+    onPanResponderGrant: () => {
+      this.done = false;
+      this.inRegion = false;
     },
-    onPanResponderTerminate: () => this.springBack(),
+    onPanResponderMove: (_event, move) => {
+      if (this.done) return;
+      this.position.setValue(swipePosition(move.dx, this.travel));
+      const entered = inConfirmRegion(move.dx, this.travel);
+      if (entered && !this.inRegion) this.haptic();
+      this.inRegion = entered;
+      if (reachedEnd(move.dx, this.travel)) this.confirm();
+    },
+    onPanResponderRelease: (_event, move) => {
+      if (this.done) return;
+      if (isFullSwipe(move.dx, this.travel)) this.confirm();
+      else this.springBack();
+    },
+    onPanResponderTerminate: () => {
+      if (!this.done) this.springBack();
+    },
   });
 
   update(onConfirm: () => void, disabled: boolean): void {
@@ -66,6 +85,14 @@ class SwipeGesture {
 
   measure(trackWidth: number): void {
     this.travel = swipeTravel(trackWidth, THUMB, PAD);
+  }
+
+  private confirm(): void {
+    this.done = true;
+    this.locked = true;
+    this.position.setValue(this.travel);
+    this.onConfirm();
+    this.timer = setTimeout(() => this.springBack(), 700);
   }
 
   /** The control has gone: nothing may move it any more. */
@@ -84,9 +111,9 @@ class SwipeGesture {
 }
 
 /**
- * Slide to confirm (SPEC 5.1). A full swipe is needed; a partial one springs back. With a screen
- * reader on, the control is one button: a double tap opens a plain confirmation sheet, so a person
- * who can't swipe isn't shut out.
+ * Slide to confirm (SPEC 5.1). The handle must be let go past 85% of the track, or reach its end;
+ * short of that it springs back. With a screen reader on, the control is one button: a double tap
+ * opens a plain confirmation sheet, so a person who can't swipe isn't shut out.
  */
 export function SwipeControl({ label, detail, tone, confirm, onConfirm, disabled = false, testID }: SwipeControlProps) {
   const { t } = useTranslation('common');

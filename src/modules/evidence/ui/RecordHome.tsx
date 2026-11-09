@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet } from 'react-native';
 
 import { AppText, Button, Screen } from '@/components';
+import { RecoveryCodeReminder } from '@/modules/secretcode';
 import { touchTarget } from '@/theme';
 
 import { recoverInterruptedRecordings } from '../capture/recoverDevice';
@@ -33,6 +34,8 @@ export function RecordHome() {
       {/* Pocket recording, sound only, beside body-cam (round 2; it was bug mode on the SOS tab). */}
       <Button variant="secondary" label={t('pocket.open')} onPress={() => router.push('/record/pocket')} />
       <AppText color="textMuted">{t('pocket.openHint')}</AppText>
+      {/* On a phone with no screen lock and no recovery code yet, Saakshi asks for one (group 1.6). */}
+      <RecoveryCodeReminder />
 
       <AppText variant="heading">{t('locker.heading')}</AppText>
       {sessions.length === 0 ? <AppText color="textMuted">{t('locker.empty')}</AppText> : null}

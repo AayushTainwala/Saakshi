@@ -31,7 +31,8 @@ export function PhoneTakenSwipe() {
   };
 
   const setCode = async () => {
-    if (await openCodeScreen('set')) await start();
+    // Set to start the mode at once: no recovery code is shown now (Saakshi asks for one later).
+    if (await openCodeScreen('set', 'phone-taken')) await start();
   };
 
   return (

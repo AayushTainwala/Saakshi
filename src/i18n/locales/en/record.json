@@ -216,7 +216,8 @@
   "battery": {
     "warn": "Battery {{percent}}%. The camera keeps recording until you stop it or the phone switches off.",
     "handoverSoon": "Battery {{percent}}%. At 5%, recording carries on in a new file at lower quality, to save power.",
-    "handedOverVideo": "Battery at 5%: recording carries on in a new file, at 480p and 15 frames a second, to save power.",
+    "handedOverVideoIos": "Battery at 5%: recording carries on in a new file, at 480p and 15 frames a second, to save power.",
+    "handedOverVideoAndroid": "Battery at 5%: recording carries on in a new file with less data, and 15 frames a second where the camera allows, to save power.",
     "handedOverSound": "Battery at 5%: recording carries on in a new file, to save power.",
     "charging": "Charging: power saving is off, and the next file is at the normal quality."
   },

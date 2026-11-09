@@ -65,14 +65,8 @@
       [
         "expo-secure-store",
         {
-          "faceIDPermission": "Saakshi uses Face ID only when you reset a forgotten secret code, to check that it is you.",
+          "faceIDPermission": false,
           "configureAndroidBackup": false
-        }
-      ],
-      [
-        "expo-local-authentication",
-        {
-          "faceIDPermission": "Saakshi uses Face ID only when you reset a forgotten secret code, to check that it is you."
         }
       ],
       [

@@ -4,18 +4,25 @@ import i18n, { initI18n } from '@/i18n';
 import { PreferencesProvider } from '@/preferences/PreferencesProvider';
 
 import type { memoryCodeStore } from './memory';
+import type { ResetMethod } from '../reset';
 import { requireSecretCode } from '../request';
 import { clearRunningChecks, registerRunningCheck } from '../running';
+import { RecoveryCodeReminder, resetRecoveryReminder } from '../ui/RecoveryCodeReminder';
 import { SecretCodeRoute, SecretCodeScreen } from '../ui/SecretCodeScreen';
 import { SecretCodeSettings } from '../ui/SecretCodeSettings';
 
-// The stored code lives in memory instead of the phone's secure storage.
+// The stored code lives in memory instead of the phone's secure storage, and the phone's screen
+// lock is whatever the test says (`method`).
 jest.mock('../instance', () => {
   const { memoryCodeStore } = jest.requireActual('./memory');
   const { useEffect, useSyncExternalStore } = jest.requireActual('react');
+  const { resetWithRecoveryCode } = jest.requireActual('../reset');
+  const { whatIsRunning } = jest.requireActual('../running');
   const holder = { current: memoryCodeStore() };
+  const method = { current: 'passcode' };
   return {
     holder,
+    method,
     get secretCode() {
       return holder.current.store;
     },
@@ -27,7 +34,15 @@ jest.mock('../instance', () => {
       }, [store]);
       return useSyncExternalStore(store.subscribe, store.getState);
     },
+    useResetMethod: () => method.current,
+    currentResetMethod: () => method.current,
     resetWithPhonePasscode: jest.fn(async () => 'reset'),
+    resetWithRecoveryCode: (input: string) =>
+      resetWithRecoveryCode(input, {
+        running: whatIsRunning,
+        verify: (text: string) => holder.current.store.verifyRecovery(text),
+        clear: () => holder.current.store.clear(),
+      }),
   };
 });
 
@@ -41,7 +56,12 @@ jest.mock('react-native-safe-area-context', () => {
   return { SafeAreaView: View };
 });
 
-const holder = (jest.requireMock('../instance') as { holder: { current: ReturnType<typeof memoryCodeStore> } }).holder;
+const instance = jest.requireMock('../instance') as {
+  holder: { current: ReturnType<typeof memoryCodeStore> };
+  method: { current: ResetMethod };
+  resetWithPhonePasscode: jest.Mock;
+};
+const holder = instance.holder;
 const store = () => holder.current.store;
 
 async function type(digits: string) {
@@ -60,8 +80,11 @@ describe('the secret code screens', () => {
   beforeEach(() => {
     const { memoryCodeStore } = jest.requireActual('./memory');
     holder.current = memoryCodeStore();
+    instance.method.current = 'passcode';
+    instance.resetWithPhonePasscode.mockClear();
     mockPush.mockClear();
     clearRunningChecks();
+    resetRecoveryReminder();
   });
 
   it('shows in Settings what is stored, at once after Set and after Remove', async () => {
@@ -198,6 +221,162 @@ describe('the secret code screens', () => {
     await screen.findByText('Enter your secret code to stop body-cam');
     await act(async () => view.unmount());
     await expect(backedOut).resolves.toBe(false);
+  });
+
+  it('says a forgotten code is reset with the passcode only, never a face or fingerprint (round 2, group 1.6)', async () => {
+    await store().setCode('2580');
+    await render(wrap(<SecretCodeScreen mode="change" onDone={jest.fn()} />));
+    await screen.findByRole('button', { name: 'Forgot the code?' });
+    expect(
+      screen.getByText("A forgotten code can be reset with this phone's own passcode (not a face or fingerprint), but only while nothing is running in Saakshi."),
+    ).toBeTruthy();
+    expect(screen.queryByText(/face or fingerprint unlock, if that is set up/)).toBeNull();
+  });
+
+  it('on Android 7 to 10, says the code can not be reset rather than use a prompt that takes a fingerprint', async () => {
+    instance.method.current = 'none';
+    await store().setCode('2580');
+    await render(wrap(<SecretCodeScreen mode="change" onDone={jest.fn()} />));
+    await fireEvent.press(await screen.findByRole('button', { name: 'Forgot the code?' }));
+    expect(await screen.findByText(/On this version of Android, Saakshi can't ask for the screen lock alone/)).toBeTruthy();
+    expect(instance.resetWithPhonePasscode).not.toHaveBeenCalled();
+    expect(await store().isSet()).toBe(true);
+  });
+
+  describe('a phone with no screen lock: the recovery code', () => {
+    beforeEach(() => {
+      instance.method.current = 'recovery';
+    });
+
+    /** The code on the screen, as shown: "7KQM-4WXH-9RTD". */
+    const shownCode = () => screen.getByText(/^[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}$/).props.children as string;
+
+    it('is shown once after the code is set, then the screen is done', async () => {
+      const done = jest.fn();
+      await render(wrap(<SecretCodeScreen mode="set" onDone={done} />));
+      expect(await screen.findByText(/Saakshi will also give you a recovery code to write down/)).toBeTruthy();
+      await type('2580');
+      await type('2580');
+      expect(await screen.findByText('Your recovery code')).toBeTruthy();
+      const code = shownCode();
+      expect(screen.getByText(/Write it down on paper and keep it somewhere safe, away from this phone/)).toBeTruthy();
+      expect(done).not.toHaveBeenCalled();
+      await fireEvent.press(screen.getByRole('button', { name: 'I have written it down' }));
+      expect(done).toHaveBeenCalledWith(true);
+      expect(await store().verifyRecovery(code)).toEqual({ ok: true });
+    });
+
+    it('is not shown when the code is set to start "My phone is being taken"', async () => {
+      const done = jest.fn();
+      await render(wrap(<SecretCodeScreen mode="set" reason="phone-taken" onDone={done} />));
+      await type('2580');
+      await type('2580');
+      await waitFor(() => expect(done).toHaveBeenCalledWith(true));
+      expect(screen.queryByText('Your recovery code')).toBeNull();
+      expect(store().getState()).toMatchObject({ set: true, recovery: false });
+    });
+
+    it('resets a forgotten code, and setting a new one gives a new recovery code', async () => {
+      const set = (await store().setCode('2580', { recovery: true })) as { recoveryCode: string };
+      await render(wrap(<SecretCodeScreen mode="change" onDone={jest.fn()} />));
+      expect(await screen.findByText(/a forgotten code can be reset with the recovery code you wrote down/)).toBeTruthy();
+      await fireEvent.press(screen.getByRole('button', { name: 'Forgot the code?' }));
+      expect(await screen.findByText('Reset with your recovery code')).toBeTruthy();
+
+      await fireEvent.changeText(screen.getByLabelText('Recovery code'), 'ABCD-EFGH-JKMN');
+      await fireEvent.press(screen.getByRole('button', { name: 'Reset the secret code' }));
+      expect(await screen.findByText("That's not the recovery code.")).toBeTruthy();
+      await fireEvent.changeText(screen.getByLabelText('Recovery code'), 'ABC');
+      await fireEvent.press(screen.getByRole('button', { name: 'Reset the secret code' }));
+      expect(await screen.findByText(/A recovery code is 12 letters and numbers/)).toBeTruthy();
+
+      await fireEvent.changeText(screen.getByLabelText('Recovery code'), set.recoveryCode.toLowerCase());
+      await fireEvent.press(screen.getByRole('button', { name: 'Reset the secret code' }));
+      expect(await screen.findByText('The code was reset. Choose a new one.')).toBeTruthy();
+      expect(await store().isSet()).toBe(false);
+
+      await type('4096');
+      await type('4096');
+      expect(await screen.findByText('Your recovery code')).toBeTruthy();
+      expect(shownCode().replace(/-/g, '')).not.toBe(set.recoveryCode);
+    });
+
+    it('offers no reset while something runs', async () => {
+      await store().setCode('2580', { recovery: true });
+      registerRunningCheck('phone-taken', () => true);
+      await render(wrap(<SecretCodeScreen mode="confirm" reason="phone-taken" onDone={jest.fn()} />));
+      await screen.findByText('Enter your secret code to stop "My phone is being taken"');
+      expect(screen.queryByRole('button', { name: 'Forgot the code?' })).toBeNull();
+    });
+
+    it('says so when none was made', async () => {
+      await store().setCode('2580');
+      await render(wrap(<SecretCodeScreen mode="change" onDone={jest.fn()} />));
+      await fireEvent.press(await screen.findByRole('button', { name: 'Forgot the code?' }));
+      expect(await screen.findByText(/no recovery code was made, so the code can't be reset/)).toBeTruthy();
+    });
+
+    it('is made anew in Settings after the secret code, and Settings says when', async () => {
+      await store().setCode('2580');
+      await render(
+        wrap(
+          <>
+            <SecretCodeSettings />
+            <SecretCodeScreen mode="recovery" onDone={jest.fn()} />
+          </>,
+        ),
+      );
+      expect(await screen.findByText(/No recovery code yet/)).toBeTruthy();
+      await fireEvent.press(screen.getByRole('button', { name: 'Make a recovery code' }));
+      expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/secret-code', params: { mode: 'recovery', request: expect.any(String) } });
+
+      await type('1357');
+      expect(await screen.findByText("That's not the code.")).toBeTruthy();
+      await type('2580');
+      expect(await screen.findByText('Your recovery code')).toBeTruthy();
+      // 6 Nov 2026, 10:00 UTC is 15:30 IST, the same day.
+      expect(await screen.findByText('Recovery code made on 06/11/2026.')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Make a new recovery code' })).toBeTruthy();
+    });
+
+    it('is asked for when Saakshi opens, if none is kept; "Not now" waits for the next open', async () => {
+      await store().setCode('2580');
+      const view = await render(wrap(<RecoveryCodeReminder />));
+      expect(await screen.findByText(/only a recovery code can reset it/)).toBeTruthy();
+      await fireEvent.press(screen.getByRole('button', { name: 'Make it now' }));
+      expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/secret-code', params: { mode: 'recovery', request: expect.any(String) } });
+      await fireEvent.press(screen.getByRole('button', { name: 'Not now' }));
+      expect(screen.queryByText('Make a recovery code')).toBeNull();
+      await view.unmount();
+      // Still "Not now" until Saakshi opens again.
+      const again = await render(wrap(<RecoveryCodeReminder />));
+      expect(screen.queryByRole('button', { name: 'Make it now' })).toBeNull();
+      await again.unmount();
+      resetRecoveryReminder();
+      await render(wrap(<RecoveryCodeReminder />));
+      expect(await screen.findByRole('button', { name: 'Make it now' })).toBeTruthy();
+    });
+
+    it('is not asked for once one is kept, while something runs, or on a phone with a screen lock', async () => {
+      await store().setCode('2580', { recovery: true });
+      const kept = await render(wrap(<RecoveryCodeReminder />));
+      await waitFor(() => expect(store().getState().loaded).toBe(true));
+      expect(screen.queryByRole('button', { name: 'Make it now' })).toBeNull();
+      await kept.unmount();
+
+      holder.current = jest.requireActual('./memory').memoryCodeStore();
+      await store().setCode('2580');
+      registerRunningCheck('live-location', () => true);
+      const running = await render(wrap(<RecoveryCodeReminder />));
+      await waitFor(() => expect(store().getState().loaded).toBe(true));
+      expect(screen.queryByRole('button', { name: 'Make it now' })).toBeNull();
+      await running.unmount();
+
+      clearRunningChecks();
+      instance.method.current = 'passcode';
+      await render(wrap(<RecoveryCodeReminder />));
+      expect(screen.queryByRole('button', { name: 'Make it now' })).toBeNull();
+    });
   });
 
   it('works in Hindi', async () => {

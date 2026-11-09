@@ -69,7 +69,7 @@ describe('"My phone is being taken" on the SOS page', () => {
 
     parts.codeIsSet.mockResolvedValue(true);
     await fireEvent.press(screen.getByRole('button', { name: 'Set a secret code' }));
-    expect(mockOpenCodeScreen).toHaveBeenCalledWith('set');
+    expect(mockOpenCodeScreen).toHaveBeenCalledWith('set', 'phone-taken');
     await waitFor(() => expect(parts.startPocket).toHaveBeenCalled());
     mockRunning.bug = true;
     mockRunning.share = true;

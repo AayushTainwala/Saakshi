@@ -3,6 +3,7 @@ import { File, Paths } from 'expo-file-system';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { useSyncExternalStore } from 'react';
+import { Platform } from 'react-native';
 
 import { readBatteryPercent } from '@/platform/battery';
 
@@ -23,22 +24,31 @@ function toPoint(position: Location.LocationObject): LivePoint {
   };
 }
 
+/** The updates' settings: normally, and in saving mode on iPhone (round 2, group 1.6). */
+export function trackingOptions(saving: boolean): Location.LocationTaskOptions {
+  return {
+    // Saving mode, built so: about 100 m (iOS may then find the position without the GPS, from
+    // Wi-Fi and cell towers), and a new position only after moving about 100 m.
+    accuracy: saving ? Location.Accuracy.Balanced : Location.Accuracy.High,
+    timeInterval: 30_000,
+    distanceInterval: saving ? 100 : 20,
+    pausesUpdatesAutomatically: false,
+    showsBackgroundLocationIndicator: true,
+    activityType: Location.ActivityType.Other,
+  };
+}
+
 /**
  * Position updates that carry on with the screen locked, with only "while using" permission:
  * Android runs them in a location foreground service with a notification; iPhone shows the blue
  * location indicator. Both must be started while the app is on screen.
  */
-const tracker: Tracker = {
+export const tracker: Tracker = {
   async start(notice) {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') throw new LocationDeniedError('Location permission was not granted');
     await Location.startLocationUpdatesAsync(TASK, {
-      accuracy: Location.Accuracy.High,
-      timeInterval: 30_000,
-      distanceInterval: 20,
-      pausesUpdatesAutomatically: false,
-      showsBackgroundLocationIndicator: true,
-      activityType: Location.ActivityType.Other,
+      ...trackingOptions(false),
       foregroundService: {
         notificationTitle: notice.title,
         notificationBody: notice.body,
@@ -48,6 +58,21 @@ const tracker: Tracker = {
   },
   async stop() {
     if (await Location.hasStartedLocationUpdatesAsync(TASK)) await Location.stopLocationUpdatesAsync(TASK);
+  },
+  /**
+   * Saving mode's GPS (round 2, group 1.6), iPhone only. expo-location 58, asked again for a task
+   * that runs, only changes the running CLLocationManager's accuracy and distance filter
+   * (EXTaskService registerTaskWithName → EXLocationTaskConsumer setOptions): nothing is stopped,
+   * and it works in the background. On Android the same call stops and restarts the updates
+   * (LocationTaskConsumer.setOptions: removeLocationUpdates, then requestLocationUpdates), and the
+   * library refuses it from the background, so Android is left as it is: positions are only sent
+   * less often. Never starts updates that aren't running.
+   */
+  async setSaving(on) {
+    if (Platform.OS !== 'ios') return false;
+    if (!(await Location.hasStartedLocationUpdatesAsync(TASK))) return false;
+    await Location.startLocationUpdatesAsync(TASK, trackingOptions(on));
+    return true;
   },
 };
 

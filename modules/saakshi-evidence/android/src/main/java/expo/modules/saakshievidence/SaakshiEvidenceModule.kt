@@ -58,7 +58,8 @@ class SaakshiEvidenceModule : Module() {
     Function("bodyCamRunning") { BodyCamService.running }
 
     // The low-battery handover at 5% (round 2, group 1.5): the file being written closes as
-    // "low-battery" and a new one continues; with `saving`, at 480p and 15 frames a second.
+    // "low-battery" and a new one continues; with `saving`, at the same size with a lower bit
+    // rate and 15 frames a second where the camera offers it (group 1.6: the camera isn't rebuilt).
     AsyncFunction("bodyCamHandOver") { reason: String, saving: Boolean ->
       CameraRecorder.handOver(reason, saving)
     }

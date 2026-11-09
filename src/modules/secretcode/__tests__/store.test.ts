@@ -91,7 +91,7 @@ describe('the secret code', () => {
     const waitUntil = clock.now() + 30 * SECOND;
 
     const reopened = clock.reopen();
-    expect(await reopened.load()).toEqual({ loaded: true, set: true, wrongTries: 3, waitUntil });
+    expect(await reopened.load()).toEqual({ loaded: true, set: true, wrongTries: 3, waitUntil, recovery: false, recoveryMadeAt: null });
     expect(await reopened.verify('2580')).toEqual({ ok: false, reason: 'wait', waitUntil });
     clock.advance(30 * SECOND);
     expect(await reopened.verify('0001')).toMatchObject({ wrongTries: 4, waitUntil: clock.now() + MINUTE });
@@ -108,6 +108,7 @@ describe('the secret code', () => {
         storedWhenHashing.push(text ? JSON.parse(text).wrongTries : null);
         return createHash('sha256').update(value).digest('hex');
       },
+      slowHashHex: async () => 'not used',
       now: () => Date.parse('2026-11-06T10:00:00Z'),
     });
     await store.setCode('2580');
@@ -161,6 +162,118 @@ describe('the secret code', () => {
     await store.setCode('2580');
     for (let i = 0; i < 5; i++) await store.verify('0001');
     await store.clear();
-    expect(store.getState()).toEqual({ loaded: true, set: false, wrongTries: 0, waitUntil: null });
+    expect(store.getState()).toEqual({ loaded: true, set: false, wrongTries: 0, waitUntil: null, recovery: false, recoveryMadeAt: null });
+  });
+});
+
+describe('the recovery code (round 2, group 1.6)', () => {
+  it('is made with the code on a phone with no screen lock, and kept only as a salted slow hash', async () => {
+    const memory = memoryCodeStore();
+    const set = await memory.store.setCode('2580', { recovery: true });
+    expect(set).toEqual({ ok: true, recoveryCode: expect.stringMatching(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{12}$/) });
+    const code = (set as { recoveryCode: string }).recoveryCode;
+    const saved = memory.saved()!;
+    expect(saved).not.toContain(code);
+    expect(saved).not.toContain(code.toLowerCase());
+    const recovery = JSON.parse(saved).recovery;
+    expect(recovery).toEqual({ salt: expect.stringMatching(/^[0-9a-f]{32}$/), hash: expect.stringMatching(/^[0-9a-f]{64}$/), iterations: 100_000, madeAt: memory.now() });
+    // The slow hash, with its own salt and 100,000 iterations.
+    expect(memory.slowHash).toHaveBeenCalledWith(`saakshi.recovery.v1|${code}`, recovery.salt, 100_000);
+    expect(memory.store.getState()).toMatchObject({ set: true, recovery: true, recoveryMadeAt: memory.now() });
+  });
+
+  it('is not made unless asked for', async () => {
+    const memory = memoryCodeStore();
+    expect(await memory.store.setCode('2580')).toEqual({ ok: true });
+    expect(JSON.parse(memory.saved()!).recovery).toBeNull();
+    expect(memory.slowHash).not.toHaveBeenCalled();
+  });
+
+  it('is checked in any case, with or without the dashes, and survives a restart', async () => {
+    const memory = memoryCodeStore();
+    const { recoveryCode } = (await memory.store.setCode('2580', { recovery: true })) as { recoveryCode: string };
+    const reopened = memory.reopen();
+    const typed = `${recoveryCode.slice(0, 4).toLowerCase()}-${recoveryCode.slice(4, 8)} ${recoveryCode.slice(8)}`;
+    expect(await reopened.verifyRecovery(typed)).toEqual({ ok: true });
+  });
+
+  it('refuses a wrong one, and something that can not be one without counting it', async () => {
+    const memory = memoryCodeStore();
+    await memory.store.setCode('2580', { recovery: true });
+    expect(await memory.store.verifyRecovery('ABCD-EFGH-JKMN')).toEqual({ ok: false, reason: 'wrong', wrongTries: 1, waitUntil: null });
+    expect(await memory.store.verifyRecovery('ABCD-EFGH-JKM')).toEqual({ ok: false, reason: 'format' });
+    // O and 0, I, L and 1 are not in the alphabet.
+    expect(await memory.store.verifyRecovery('ABCD-EFGH-JKMO')).toEqual({ ok: false, reason: 'format' });
+    expect(memory.store.getState().wrongTries).toBe(1);
+  });
+
+  it('shares the wrong tries and waits with the code, and a right code ends them', async () => {
+    const memory = memoryCodeStore();
+    await memory.store.setCode('2580', { recovery: true });
+    await memory.store.verifyRecovery('ABCD-EFGH-JKMN');
+    await memory.store.verify('0001');
+    expect(await memory.store.verifyRecovery('ABCD-EFGH-JKMN')).toEqual({ ok: false, reason: 'wrong', wrongTries: 3, waitUntil: memory.now() + 30 * SECOND });
+    expect(await memory.store.verifyRecovery('ABCD-EFGH-JKMN')).toEqual({ ok: false, reason: 'wait', waitUntil: memory.now() + 30 * SECOND });
+    memory.advance(30 * SECOND);
+    expect(await memory.store.verify('2580')).toEqual({ ok: true });
+    expect(memory.store.getState().wrongTries).toBe(0);
+  });
+
+  it('says when none is kept, or no code is set', async () => {
+    const memory = memoryCodeStore();
+    expect(await memory.store.verifyRecovery('ABCD-EFGH-JKMN')).toEqual({ ok: false, reason: 'none' });
+    await memory.store.setCode('2580');
+    expect(await memory.store.verifyRecovery('ABCD-EFGH-JKMN')).toEqual({ ok: false, reason: 'no-recovery' });
+  });
+
+  it('is made anew only after the right code, and the old one stops working', async () => {
+    const memory = memoryCodeStore();
+    const { recoveryCode: old } = (await memory.store.setCode('2580', { recovery: true })) as { recoveryCode: string };
+    expect(await memory.store.newRecoveryCode('1357')).toEqual({ ok: false, reason: 'wrong', wrongTries: 1, waitUntil: null });
+    const made = await memory.store.newRecoveryCode('2580');
+    expect(made).toEqual({ ok: true, recoveryCode: expect.stringMatching(/^[23456789A-HJKMNP-Z]{12}$/) });
+    const fresh = (made as { recoveryCode: string }).recoveryCode;
+    expect(fresh).not.toBe(old);
+    expect(await memory.store.verifyRecovery(old)).toMatchObject({ ok: false, reason: 'wrong' });
+    expect(await memory.store.verifyRecovery(fresh)).toEqual({ ok: true });
+  });
+
+  it('can be made later for a code set without one (a phone that lost its passcode)', async () => {
+    const memory = memoryCodeStore();
+    await memory.store.setCode('2580');
+    const made = (await memory.store.newRecoveryCode('2580')) as { ok: true; recoveryCode: string };
+    expect(made.ok).toBe(true);
+    expect(memory.store.getState().recovery).toBe(true);
+    expect(await memory.store.verifyRecovery(made.recoveryCode)).toEqual({ ok: true });
+  });
+
+  it('is kept when the code changes, and goes with a removed code or a reset', async () => {
+    const memory = memoryCodeStore();
+    const { recoveryCode } = (await memory.store.setCode('2580', { recovery: true })) as { recoveryCode: string };
+    expect(await memory.store.changeCode('2580', '4096')).toEqual({ ok: true });
+    expect(await memory.store.verifyRecovery(recoveryCode)).toEqual({ ok: true });
+    expect(await memory.store.removeCode('4096')).toEqual({ ok: true });
+    expect(memory.store.getState()).toMatchObject({ set: false, recovery: false });
+
+    await memory.store.setCode('2580', { recovery: true });
+    await memory.store.clear();
+    expect(memory.store.getState()).toMatchObject({ set: false, recovery: false });
+    expect(JSON.parse(memory.saved()!).recovery).toBeNull();
+  });
+
+  it('reads a code stored before round 2, group 1.6, as one with no recovery code', async () => {
+    const memory = memoryCodeStore();
+    await memory.store.setCode('2580');
+    const before = JSON.parse(memory.saved()!);
+    delete before.recovery;
+    const store = new SecretCodeStore({
+      storage: { read: async () => JSON.stringify(before), write: async () => undefined },
+      randomHex: (bytes) => randomBytes(bytes).toString('hex'),
+      sha256Hex: async (value) => createHash('sha256').update(value).digest('hex'),
+      slowHashHex: async () => 'not used',
+      now: () => Date.now(),
+    });
+    expect(await store.load()).toMatchObject({ set: true, recovery: false });
+    expect(await store.verify('2580')).toEqual({ ok: true });
   });
 });

@@ -1,4 +1,5 @@
 import { type FixResult, mapsLink } from '@/modules/location';
+import { batteryToShare } from '@/platform/battery';
 
 import { formatDateIST, formatIST, formatTimeIST } from './time';
 
@@ -14,10 +15,8 @@ export type AlertLabels = {
   accuracy: (meters: number) => string;
   /** "Live location" */
   live: string;
-  /** "Battery: 82%" */
+  /** "Battery: 12%" (only at 20% or less) */
   battery: (percent: number) => string;
-  /** "Battery: not known" */
-  batteryUnknown: string;
   /** "Sent" */
   sent: string;
 };
@@ -25,13 +24,14 @@ export type AlertLabels = {
 /**
  * The SOS text, "I need help" (SPEC 5.2; round 2, group 1.4). Who it is from is the sender's
  * number. It carries a map link to the best known position (Google Maps) with its accuracy and when
- * the phone took it, the live-location link when it is ready in time, the battery level, and the
- * time it was sent:
+ * the phone took it, the live-location link when it is ready in time, the battery level when it is
+ * 20% or less (group 1.6: otherwise, or when the phone can't read it, there is no battery line),
+ * and the time it was sent:
  *
  *   Saakshi alert: I may need help.
  *   My location: https://maps.google.com/?q=19.07600,72.87770 (within 20 m, 14:31 IST)
  *   Live location: https://aayushtainwala.github.io/Saakshi/live/#…
- *   Battery: 82%
+ *   Battery: 12%
  *   Sent: 20/10/2026 14:32 IST
  *
  * Each link ends its line, so that no punctuation can be taken as part of it.
@@ -55,7 +55,8 @@ export function alertMessage(
     lines.push(labels.noLocation);
   }
   if (extra.liveLink) lines.push(`${labels.live}: ${extra.liveLink}`);
-  lines.push(extra.battery != null ? labels.battery(extra.battery) : labels.batteryUnknown);
+  const battery = batteryToShare(extra.battery);
+  if (battery !== null) lines.push(labels.battery(battery));
   lines.push(`${labels.sent}: ${formatIST(sentAt)}`);
   return lines.join('\n');
 }
@@ -66,7 +67,7 @@ export type ShareLabels = {
   until: (time: string) => string;
   /** "I'm sharing my location with you until I stop." (no fixed end) */
   open: string;
-  /** "Battery 82%." */
+  /** "Battery 12%." (only at 20% or less) */
   battery: (percent: number) => string;
   /** "Follow it here: <link>" */
   follow: (link: string) => string;
@@ -74,9 +75,9 @@ export type ShareLabels = {
 
 /**
  * "Share my location" (SPEC 5.2): a calm message, not an alert, to the people ticked for live
- * location, with the link and the battery level:
+ * location, with the link, and the battery level when it is 20% or less (group 1.6):
  *
- *   I'm sharing my location with you until 18:40 IST. Battery 82%.
+ *   I'm sharing my location with you until 18:40 IST. Battery 12%.
  *   Follow it here: https://aayushtainwala.github.io/Saakshi/live/#…
  *
  * The link comes last, so no full stop can end up in it.
@@ -87,6 +88,7 @@ export function shareMessage(
   labels: ShareLabels,
 ): string {
   const first = [share.persistent ? labels.open : labels.until(formatTimeIST(share.expiresAt))];
-  if (battery != null) first.push(labels.battery(battery));
+  const level = batteryToShare(battery);
+  if (level !== null) first.push(labels.battery(level));
   return `${first.join(' ')}\n${labels.follow(share.link)}`;
 }

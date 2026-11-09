@@ -64,10 +64,3 @@ R2 FEATURES
 - Pocket recording (Record tab): records sound as one file, fingerprinted and signed every 10 seconds, until stopped. Background audio mode with a Live Activity; the orange indicator shows.
 - Quick trigger: a Control Center, Lock Screen and Action Button control (App Intent) opens the SOS screen; nothing is sent until the user slides.
 ```
-
-## Optional: secret code (round 2, if the build has it)
-
-```text
-SECRET CODE
-- Face ID: only to reset a forgotten Saakshi secret code (system prompt: passcode, or Face ID if set up), offered only while nothing records or shares. The code is needed to stop recording or sharing.
-```

@@ -53,8 +53,9 @@ declare class SaakshiEvidenceModule extends NativeModule<SaakshiEvidenceEvents> 
   bodyCamRunning(): boolean;
   /**
    * The low-battery handover at 5% (round 2, group 1.5): the file being written closes with
-   * `reason` ("low-battery") and a new file of the same clip continues; with `saving`, at 480p and
-   * 15 frames a second.
+   * `reason` ("low-battery") and a new file of the same clip continues; with `saving`, at lower
+   * power: iPhone 480p at 15 frames a second (made in the file writer); Android the same picture
+   * size at half the bit rate and 15 frames a second where the camera offers it (group 1.6).
    */
   bodyCamHandOver(reason: string, saving: boolean): Promise<void>;
   /** Saving mode on or off; it applies from the next file. */

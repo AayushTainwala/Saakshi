@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, pbkdf2Sync, randomBytes } from 'node:crypto';
 
 import { SecretCodeStore } from '../store';
 
@@ -20,6 +20,10 @@ export function memoryCodeStore(start = Date.parse('2026-11-06T10:00:00Z')) {
     storage,
     randomHex: (bytes: number) => randomBytes(bytes).toString('hex'),
     sha256Hex: async (value: string) => createHash('sha256').update(value).digest('hex'),
+    // The same PBKDF2-HMAC-SHA256 the native module computes (checked: modules/saakshi-device/verify).
+    slowHashHex: jest.fn(async (secret: string, salt: string, iterations: number) =>
+      pbkdf2Sync(secret, Buffer.from(salt, 'hex'), iterations, 32, 'sha256').toString('hex'),
+    ),
     now: () => time,
   };
   return {
@@ -31,5 +35,6 @@ export function memoryCodeStore(start = Date.parse('2026-11-06T10:00:00Z')) {
     setTime: (ms: number) => void (time = ms),
     now: () => time,
     breakReads: () => void (failRead = true),
+    slowHash: deps.slowHashHex,
   };
 }

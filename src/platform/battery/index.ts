@@ -5,5 +5,6 @@
  */
 export { type BatteryAction, batteryMonitor, HANDOVER_LEVEL, WARN_LEVELS } from './monitor';
 export { readBatteryPercent, toPercent } from './read';
+export { batteryToShare, SHARE_BATTERY_AT_OR_BELOW } from './share';
 export { onSavingMode, setSavingMode } from './saving';
 export { useLowBattery, watchBattery } from './useLowBattery';

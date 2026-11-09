@@ -70,6 +70,19 @@ describe('App Review notes', () => {
     expect(bytes(blocks.join('\n'))).toBeLessThanOrEqual(4000);
   });
 
+  it('ask for no Face ID: the secret code is reset with the passcode only (round 2, group 1.6)', () => {
+    const plist = JSON.parse(readFileSync(join(STORE, '../src/i18n/native/en.json'), 'utf8')).ios;
+    const hindi = JSON.parse(readFileSync(join(STORE, '../src/i18n/native/hi.json'), 'utf8')).ios;
+    expect(plist.NSFaceIDUsageDescription).toBeUndefined();
+    expect(hindi.NSFaceIDUsageDescription).toBeUndefined();
+    expect(blocks.join('\n')).not.toMatch(/Face ID/);
+    const app = JSON.parse(readFileSync(join(STORE, '../app.json'), 'utf8')).expo;
+    const plugins = app.plugins.map((p: string | [string, object]) => (Array.isArray(p) ? p : [p, {}]));
+    expect(plugins.map(([name]: [string]) => name)).not.toContain('expo-local-authentication');
+    // expo-secure-store would otherwise write its own default Face ID text.
+    expect(plugins.find(([name]: [string]) => name === 'expo-secure-store')[1].faceIDPermission).toBe(false);
+  });
+
   it('explain every permission the app asks for on iPhone', () => {
     const plist = JSON.parse(readFileSync(join(STORE, '../src/i18n/native/en.json'), 'utf8')).ios;
     const notes = blocks.join('\n');
@@ -79,7 +92,6 @@ describe('App Review notes', () => {
       NSLocationWhenInUseUsageDescription: 'Location When In Use',
       NSContactsUsageDescription: 'Contacts',
       NSLocationAlwaysAndWhenInUseUsageDescription: 'Location Always',
-      NSFaceIDUsageDescription: 'Face ID',
     };
     for (const key of Object.keys(plist).filter((k) => k.endsWith('UsageDescription'))) {
       expect(named[key]).toBeDefined();

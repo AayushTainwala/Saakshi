@@ -132,8 +132,10 @@
     $('ago').textContent = 'Last seen ' + a.en + ' · ' + a.hi;
     var acc = p.acc != null ? ' · ±' + Math.round(p.acc) + ' m' : '';
     $('detail').textContent = time(p.at) + acc + ' · ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5);
-    // The battery level when the phone sent its newest reading (round 2), with how long ago that was.
-    var withBattery = positions.filter(function (q) { return q.bat != null; })[0];
+    // The battery level, with how long ago it was sent (round 2). Shown only when the newest
+    // position carries one: the phone sends it only at 20% or less (group 1.6), so a level on an
+    // older position may no longer be true.
+    var withBattery = p.bat != null ? p : null;
     if (withBattery) {
       var b = ago(withBattery.at);
       $('battery').textContent = 'Battery ' + withBattery.bat + '% (' + b.en + ') · ' + 'बैटरी ' + withBattery.bat + '% (' + b.hi + ')' +
