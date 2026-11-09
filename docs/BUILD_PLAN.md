@@ -26,8 +26,8 @@ The redesign of the SOS page and of how a phone being taken is protected, with t
 
 | Part | What | Needs from the owner first |
 |---|---|---|
-| **1** | Bugs; Pocket recording moved to Record; the SOS page's three swipes; the secret code; Settings; alerts with both links and the battery level; low battery at 5% (bundle format 0.9) | nothing |
-| **2** | E7: uploads to the user's Google Drive, in upload parts that lengthen | Google Cloud project (guide) |
+| **1** | Bugs; Pocket recording moved to Record; the SOS page's three swipes; the secret code; Settings; alerts with both links and the battery level; low battery at 5% (bundle format 0.9); then follow-ups (1.6) | nothing |
+| **2** | E7: uploads to the user's own cloud (Google Drive and iCloud Drive; built so the owner can designate others), in upload parts that lengthen | Google Cloud project; iCloud container (guide) |
 | **3** | Saakshi-to-Saakshi (pairing, encrypted alerts, push, the received-alerts page) and the silence alarm | Apple push key, Google notification service (guide) |
 | **4** | The first-open walkthrough, with the phone's own protections | the power-off research (done before Part 4 starts) |
 
@@ -99,4 +99,4 @@ The rules are in [CLAUDE.md](../CLAUDE.md). In short:
    - **Network access:** Custom. Tick "Also include default list of common package managers", and add `expo.dev`, `*.expo.dev` and `*.expo.io` to Allowed domains.
    - **Environment variables:** `BASH_DEFAULT_TIMEOUT_MS=600000` and `BASH_MAX_TIMEOUT_MS=1800000`.
 5. **Start the streams** with the prompts in [BUILD_HANDOFF.md](BUILD_HANDOFF.md).
-6. **Round 2 setup, in one early sitting** (the plain guide is in the owner's vault, "Round 2 setup guide"): (a) an **Apple push key** (`.p8`) for notifications to iPhones; (b) a **Google Cloud project**, with Firebase added for notifications to Android phones, the **Drive** permission screen and sign-in for E7, and (c) a Maps key for the in-app map on Android. The keys and the notification service account are kept in Supabase's and EAS's secret stores, never in the repository. Parts 2 and 3 cannot be finished without them.
+6. **Round 2 setup, in one early sitting** (the plain guide is in the owner's vault, "Round 2 setup guide"): (a) an **Apple push key** (`.p8`) for notifications to iPhones; (b) a **Google Cloud project**, with Firebase added for notifications to Android phones, and the **Drive** permission screen and sign-in for E7; (c) an **iCloud container** for iCloud Drive copies. No paid maps (owner, 9 Nov 2026), so no Maps key. The keys and the notification service account are kept in Supabase's and EAS's secret stores, never in the repository. Parts 2 and 3 cannot be finished without them.
