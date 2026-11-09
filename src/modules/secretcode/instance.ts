@@ -1,12 +1,20 @@
+import SaakshiDevice from '@native/saakshi-device';
 import { CryptoDigestAlgorithm, digestStringAsync, getRandomBytes } from 'expo-crypto';
 import { File, Paths } from 'expo-file-system';
-import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { AppState } from 'react-native';
 
 import i18n from '@/i18n';
 
-import { resetWithPhonePasscode as reset, type ResetOutcome } from './reset';
+import {
+  type RecoveryResetResult,
+  resetMethodFor,
+  type ResetMethod,
+  resetWithPhonePasscode as reset,
+  resetWithRecoveryCode as recoveryReset,
+  type ResetOutcome,
+} from './reset';
 import { whatIsRunning } from './running';
 import { type SecretCodeState, SecretCodeStore } from './store';
 
@@ -41,6 +49,11 @@ export const secretCode = new SecretCodeStore({
   },
   randomHex: (bytes) => toHex(getRandomBytes(bytes)),
   sha256Hex: (text) => digestStringAsync(CryptoDigestAlgorithm.SHA256, text),
+  // PBKDF2-HMAC-SHA256 in native code (modules/saakshi-device), 32 bytes.
+  slowHashHex: async (secret, salt, iterations) => {
+    if (!SaakshiDevice) throw new Error('The SaakshiDevice native module is not available in this build.');
+    return SaakshiDevice.pbkdf2Sha256(secret, salt, iterations, 32);
+  },
   now: () => Date.now(),
 });
 
@@ -56,19 +69,54 @@ export function useSecretCode(): SecretCodeState {
   return useSyncExternalStore(secretCode.subscribe, secretCode.getState);
 }
 
-/** The reset with the phone's own passcode, with the real prompt. */
+/** What this phone has: a screen lock, and a prompt for it alone. Null if it can't be asked. */
+function phoneLock(): { hasScreenLock: boolean; canAskPasscodeOnly: boolean } | null {
+  try {
+    if (!SaakshiDevice) return null;
+    return { hasScreenLock: SaakshiDevice.hasScreenLock(), canAskPasscodeOnly: SaakshiDevice.canAskPasscodeOnly() };
+  } catch {
+    return null;
+  }
+}
+
+/** How a forgotten code is reset on this phone now (round 2, group 1.6). */
+export function currentResetMethod(): ResetMethod {
+  return resetMethodFor(phoneLock());
+}
+
+/**
+ * How a forgotten code is reset on this phone, read again whenever Saakshi comes back on screen
+ * (the screen lock may have been turned on or off in the phone's Settings meanwhile).
+ */
+export function useResetMethod(): ResetMethod {
+  const [method, setMethod] = useState<ResetMethod>(currentResetMethod);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') setMethod(currentResetMethod());
+    });
+    return () => subscription.remove();
+  }, []);
+  return method;
+}
+
+/** The reset with the phone's own passcode, and only the passcode, with the real prompt. */
 export function resetWithPhonePasscode(): Promise<ResetOutcome> {
   return reset({
     running: whatIsRunning,
-    hasScreenLock: async () => (await LocalAuthentication.getEnrolledLevelAsync()) !== LocalAuthentication.SecurityLevel.NONE,
+    hasScreenLock: async () => phoneLock()?.hasScreenLock ?? false,
     authenticate: async () => {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: i18n.t('secretcode:reset.prompt'),
-        cancelLabel: i18n.t('secretcode:cancel'),
-        disableDeviceFallback: false,
-      });
-      return { success: result.success, noPasscode: !result.success && result.error === 'passcode_not_set' };
+      if (!SaakshiDevice) return 'unavailable';
+      return SaakshiDevice.confirmScreenLock(i18n.t('secretcode:reset.prompt'), i18n.t('secretcode:reset.promptDetail'));
     },
+    clear: () => secretCode.clear(),
+  });
+}
+
+/** The reset with the recovery code, on a phone with no screen lock. */
+export function resetWithRecoveryCode(input: string): Promise<RecoveryResetResult> {
+  return recoveryReset(input, {
+    running: whatIsRunning,
+    verify: (text) => secretCode.verifyRecovery(text),
     clear: () => secretCode.clear(),
   });
 }

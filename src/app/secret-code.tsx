@@ -2,10 +2,10 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 
 import { type CodeScreenMode, type Protected, SecretCodeRoute } from '@/modules/secretcode';
 
-const MODES: readonly CodeScreenMode[] = ['confirm', 'set', 'change', 'remove'];
+const MODES: readonly CodeScreenMode[] = ['confirm', 'set', 'change', 'remove', 'recovery'];
 const PROTECTED: readonly Protected[] = ['body-cam', 'pocket-recording', 'live-location', 'phone-taken'];
 
-/** The one code screen (round 2, group 1.2), full screen without the tab bar. */
+/** The one code screen (round 2, groups 1.2 and 1.6), full screen without the tab bar. */
 export default function SecretCodeScreen() {
   const params = useLocalSearchParams<{ mode?: string; reason?: string; request?: string }>();
   const mode = MODES.includes(params.mode as CodeScreenMode) ? (params.mode as CodeScreenMode) : 'confirm';

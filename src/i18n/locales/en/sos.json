@@ -34,7 +34,6 @@
     "live": "Live location",
     "accuracy": "within {{meters}} m",
     "battery": "Battery: {{percent}}%",
-    "batteryUnknown": "Battery: not known",
     "shareUntil": "I'm sharing my location with you until {{time}}.",
     "shareOpen": "I'm sharing my location with you until I stop.",
     "shareBattery": "Battery {{percent}}%.",

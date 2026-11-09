@@ -34,7 +34,6 @@
     "live": "लाइव लोकेशन",
     "accuracy": "{{meters}} मीटर के भीतर",
     "battery": "बैटरी: {{percent}}%",
-    "batteryUnknown": "बैटरी: पता नहीं",
     "shareUntil": "मेरी लोकेशन {{time}} तक आपके साथ शेयर हो रही है।",
     "shareOpen": "मेरी लोकेशन आपके साथ तब तक शेयर हो रही है जब तक मैं बंद न करूँ।",
     "shareBattery": "बैटरी {{percent}}%।",

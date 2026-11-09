@@ -2,15 +2,19 @@ import { router } from 'expo-router';
 
 import type { Protected } from './running';
 
-/** What the one code screen is opened for. */
-export type CodeScreenMode = 'confirm' | 'set' | 'change' | 'remove';
+/**
+ * What the one code screen is opened for. `recovery`: make a new recovery code, after the code
+ * (round 2, group 1.6).
+ */
+export type CodeScreenMode = 'confirm' | 'set' | 'change' | 'remove' | 'recovery';
 
 const pending = new Map<string, (ok: boolean) => void>();
 let next = 0;
 
 /**
  * Opens the one full-screen code screen and resolves when it is done: true when the right code was
- * entered (or, for "set", a code was set), false when the user backed out.
+ * entered (or, for "set", a code was set), false when the user backed out. `reason` says what for:
+ * for "set", `phone-taken` means the code is set to start "My phone is being taken" at once.
  */
 export function openCodeScreen(mode: CodeScreenMode, reason?: Protected): Promise<boolean> {
   const request = String(++next);

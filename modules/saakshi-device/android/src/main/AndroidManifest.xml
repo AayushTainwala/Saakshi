@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!--
+    The system's own screen-lock prompt (BiometricPrompt with DEVICE_CREDENTIAL alone, Android 11+),
+    used only to reset a forgotten secret code. Android requires this permission for the prompt
+    even when it asks only for the PIN, pattern or password; it is a normal permission, granted
+    without asking. No fingerprint or face is ever asked for (round 2, group 1.6).
+  -->
+  <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+</manifest>

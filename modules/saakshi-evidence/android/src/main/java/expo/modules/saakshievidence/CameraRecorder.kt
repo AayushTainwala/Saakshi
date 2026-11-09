@@ -104,13 +104,15 @@ object CameraRecorder {
   /** Degrees to turn the picture upright, for MPEG-TS, which has no field for it. Null for MP4. */
   private var currentRotation: Int? = null
   /**
-   * Saving mode (round 2, group 1.5): from 5% battery, files are 480p at 15 frames a second. It
-   * ends when the phone is charged; from then the next file is at the normal quality.
+   * Saving mode (round 2, groups 1.5 and 1.6): from 5% battery, each new file is at the same
+   * picture size, with a lower video bit rate and 15 frames a second where the camera offers it.
+   * The camera's session and the persistent surface stay as they are (owner, 9 Nov 2026: the camera
+   * is never rebuilt in the middle of a recording). It ends when the phone is charged; from then
+   * the next file is at the normal quality.
    */
   private var lowPower = false
-  /** The sizes the camera can record, and the quality asked for, to choose the size again. */
-  private var recordSizes: Array<Size> = emptyArray()
-  private var quality = 720
+  /** Whether the file being written was started in saving mode: its frame rate stays until it ends. */
+  private var fileSaving = false
   private var fpsRanges: Array<android.util.Range<Int>>? = null
 
   val isRecording: Boolean get() = recorder != null
@@ -182,10 +184,9 @@ object CameraRecorder {
       activeArray = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
       sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
       val map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
-      recordSizes = map?.getOutputSizes(MediaRecorder::class.java) ?: emptyArray()
-      this.quality = quality
+      val recordSizes = map?.getOutputSizes(MediaRecorder::class.java) ?: emptyArray()
       fpsRanges = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
-      videoSize = chooseSize(recordSizes, quality, lowPower)
+      videoSize = chooseSize(recordSizes, quality)
       makePreviewSurface()
 
       orientationListener = object : OrientationEventListener(context.applicationContext) {
@@ -245,6 +246,7 @@ object CameraRecorder {
     post {
       openToken++
       finishCurrent("stopped")
+      lowPower = false
       checkpointThread?.quitSafely()
       checkpointThread = null
       checkpointHandler = null
@@ -286,13 +288,7 @@ object CameraRecorder {
     if (previewSurface != null) onPreviewSize?.invoke(videoSize)
   }
 
-  private fun chooseSize(sizes: Array<Size>, quality: Int, saving: Boolean = false): Size {
-    if (saving) {
-      // 480p: the widest the camera offers at 480 lines (854, 864, 720 or 640 wide), else the
-      // smallest 16:9 size at 480 lines or more.
-      sizes.filter { it.height == 480 && it.width <= 864 }.maxByOrNull { it.width }?.let { return it }
-      sizes.filter { it.width * 9 == it.height * 16 && it.height >= 480 }.minByOrNull { it.height }?.let { return it }
-    }
+  private fun chooseSize(sizes: Array<Size>, quality: Int): Size {
     val target = if (quality >= 1080) Size(1920, 1080) else Size(1280, 720)
     sizes.firstOrNull { it.width == target.width && it.height == target.height }?.let { return it }
     val wide = sizes.filter { it.width * 9 == it.height * 16 && it.width <= target.width }
@@ -352,8 +348,9 @@ object CameraRecorder {
       targets.forEach { addTarget(it) }
       set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
       set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
-      // Saving mode: 15 frames a second from the camera, where it offers a range up to 15.
-      if (lowPower && recorder != null) savingFpsRange()?.let { set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
+      // Saving mode: 15 frames a second from the camera, where it offers a range up to 15, for as
+      // long as the file started in saving mode is written.
+      if (fileSaving && recorder != null) savingFpsRange()?.let { set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
       applyZoom(this)
     }.build()
     s.setRepeatingRequest(request, null, handler)
@@ -391,54 +388,69 @@ object CameraRecorder {
   }
 
   /**
-   * The recording size for the power mode. When it changes, the persistent surface is made again
-   * at the new size and the capture session rebuilt (Camera2 fixes a session's output sizes when it
-   * is made): the one place a resolution change needs a new session.
+   * The video bit rate of a new file (round 2, group 1.6). Normal: 3 Mbit/s at 720p, 6 Mbit/s at
+   * 1080p. Saving mode: half that, which at 15 frames a second gives each frame the same number of
+   * bits as at the normal rate, so each frame is about as sharp as before while the file (and its
+   * upload) is half the size. Where the camera has no 15 frames a second, the file stays at its
+   * usual rate and each frame gets half the bits.
    */
-  private fun ensureSizeForPower() {
-    val wanted = chooseSize(recordSizes, quality, lowPower)
-    if (wanted == videoSize || device == null) return
-    videoSize = wanted
-    session?.close()
-    session = null
-    persistentSurface?.release()
-    persistentSurface = null
-    preparePersistentSurface()
-    rebuildSession()
+  private fun videoBitRate(): Int {
+    val normal = if (videoSize.height >= 1080) 6_000_000 else 3_000_000
+    return if (lowPower) normal / 2 else normal
   }
 
   /**
-   * The low-battery handover at 5% (round 2, group 1.5; bundle format 0.9): the file being written
-   * closes cleanly with `reason` and the next file of the same clip starts, on the same path as a
-   * piece of fixed length. With `saving`, the new file is 480p at 15 frames a second, which needs
-   * the capture session rebuilt at the new size (see ensureSizeForPower).
+   * The frame rate the recorder is told: 15 in saving mode when the camera sends 15 a second (a
+   * range that tops out at 15), else 30, the rate the camera then sends. The encoder spreads the
+   * bit rate over this many frames, so it must match what the camera really sends.
+   */
+  private fun videoFrameRate(): Int = if (lowPower && savingFpsRange() != null) 15 else 30
+
+  /**
+   * The low-battery handover at 5% (round 2, groups 1.5 and 1.6; bundle format 0.9): the file being
+   * written closes cleanly with `reason` and the next file of the same clip starts, on the same
+   * path as a piece of fixed length. With `saving`, the new file has a lower bit rate and, where
+   * the camera offers it, 15 frames a second (the capture request's frame-rate range). The picture
+   * size, the persistent surface and the capture session stay as they are.
    */
   fun handOver(reason: String, saving: Boolean) {
     post {
       if (recorder == null) {
+        // Not recording yet (the service's start is still on its way): the first file follows it.
         lowPower = saving
         return@post
       }
+      // Saving power must never stop the recording. Whatever fails here, a new file is started
+      // (in saving mode if it can be, else at the normal settings) and the camera is sent to it.
       try {
         session?.stopRepeating()
         finishCurrent(reason)
-        lowPower = saving
-        pieceIndex++
-        startFile()
-        applyRepeatingRequest()
       } catch (e: Exception) {
-        emit("onRecorderError", mapOf("message" to "The low-battery handover failed: ${e.message ?: e}"))
-        // Saving power must never stop the recording: if the new file couldn't start at 480p, it
-        // starts at the normal size instead.
-        if (recorder == null && config != null && lowPower) {
-          try {
-            lowPower = false
-            startFile()
-            applyRepeatingRequest()
-          } catch (again: Exception) {
-            emit("onRecorderError", mapOf("message" to "Recording could not carry on after the low-battery handover: ${again.message ?: again}"))
+        // finishCurrent lets go of the recorder before anything in it can throw; the old file's
+        // marker is then sealed as cut off when the app next opens.
+        emit("onRecorderError", mapOf("message" to "The file before the low-battery handover didn't close cleanly: ${e.message ?: e}"))
+      }
+      lowPower = saving
+      pieceIndex++
+      if (recorder == null && config != null) {
+        try {
+          startFile()
+        } catch (e: Exception) {
+          emit("onRecorderError", mapOf("message" to "The low-battery handover failed: ${e.message ?: e}"))
+          if (recorder == null && lowPower) {
+            try {
+              lowPower = false
+              startFile()
+            } catch (again: Exception) {
+              emit("onRecorderError", mapOf("message" to "Recording could not carry on after the low-battery handover: ${again.message ?: again}"))
+            }
           }
         }
+      }
+      try {
+        applyRepeatingRequest()
+      } catch (e: Exception) {
+        emit("onRecorderError", mapOf("message" to "The camera couldn't be sent to the new file: ${e.message ?: e}"))
       }
     }
   }
@@ -454,6 +466,8 @@ object CameraRecorder {
     post {
       if (recorder != null) return@post
       this.config = config
+      // lowPower is not reset here: a handover that came before this start (the battery already at
+      // 5%) applies to the first file. It is reset when a recording ends (stopRecording, close).
       pieceIndex = 0
       lastEndedAt = null
       config.outputDir.mkdirs()
@@ -468,6 +482,8 @@ object CameraRecorder {
     post {
       handler?.removeCallbacksAndMessages(PIECE_TOKEN)
       finishCurrent("stopped")
+      // The next recording starts at the normal quality: saving mode doesn't carry into it.
+      lowPower = false
       applyRepeatingRequest()
       config = null
     }
@@ -504,8 +520,8 @@ object CameraRecorder {
       r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
     }
     r.setOutputFile(file.absolutePath)
-    r.setVideoEncodingBitRate(if (lowPower) 1_000_000 else if (videoSize.height >= 1080) 6_000_000 else 3_000_000)
-    r.setVideoFrameRate(if (lowPower) 15 else 30)
+    r.setVideoEncodingBitRate(videoBitRate())
+    r.setVideoFrameRate(videoFrameRate())
     r.setVideoSize(videoSize.width, videoSize.height)
     r.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
     r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
@@ -526,7 +542,6 @@ object CameraRecorder {
 
   private fun startFile() {
     val cfg = config ?: return
-    ensureSizeForPower()
     val surface = persistentSurface ?: throw IllegalStateException("Camera is not open")
     val stamp = System.currentTimeMillis()
     var useTs = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
@@ -548,6 +563,7 @@ object CameraRecorder {
     val startedAt = System.currentTimeMillis()
     r.start()
     recorder = r
+    fileSaving = lowPower
     currentFile = file
     currentStartedAt = startedAt
     val recording = UUID.randomUUID().toString()

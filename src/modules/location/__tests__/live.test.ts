@@ -41,24 +41,73 @@ function setup() {
 
 const notice = { title: 'Saakshi', body: 'Sharing your location' };
 
-describe('the battery level in every location update (round 2, group 1.4)', () => {
-  it('goes with the newest position of each delivery', () => {
-    expect(withBattery([point(2), point(5), point(3)], 82)).toEqual([point(2), { ...point(5), bat: 82 }, point(3)]);
+describe('the battery level in location updates (round 2, groups 1.4 and 1.6)', () => {
+  it('goes with the newest position of each delivery, at 20% or less', () => {
+    expect(withBattery([point(2), point(5), point(3)], 18)).toEqual([point(2), { ...point(5), bat: 18 }, point(3)]);
+    expect(withBattery([point(2)], 20)).toEqual([{ ...point(2), bat: 20 }]);
+    expect(withBattery([point(2)], 0)).toEqual([{ ...point(2), bat: 0 }]);
     expect(withBattery([point(2)], null)).toEqual([point(2)]);
-    expect(withBattery([], 82)).toEqual([]);
+    expect(withBattery([], 12)).toEqual([]);
+  });
+
+  it('is left out of every position above 20%', () => {
+    for (const level of [21, 64, 100]) {
+      const points = withBattery([point(2), point(5)], level);
+      expect(points).toEqual([point(2), point(5)]);
+      expect(points.some((p) => 'bat' in p)).toBe(false);
+    }
   });
 
   it('is sent to the server with its position, and kept while there is no signal', async () => {
     const { live, server, saved } = setup();
     await live.start(4, notice);
     server.push.mockRejectedValueOnce(new Error('offline'));
-    await live.receive([{ ...point(1), bat: 64 }]);
-    expect(saved().active.pending).toEqual([{ ...point(1), bat: 64 }]);
-    await live.receive([{ ...point(2), bat: 63 }]);
+    await live.receive([{ ...point(1), bat: 14 }]);
+    expect(saved().active.pending).toEqual([{ ...point(1), bat: 14 }]);
+    await live.receive([{ ...point(2), bat: 13 }]);
     expect(server.push).toHaveBeenLastCalledWith('share-1', 'ab'.repeat(32), [
-      { ...point(1), bat: 64 },
-      { ...point(2), bat: 63 },
+      { ...point(1), bat: 14 },
+      { ...point(2), bat: 13 },
     ]);
+  });
+});
+
+describe("saving mode's GPS (round 2, group 1.6)", () => {
+  it('asks the tracker to slow the running updates, and to go back, once each', async () => {
+    const { live, deps } = setup();
+    const setSaving = jest.fn(async () => true);
+    deps.tracker.setSaving = setSaving;
+    await live.start(4, notice);
+    await live.setSaving(true);
+    await live.setSaving(true);
+    await live.setSaving(false);
+    expect(setSaving.mock.calls).toEqual([[true], [false]]);
+    // Never stopped or restarted for it.
+    expect(deps.tracker.stop).not.toHaveBeenCalled();
+    expect(deps.tracker.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('carries on sharing if the tracker can not slow down', async () => {
+    const { live, deps, server, saved, setClock } = setup();
+    deps.tracker.setSaving = jest.fn(async () => {
+      throw new Error('refused');
+    });
+    await live.start(4, notice);
+    await live.receive([point(0)]);
+    await live.setSaving(true);
+    expect(saved().active.saving).toBe(true);
+    setClock('2026-10-20T09:05:30Z');
+    await live.receive([point(5)]);
+    expect(server.push).toHaveBeenCalledTimes(2);
+    expect(deps.tracker.stop).not.toHaveBeenCalled();
+  });
+
+  it('asks nothing of the tracker when nothing is shared', async () => {
+    const { live, deps } = setup();
+    const setSaving = jest.fn(async () => true);
+    deps.tracker.setSaving = setSaving;
+    await live.setSaving(true);
+    expect(setSaving).not.toHaveBeenCalled();
   });
 });
 

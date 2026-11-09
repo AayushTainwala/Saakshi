@@ -42,7 +42,6 @@ function setup(options: { direct?: boolean; contacts?: TrustedContact[]; where?:
       accuracy: (m: number) => `within ${m} m`,
       live: 'Live location',
       battery: (p: number) => `Battery: ${p}%`,
-      batteryUnknown: 'Battery: not known',
       sent: 'Sent',
     }),
     battery: async () => 82,
@@ -160,16 +159,21 @@ describe('AlertController', () => {
     expect(controller.state).toEqual({ phase: 'failed', error: 'no-sms' });
   });
 
-  it('carries the battery level, or says it is not known (round 2, group 1.4)', async () => {
+  it('carries the battery level only at 20% or less, and none when it is not known (round 2, groups 1.4 and 1.6)', async () => {
     const { controller, channels, deps } = setup();
+    const battery = (read: () => Promise<number | null>) => ((deps as { battery: () => Promise<number | null> }).battery = read);
     await controller.start({ immediate: true });
-    expect(channels.composer.send).toHaveBeenLastCalledWith(expect.anything(), expect.stringContaining('Battery: 82%'));
+    expect(channels.composer.send).toHaveBeenLastCalledWith(expect.anything(), expect.not.stringContaining('Battery'));
     controller.dismiss();
-    (deps as { battery: () => Promise<number | null> }).battery = async () => {
-      throw new Error('no reading');
-    };
+    battery(async () => 14);
     await controller.start({ immediate: true });
-    expect(channels.composer.send).toHaveBeenLastCalledWith(expect.anything(), expect.stringContaining('Battery: not known'));
+    expect(channels.composer.send).toHaveBeenLastCalledWith(expect.anything(), expect.stringContaining('Battery: 14%'));
+    controller.dismiss();
+    battery(async () => {
+      throw new Error('no reading');
+    });
+    await controller.start({ immediate: true });
+    expect(channels.composer.send).toHaveBeenLastCalledWith(expect.anything(), expect.not.stringContaining('Battery'));
   });
 
   it('waits for a live link only as long as it waits for the position', async () => {
@@ -207,7 +211,6 @@ function setupDeps(channels: SmsChannels): AlertDeps {
       accuracy: (m: number) => `within ${m} m`,
       live: 'Live location',
       battery: (p: number) => `Battery: ${p}%`,
-      batteryUnknown: 'Battery: not known',
       sent: 'Sent',
     }),
     battery: async () => 82,

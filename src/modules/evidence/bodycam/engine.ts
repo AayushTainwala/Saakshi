@@ -12,8 +12,9 @@ export type BodyCamEngine = {
   stop: (reason?: EndReason) => Promise<void>;
   /**
    * The low-battery handover at 5% (round 2, group 1.5): the file being written closes as
-   * "low-battery" and a new file of the same clip continues, at 480p and 15 frames a second when
-   * `saving`.
+   * "low-battery" and a new file of the same clip continues, at lower power when `saving` (iPhone:
+   * 480p at 15 frames a second; Android: the same size, half the bit rate, 15 frames a second where
+   * the camera offers it).
    */
   handOver: (saving: boolean) => Promise<void>;
   /** Saving mode on or off (off once the phone is charging); it applies from the next file. */
