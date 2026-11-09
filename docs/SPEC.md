@@ -89,7 +89,7 @@ In v1.1, C2PA Content Credentials and motion, compass and network readings are a
 
 **Low battery (owner, 6 Nov 2026).** At **5%** battery, in **Pocket recording** (and so in "My phone is being taken") and in **body-cam**:
 - the current file closes cleanly with the end reason `low-battery`, and a **new file continues** until the phone dies;
-- **saving mode**: location every 5 minutes, and uploads in the same bursts; the contacts are told "battery at 5%, location now every 5 minutes";
+- **saving mode**: location every 5 minutes, and uploads in the same bursts; the contacts are told "battery at 5%, location now every 5 minutes" (owner, 9 Nov 2026): by text where the phone can send one without a tap (the Android APK now, and the Play Store build once Google grants the SMS permission), and by notification to contacts who have Saakshi (Part 3). No text goes from an iPhone, which lets no app send one without a tap; the live page shows the warning for everyone;
 - **body-cam's new file uses less power** (owner, 9 Nov 2026): on iPhone, 480p at 15 frames a second, made in the file writer without touching the camera; on Android, the same picture size at 15 frames a second and a lower data rate, so the camera is never rebuilt in the middle of a recording;
 - the **evidence camera never stops by itself**: warnings at 10% and 5% only.
 This replaces the 3% stop-and-save of 21–22 Oct for every mode. The bundle format records the handover (bundle spec 0.9).
@@ -107,6 +107,8 @@ The SOS page has three controls, each a **swipe** like Apple's slide controls, s
 1. **Call 112.** Dials 112. Saakshi is not an emergency service and never says so.
 2. **I need help.** Alerts the user's trusted contacts (below).
 3. **My phone is being taken.** Starts the protections for a phone that is about to leave the user's hands (section 5.4). It replaces confiscation mode.
+
+**How far a swipe must go** (owner's instruction, 9 Nov 2026: natural to use, still deliberate). Apple's slide-to-unlock, as its patent describes it, completes when the knob is dragged to an unlock region at the end of its channel, and springs back if released short of it. Saakshi follows that, with a region a hurried thumb can reach: the swipe counts when the handle is released past about **85%** of its track, or when it reaches the end; released short of that, it springs back. The phone gives a light tap (haptic) as the handle enters the region. A quick flick that doesn't carry the handle there does nothing.
 
 With a screen reader on, each swipe can be done by activating it and confirming (built so; a person who can't swipe must not be shut out).
 
@@ -127,6 +129,7 @@ With a screen reader on, each swipe can be done by activating it and confirming 
 - **One secret code of 4 digits**, set in Settings, used to **turn off anything that was turned on**: body-cam, "My phone is being taken", live location and Pocket recording (owner, 6 Nov 2026). Nothing else in the app uses a code.
 - **Waits get longer after each wrong try** (owner). Built so: two wrong tries cost nothing; then 30 seconds, 1, 2, 5, 15, 30 minutes, and 1 hour from there. The count survives closing the app and restarting the phone. The code is kept only as a salted hash in the phone's secure storage.
 - **A forgotten code is reset with the phone's own passcode, and only the passcode** (owner; no face or fingerprint, owner, 9 Nov 2026). Built so: only while nothing is running, because whoever holds the phone and its passcode could otherwise reset the code and switch off "My phone is being taken". While something is running, the code screen offers no reset.
+- **A phone with no passcode gets a recovery code** (owner, 9 Nov 2026). Setting the secret code on a phone with no screen lock also sets up a recovery code, shown once, for the user to keep away from the phone. It resets the secret code under the same rules as the passcode: only while nothing is running, and wrong tries count towards the waits. Nothing is sent anywhere.
 - **No Stop control outside the app's code screen** (owner, 6 Nov 2026). Every Stop in the app opens the code screen; Android's body-cam notification loses its Stop button.
 - Built so: obviously guessable codes (one digit repeated, straight runs) are refused with a plain reason.
 
