@@ -609,7 +609,7 @@ describe('evidence bundle', () => {
     expect(report).toContain(`Chain head (SHA-256 of the last record): ${records[2].recordSha256}`);
     const manifest = JSON.parse(new TextDecoder().decode(files.get('manifest.json')!));
     expect(manifest.chainHead).toBe(records[2].recordSha256);
-    expect(manifest).toMatchObject({ version: '0.10', session: state.id, name: '2026-10-20 14-32 IST Camera', certificate: null });
+    expect(manifest).toMatchObject({ version: '0.11', session: state.id, name: '2026-10-20 14-32 IST Camera', certificate: null });
     expect(manifest.records[1]).toEqual({
       record: 'Signed records/0001 video 1.json',
       signature: 'Signed records/0001 video 1.json.sig',

@@ -133,7 +133,7 @@ describe('makeJoinedCopy', () => {
     const record = JSON.parse(stored.body);
     expect(record).toMatchObject({
       type: 'saakshi.evidence.joined-copy',
-      version: '0.10',
+      version: '0.11',
       session: 's',
       method: { name: 'join-mp4', reencoded: false },
       file: { name: JOINED_COPY_NAME, mediaType: 'video/mp4', size: 9000, sha256: 'c'.repeat(64) },

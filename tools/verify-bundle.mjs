@@ -17,7 +17,19 @@ import { closeSync, createReadStream, existsSync, openSync, readdirSync, readFil
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 
-const SUPPORTED_VERSIONS = ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '0.10'];
+const SUPPORTED_VERSIONS = ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '0.10', '0.11'];
+const before = (version, other) => SUPPORTED_VERSIONS.indexOf(version) < SUPPORTED_VERSIONS.indexOf(other);
+/**
+ * From 0.11 a bundle carries the file of each key that signed its records: "device-key.json" for
+ * the key of the first record, and "device-key 2.json", "device-key 3.json" and so on for any other
+ * key, in the order the records first use them. Each record is checked against the key its
+ * "key.id" names. A record whose key differs from the key of the record before it must say so in
+ * "key.replaces" (that earlier key's id), and must be of format 0.11 or later.
+ */
+const KEY_FILE = 'device-key.json';
+const MORE_KEY_FILE = /^device-key ([2-9]|[1-9][0-9]+)\.json$/;
+const keyFileName = (number) => (number <= 1 ? KEY_FILE : `device-key ${number}.json`);
+const KEY_ID = /^[0-9a-f]{64}$/;
 /**
  * From 0.10 (free storage, stage one) a file may end with `capture.endReason` "storage-full" (the
  * app stopped it cleanly for lack of room) or "storage-sound-only" (a body-cam video file closed at
@@ -46,6 +58,12 @@ function newMemberProblems(record) {
       problems.push('capture.endReason "storage-sound-only" is only for a body-cam file');
     }
     if (record.interrupted) problems.push(`a file cut off can't have ended with "${capture.endReason}"`);
+  }
+  const key = record.key ?? {};
+  if ('replaces' in key) {
+    if (before(record.version, '0.11')) problems.push(`key.replaces is not part of format ${record.version}`);
+    if (typeof key.replaces !== 'string' || !KEY_ID.test(key.replaces)) problems.push('key.replaces must be a key id (64 lowercase hex characters)');
+    else if (key.replaces === key.id) problems.push('key.replaces names the same key as key.id');
   }
   if ('startedFrom' in capture) {
     if (before09) problems.push(`capture.startedFrom is not part of format ${record.version}`);
@@ -394,6 +412,17 @@ function hashWithPrefixes(stream, offsets) {
   });
 }
 
+/** A key file's public key, checked against its own id. */
+function loadKeyFile(source, name, fail) {
+  const keyFile = JSON.parse(source.read(name).toString('utf8'));
+  const publicKey = createPublicKey(keyFile.publicKeyPem);
+  const spki = publicKey.export({ type: 'spki', format: 'der' });
+  const keyId = createHash('sha256').update(spki).digest('hex');
+  if (keyId !== keyFile.keyId) fail(`${name}: keyId does not match the public key (${keyId})`);
+  if (Buffer.from(keyFile.publicKeySpki, 'base64').compare(spki) !== 0) fail(`${name}: publicKeySpki and publicKeyPem differ`);
+  return { name, keyFile, publicKey, spki, keyId };
+}
+
 // ---- Checks -----------------------------------------------------------------------------------
 
 export async function verifyBundle(path) {
@@ -408,13 +437,23 @@ export async function verifyBundle(path) {
   }
 
   try {
-    const keyFile = JSON.parse(source.read('device-key.json').toString('utf8'));
-    const publicKey = createPublicKey(keyFile.publicKeyPem);
-    const spki = publicKey.export({ type: 'spki', format: 'der' });
-    const keyId = createHash('sha256').update(spki).digest('hex');
-    if (keyId !== keyFile.keyId) fail(`device-key.json: keyId does not match the public key (${keyId})`);
-    if (Buffer.from(keyFile.publicKeySpki, 'base64').compare(spki) !== 0) {
-      fail('device-key.json: publicKeySpki and publicKeyPem differ');
+    // The key files: device-key.json always, and from 0.11 one more for each other key that
+    // signed a record of this bundle. Each record is checked against the key it names.
+    const first = loadKeyFile(source, KEY_FILE, fail);
+    const { spki } = first;
+    const keys = new Map([[first.keyId, first]]);
+    const moreKeyFiles = source
+      .names()
+      .filter((name) => MORE_KEY_FILE.test(name))
+      .sort((a, b) => Number(MORE_KEY_FILE.exec(a)[1]) - Number(MORE_KEY_FILE.exec(b)[1]));
+    for (const name of moreKeyFiles) {
+      try {
+        const key = loadKeyFile(source, name, fail);
+        if (keys.has(key.keyId)) fail(`${name}: the same key as ${keys.get(key.keyId).name}`);
+        else keys.set(key.keyId, key);
+      } catch (error) {
+        fail(`${name}: not a key file (${error instanceof Error ? error.message : String(error)})`);
+      }
     }
     // README.txt's step 1 has the reader save the key as key.pem; one already there must be it.
     if (source.has('key.pem')) {
@@ -426,12 +465,14 @@ export async function verifyBundle(path) {
       }
       if (!same) fail('key.pem: not the public key in device-key.json; make it again from "publicKeyPem"');
     }
-    notes.push(`Signing key ${keyFile.keyId} (${keyFile.platform}, ${keyFile.storage})`);
-    notes.push(
-      keyFile.attestation
-        ? `Key attestation present (${keyFile.attestation.format}); this tool does not check it`
-        : `No key attestation: ${keyFile.attestationError ?? 'none given'}`,
-    );
+    for (const key of keys.values()) {
+      notes.push(`Signing key ${key.keyFile.keyId} (${key.keyFile.platform}, ${key.keyFile.storage})${keys.size > 1 ? `, in ${key.name}` : ''}`);
+      notes.push(
+        key.keyFile.attestation
+          ? `Key attestation present (${key.keyFile.attestation.format}); this tool does not check it`
+          : `No key attestation: ${key.keyFile.attestationError ?? 'none given'}`,
+      );
+    }
 
     // The manifest is not signed. From 0.8 it says which file in "Original files/" is each record's;
     // each is then checked against its signed record, no file may be claimed twice, and every file
@@ -458,7 +499,7 @@ export async function verifyBundle(path) {
     const folders = layout === 'new' ? [NEW_MEDIA, NEW_RECORDS] : ['media/', 'records/'];
     const top = layout === 'new' ? NEW_TOP : OLD_TOP;
     for (const name of names) {
-      if (!top.includes(name) && !folders.some((folder) => name.startsWith(folder) && !name.slice(folder.length).includes('/'))) {
+      if (!top.includes(name) && !(layout === 'new' && MORE_KEY_FILE.test(name)) && !folders.some((folder) => name.startsWith(folder) && !name.slice(folder.length).includes('/'))) {
         fail(`${name}: not part of a Saakshi bundle${layout === 'new' && (name.startsWith('media/') || name.startsWith('records/')) ? ' from 0.8 (a bundle has one layout)' : ''}`);
       }
     }
@@ -491,6 +532,9 @@ export async function verifyBundle(path) {
 
     let previous = null;
     let lastBodyHash = null;
+    // The keys in the order the records first use them, and the key of the record before.
+    const keysUsed = [];
+    let previousKeyId = null;
     // Checkpoints by recording, waiting for their file's record (which comes after them).
     const pending = new Map();
     let checkpointCount = 0;
@@ -500,22 +544,41 @@ export async function verifyBundle(path) {
       const bodyHash = createHash('sha256').update(body).digest('hex');
       const label = name;
 
+      // The key the record names. A record that can't be read names none.
+      const signedBy = record ? keys.get(record.key?.id) : first;
       if (!source.has(`${name}.sig`)) {
         fail(`${label}: signature file missing`);
-      } else if (!verify('sha256', body, publicKey, source.read(`${name}.sig`))) {
+      } else if (!signedBy) {
+        fail(`${label}: signed by a key that is not in the bundle (${record.key?.id})`);
+      } else if (!verify('sha256', body, signedBy.publicKey, source.read(`${name}.sig`))) {
         fail(`${label}: signature does not verify`);
       }
 
       if (!record) {
         fail(`${label}: not valid JSON`);
         previous = null;
+        previousKeyId = null;
         continue;
       }
+      const recordKeyId = record.key?.id;
+      if (typeof recordKeyId === 'string' && !keysUsed.includes(recordKeyId)) keysUsed.push(recordKeyId);
+      if (previousKeyId !== null && recordKeyId !== previousKeyId) {
+        // The signing key changes here: the record must say so itself, in data that is signed.
+        if (before(record.version, '0.11')) {
+          fail(`${label}: signed by a different key (${recordKeyId}) from the record before it, which format ${record.version} does not allow`);
+        } else if (record.key?.replaces !== previousKeyId) {
+          fail(`${label}: signed by a different key from the record before it without saying so ("key.replaces" should be ${previousKeyId})`);
+        } else {
+          notes.push(`The signing key changes at ${label}: ${recordKeyId} replaced ${previousKeyId}`);
+        }
+      } else if (record.key?.replaces) {
+        notes.push(`${label} says its key ${recordKeyId} replaced ${record.key.replaces}, the phone's key before it`);
+      }
+      previousKeyId = typeof recordKeyId === 'string' ? recordKeyId : null;
       const isCheckpoint = record.type === CHECKPOINT_TYPE;
       if (record.type !== RECORD_TYPE && !isCheckpoint) fail(`${label}: not a Saakshi record`);
       if (!SUPPORTED_VERSIONS.includes(record.version)) fail(`${label}: unknown version ${record.version}`);
       for (const problem of newMemberProblems(record)) fail(`${label}: ${problem}`);
-      if (record.key?.id !== keyFile.keyId) fail(`${label}: signed by a different key (${record.key?.id})`);
       if (record.sequence !== index) fail(`${label}: sequence ${record.sequence}, expected ${index} (a record is missing or out of order)`);
       const named = namesFromRecords.get(name);
       if (layout === 'new' && named?.record !== name) {
@@ -593,6 +656,18 @@ export async function verifyBundle(path) {
 
       previous = { id: record.id, bodyHash, fileSha256: record.file?.sha256 };
       lastBodyHash = bodyHash;
+    }
+
+    // Each key file must be the file of a key some record names, under the name its place gives it.
+    for (const key of keys.values()) {
+      const place = keysUsed.indexOf(key.keyId);
+      if (place < 0) fail(`${key.name}: no record in this bundle is signed by this key`);
+      else if (key.name !== keyFileName(place + 1)) fail(`${key.name}: from the signed records this key's file should be "${keyFileName(place + 1)}"`);
+    }
+    if (manifest && Array.isArray(manifest.keys)) {
+      const listed = JSON.stringify(manifest.keys.map((entry) => [entry?.file, entry?.keyId]));
+      const expected = JSON.stringify(keysUsed.map((id, index) => [keyFileName(index + 1), id]));
+      if (listed !== expected) fail('manifest.json: "keys" differs from the keys the signed records name');
     }
 
     for (const [recording, checkpoints] of pending) {

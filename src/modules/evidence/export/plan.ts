@@ -1,9 +1,9 @@
-import type { DeviceKeyFile } from '../integrity/deviceKey';
+import { keysThatSigned } from '../integrity/deviceKey';
 import type { AppInfo } from '../integrity/record';
 import { loadCheckpoints, loadSealed } from '../locker/records';
 import type { LockerStore } from '../locker/store';
 import { buildManifest, bundleFileName, bundleRecordName, hashReport } from './contents';
-import { CERTIFICATE_NAME, HASH_REPORT_NAME, README_NAME } from './layout';
+import { CERTIFICATE_NAME, HASH_REPORT_NAME, keyFileName, README_NAME } from './layout';
 import { readme } from './readme';
 
 /** One file of a bundle: its path in the bundle, and its bytes or the original it is copied from. */
@@ -14,18 +14,19 @@ export type PlannedEntry =
 /**
  * What a session's bundle holds, and under which names (docs/spec/evidence-bundle.md, section 7):
  * README.txt, the hash report and the certificate first, then the original files and the signed
- * records in chain order, then the manifest and the device key.
+ * records in chain order, then the manifest and the key that signed the records: the key named in
+ * the records themselves, from its own file, not whichever key the phone holds today (repair round
+ * A, group 3). If the records name more than one key, each key's file is there (format 0.11).
  */
 export function planBundle(input: {
   store: LockerStore;
   id: string;
-  key: DeviceKeyFile;
   now: Date;
   app: AppInfo;
   /** The certificate PDF, if the user has made one. */
   certificate: Uint8Array | null;
 }): { fileName: string; name: string; entries: PlannedEntry[] } {
-  const { store, id, key, now, app, certificate } = input;
+  const { store, id, now, app, certificate } = input;
   const session = store.readSession(id);
   if (!session) throw new Error('No such session');
   const encode = (text: string) => new TextEncoder().encode(text);
@@ -62,9 +63,16 @@ export function planBundle(input: {
   // In chain order, as a folder lists them.
   body.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 
-  const manifest = buildManifest(session, records, now, app, !!certificate, checkpoints, name);
-  const report = hashReport(session, records, key, now, session.items.length - sealed.length, checkpoints, name);
-  const guide = readme({ name, fileName, exampleRecord: records[0].recordPath, exampleMedia: records[0].mediaPath });
+  const keys = keysThatSigned(store, [...records, ...checkpoints].map((entry) => entry.record));
+  const manifest = buildManifest(session, records, now, app, !!certificate, checkpoints, name, keys);
+  const report = hashReport(session, records, keys, now, session.items.length - sealed.length, checkpoints, name);
+  const guide = readme({
+    name,
+    fileName,
+    exampleRecord: records[0].recordPath,
+    exampleMedia: records[0].mediaPath,
+    otherKeyFiles: keys.slice(1).map((_, index) => keyFileName(index + 2)),
+  });
 
   return {
     fileName,
@@ -75,7 +83,7 @@ export function planBundle(input: {
       ...(certificate ? [{ name: CERTIFICATE_NAME, bytes: certificate }] : []),
       ...body,
       { name: 'manifest.json', bytes: encode(JSON.stringify(manifest, null, 2)) },
-      { name: 'device-key.json', bytes: encode(JSON.stringify(key, null, 2)) },
+      ...keys.map((key, index) => ({ name: keyFileName(index + 1), bytes: encode(JSON.stringify(key, null, 2)) })),
     ],
   };
 }
