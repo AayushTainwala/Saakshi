@@ -24,8 +24,11 @@ import { keyboardOverlap, type KeyboardReveal, KeyboardRevealContext, measureInC
  * it can still be scrolled to with the keyboard up, and the focused field, with the rest of its
  * `KeyboardGroup`, is scrolled above the keyboard. A tap on a button works while the keyboard is up
  * (`keyboardShouldPersistTaps`), instead of only closing the keyboard.
+ *
+ * `scrollToTop`: when it turns true, the page scrolls back to its top (for something that must be
+ * seen first, such as "Now lock your phone").
  */
-export function Screen({ children }: { children: ReactNode }) {
+export function Screen({ children, scrollToTop = false }: { children: ReactNode; scrollToTop?: boolean }) {
   const { colors } = useTheme();
   const scroll = useRef<ScrollViewInstance>(null);
   const keyboardTop = useRef<number | null>(null);
@@ -61,6 +64,10 @@ export function Screen({ children }: { children: ReactNode }) {
     const to = revealOffset({ scrollView: page, keyboardTop: top, focused, group: box, offset: offset.current });
     if (to !== null) view.scrollTo({ y: to, animated: true });
   }, []);
+
+  useEffect(() => {
+    if (scrollToTop) scroll.current?.scrollTo({ y: 0, animated: true });
+  }, [scrollToTop]);
 
   // Reveal once the padding for the keyboard has been laid out.
   useEffect(() => {

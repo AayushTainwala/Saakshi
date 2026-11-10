@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import { AppText, Button, Card, SwipeControl } from '@/components';
 import { useBugMode } from '@/modules/bugmode';
 import { useLiveShare } from '@/modules/location';
 import { openCodeScreen } from '@/modules/secretcode';
+import { radius, spacing, useTheme } from '@/theme';
 
 import { phoneTaken, usePhoneTaken } from '../phoneTakenInstance';
 
@@ -56,15 +58,47 @@ export function PhoneTakenSwipe() {
   );
 }
 
-/** What "My phone is being taken" is doing, in plain words, and its Stop (the code screen). */
-export function PhoneTakenStatus() {
+/**
+ * What "My phone is being taken" is doing, in plain words, and its Stop (the code screen).
+ *
+ * Where Saakshi didn't lock the screen itself (iPhone always; Android without the device admin, or
+ * if it failed), the card is shown first on the page, headed large by "Now lock your phone" and the
+ * button to press, until the app goes to the background (group 1.7). The page places it twice: at
+ * `first` it shows only with that reminder, at `normal` only without it.
+ */
+export function PhoneTakenStatus({ at = 'normal' }: { at?: 'first' | 'normal' }) {
+  const state = usePhoneTaken();
+  if (!state.active || state.lockReminder !== (at === 'first')) return null;
+  return <RunningCard reminder={state.lockReminder} />;
+}
+
+function LockReminder() {
+  const { t } = useTranslation('sos');
+  const { colors } = useTheme();
+  return (
+    <View
+      testID="lock-reminder"
+      accessible
+      accessibilityRole="alert"
+      accessibilityLiveRegion="assertive"
+      style={[styles.reminder, { backgroundColor: colors.primary }]}>
+      <AppText variant="title" color="onPrimary">
+        {t('taken.remind.title')}
+      </AppText>
+      <AppText variant="heading" color="onPrimary">
+        {Platform.OS === 'ios' ? t('taken.remind.ios') : t('taken.remind.android')}
+      </AppText>
+      <AppText color="onPrimary">{t('taken.remind.carriesOn')}</AppText>
+    </View>
+  );
+}
+
+function RunningCard({ reminder }: { reminder: boolean }) {
   const { t } = useTranslation('sos');
   const state = usePhoneTaken();
   const bug = useBugMode();
   const share = useLiveShare();
   const [busy, setBusy] = useState(false);
-
-  if (!state.active) return null;
 
   // What is really running: a part stopped on its own (with the code) shows as stopped.
   const actual = (running: boolean, part: typeof state.pocket) => (running ? 'on' : part === 'on' ? 'off' : part);
@@ -83,6 +117,7 @@ export function PhoneTakenStatus() {
 
   return (
     <Card accessibilityLiveRegion="polite">
+      {reminder ? <LockReminder /> : null}
       <AppText variant="heading">{t('taken.on')}</AppText>
       {state.startedAt ? <AppText color="textMuted">{t('taken.since', { time: timeIST(state.startedAt) })}</AppText> : null}
 
@@ -123,3 +158,11 @@ export function PhoneTakenStatus() {
     </Card>
   );
 }
+
+const styles = StyleSheet.create({
+  reminder: {
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+});

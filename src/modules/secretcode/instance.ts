@@ -8,7 +8,10 @@ import { AppState } from 'react-native';
 import i18n from '@/i18n';
 
 import {
+  type PhoneLock,
   type RecoveryResetResult,
+  type RecoveryWhy,
+  recoveryWhyFor,
   resetMethodFor,
   type ResetMethod,
   resetWithPhonePasscode as reset,
@@ -70,7 +73,7 @@ export function useSecretCode(): SecretCodeState {
 }
 
 /** What this phone has: a screen lock, and a prompt for it alone. Null if it can't be asked. */
-function phoneLock(): { hasScreenLock: boolean; canAskPasscodeOnly: boolean } | null {
+function phoneLock(): PhoneLock | null {
   try {
     if (!SaakshiDevice) return null;
     return { hasScreenLock: SaakshiDevice.hasScreenLock(), canAskPasscodeOnly: SaakshiDevice.canAskPasscodeOnly() };
@@ -79,24 +82,40 @@ function phoneLock(): { hasScreenLock: boolean; canAskPasscodeOnly: boolean } | 
   }
 }
 
-/** How a forgotten code is reset on this phone now (round 2, group 1.6). */
+/** How a forgotten code is reset on this phone now (round 2, groups 1.6 and 1.7). */
 export function currentResetMethod(): ResetMethod {
   return resetMethodFor(phoneLock());
 }
 
+type PhoneReset = { method: ResetMethod; why: RecoveryWhy };
+
+function currentPhoneReset(): PhoneReset {
+  const phone = phoneLock();
+  return { method: resetMethodFor(phone), why: recoveryWhyFor(phone) };
+}
+
 /**
- * How a forgotten code is reset on this phone, read again whenever Saakshi comes back on screen
- * (the screen lock may have been turned on or off in the phone's Settings meanwhile).
+ * How a forgotten code is reset on this phone and, for the recovery code, why; read again whenever
+ * Saakshi comes back on screen (the screen lock may have been turned on or off meanwhile).
  */
-export function useResetMethod(): ResetMethod {
-  const [method, setMethod] = useState<ResetMethod>(currentResetMethod);
+function usePhoneReset(): PhoneReset {
+  const [reset, setReset] = useState<PhoneReset>(currentPhoneReset);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') setMethod(currentResetMethod());
+      if (state === 'active') setReset(currentPhoneReset());
     });
     return () => subscription.remove();
   }, []);
-  return method;
+  return reset;
+}
+
+export function useResetMethod(): ResetMethod {
+  return usePhoneReset().method;
+}
+
+/** Why this phone uses the recovery code: no screen lock, or Android 7 to 10 (group 1.7). */
+export function useRecoveryWhy(): RecoveryWhy {
+  return usePhoneReset().why;
 }
 
 /** The reset with the phone's own passcode, and only the passcode, with the real prompt. */

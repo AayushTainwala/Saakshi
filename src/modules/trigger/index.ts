@@ -7,8 +7,11 @@
  * inside it.
  */
 export { SOS_ROUTE, useQuickTriggers } from './listener';
+export type { LockSettingState } from './lockScreen';
+export { lockSetting, useLockSetting } from './lockScreenInstance';
 export { removeOldCodePadSetting } from './migrate';
 export type { PhoneTakenState, StartResult as PhoneTakenStart } from './phoneTaken';
 export { phoneTaken, usePhoneTaken } from './phoneTakenInstance';
+export { LockSettings, LockSettingsCard, LockSettingsPanel } from './ui/LockSettings';
 export { PhoneTakenStatus, PhoneTakenSwipe } from './ui/PhoneTaken';
 export { TriggerSettings } from './ui/TriggerSettings';

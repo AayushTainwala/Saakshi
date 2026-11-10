@@ -4,7 +4,7 @@ import i18n, { initI18n } from '@/i18n';
 import { PreferencesProvider } from '@/preferences/PreferencesProvider';
 
 import type { memoryCodeStore } from './memory';
-import type { ResetMethod } from '../reset';
+import type { RecoveryWhy, ResetMethod } from '../reset';
 import { requireSecretCode } from '../request';
 import { clearRunningChecks, registerRunningCheck } from '../running';
 import { RecoveryCodeReminder, resetRecoveryReminder } from '../ui/RecoveryCodeReminder';
@@ -12,7 +12,7 @@ import { SecretCodeRoute, SecretCodeScreen } from '../ui/SecretCodeScreen';
 import { SecretCodeSettings } from '../ui/SecretCodeSettings';
 
 // The stored code lives in memory instead of the phone's secure storage, and the phone's screen
-// lock is whatever the test says (`method`).
+// lock is whatever the test says (`method`, and `why` for the recovery code).
 jest.mock('../instance', () => {
   const { memoryCodeStore } = jest.requireActual('./memory');
   const { useEffect, useSyncExternalStore } = jest.requireActual('react');
@@ -20,9 +20,11 @@ jest.mock('../instance', () => {
   const { whatIsRunning } = jest.requireActual('../running');
   const holder = { current: memoryCodeStore() };
   const method = { current: 'passcode' };
+  const why = { current: 'no-lock' };
   return {
     holder,
     method,
+    why,
     get secretCode() {
       return holder.current.store;
     },
@@ -35,6 +37,7 @@ jest.mock('../instance', () => {
       return useSyncExternalStore(store.subscribe, store.getState);
     },
     useResetMethod: () => method.current,
+    useRecoveryWhy: () => why.current,
     currentResetMethod: () => method.current,
     resetWithPhonePasscode: jest.fn(async () => 'reset'),
     resetWithRecoveryCode: (input: string) =>
@@ -59,6 +62,7 @@ jest.mock('react-native-safe-area-context', () => {
 const instance = jest.requireMock('../instance') as {
   holder: { current: ReturnType<typeof memoryCodeStore> };
   method: { current: ResetMethod };
+  why: { current: RecoveryWhy };
   resetWithPhonePasscode: jest.Mock;
 };
 const holder = instance.holder;
@@ -81,6 +85,7 @@ describe('the secret code screens', () => {
     const { memoryCodeStore } = jest.requireActual('./memory');
     holder.current = memoryCodeStore();
     instance.method.current = 'passcode';
+    instance.why.current = 'no-lock';
     instance.resetWithPhonePasscode.mockClear();
     mockPush.mockClear();
     clearRunningChecks();
@@ -233,14 +238,71 @@ describe('the secret code screens', () => {
     expect(screen.queryByText(/face or fingerprint unlock, if that is set up/)).toBeNull();
   });
 
-  it('on Android 7 to 10, says the code can not be reset rather than use a prompt that takes a fingerprint', async () => {
+  it('where the phone could not be asked how, says the code can not be reset now', async () => {
     instance.method.current = 'none';
     await store().setCode('2580');
     await render(wrap(<SecretCodeScreen mode="change" onDone={jest.fn()} />));
+    expect(await screen.findByText("Saakshi couldn't find out how a forgotten code can be reset on this phone.")).toBeTruthy();
     await fireEvent.press(await screen.findByRole('button', { name: 'Forgot the code?' }));
-    expect(await screen.findByText(/On this version of Android, Saakshi can't ask for the screen lock alone/)).toBeTruthy();
+    expect(await screen.findByText(/so it can't be reset now/)).toBeTruthy();
     expect(instance.resetWithPhonePasscode).not.toHaveBeenCalled();
     expect(await store().isSet()).toBe(true);
+  });
+
+  describe('Android 7 to 10 with a screen lock: the recovery code (round 2, group 1.7)', () => {
+    beforeEach(() => {
+      instance.method.current = 'recovery';
+      instance.why.current = 'old-android';
+    });
+
+    const shownCode = () => screen.getByText(/^[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}$/).props.children as string;
+
+    it('says why before the code is chosen, and shows a recovery code once it is set', async () => {
+      const done = jest.fn();
+      await render(wrap(<SecretCodeScreen mode="set" onDone={done} />));
+      expect(
+        await screen.findByText(/On this version of Android, Saakshi can't ask for the screen lock alone \(without a fingerprint or face\), so Saakshi will also give you a recovery code/),
+      ).toBeTruthy();
+      // Never the wording for a phone with no screen lock.
+      expect(screen.queryByText(/This phone has no screen lock/)).toBeNull();
+      await type('2580');
+      await type('2580');
+      expect(await screen.findByText('Your recovery code')).toBeTruthy();
+      const code = shownCode();
+      await fireEvent.press(screen.getByRole('button', { name: 'I have written it down' }));
+      expect(done).toHaveBeenCalledWith(true);
+      expect(await store().verifyRecovery(code)).toEqual({ ok: true });
+    });
+
+    it('resets a forgotten code with it, never with a prompt that takes a fingerprint', async () => {
+      const set = await store().setCode('2580', { recovery: true });
+      if (!set.ok || !set.recoveryCode) throw new Error('no recovery code');
+      await render(wrap(<SecretCodeScreen mode="change" onDone={jest.fn()} />));
+      expect(await screen.findByText(/so a forgotten code can be reset with the recovery code you wrote down/)).toBeTruthy();
+      await fireEvent.press(screen.getByRole('button', { name: 'Forgot the code?' }));
+      expect(await screen.findByText('Reset with your recovery code')).toBeTruthy();
+      expect(instance.resetWithPhonePasscode).not.toHaveBeenCalled();
+      await fireEvent.changeText(screen.getByLabelText('Recovery code'), set.recoveryCode);
+      await fireEvent.press(screen.getByRole('button', { name: 'Reset the secret code' }));
+      expect(await screen.findByText('The code was reset. Choose a new one.')).toBeTruthy();
+      expect(await store().isSet()).toBe(false);
+    });
+
+    it('says so when none was made (a code set before group 1.7), and asks for one', async () => {
+      await store().setCode('2580');
+      await render(wrap(<SecretCodeScreen mode="change" onDone={jest.fn()} />));
+      await fireEvent.press(await screen.findByRole('button', { name: 'Forgot the code?' }));
+      expect(await screen.findByText(/On this version of Android.*and no recovery code was made, so the code can't be reset\./)).toBeTruthy();
+    });
+
+    it('asks for one in Settings and when Saakshi opens, saying why', async () => {
+      await store().setCode('2580');
+      const settings = await render(wrap(<SecretCodeSettings />));
+      expect(await screen.findByText(/No recovery code yet\. On this version of Android/)).toBeTruthy();
+      await settings.unmount();
+      await render(wrap(<RecoveryCodeReminder />));
+      expect(await screen.findByText(/On this version of Android, Saakshi can't ask for the screen lock alone \(without a fingerprint or face\)\. If you forget/)).toBeTruthy();
+    });
   });
 
   describe('a phone with no screen lock: the recovery code', () => {

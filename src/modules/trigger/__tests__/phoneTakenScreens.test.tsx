@@ -24,6 +24,8 @@ jest.mock('../phoneTakenInstance', () => {
     ...parts,
     storage: { read: () => text, write: (value: string) => void (text = value) },
     heartbeat: { start: jest.fn(), stop: jest.fn() },
+    // Android with the device admin on (group 1.7): locked, so no reminder in these tests.
+    lockScreen: jest.fn(async () => true),
     now: () => new Date('2026-11-06T05:10:00Z'),
     liveWaitMs: 10,
   });

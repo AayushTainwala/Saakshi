@@ -38,9 +38,39 @@ class SaakshiSosModule : Module() {
 
     lateinit var phonePicker: AppContextActivityResultLauncher<PickPhoneInput, Uri?>
 
+    lateinit var lockAdminActivation: AppContextActivityResultLauncher<AddLockAdminInput, Boolean>
+
     RegisterActivityContracts {
       phonePicker = registerForActivityResult(PickPhoneContract())
+      lockAdminActivation = registerForActivityResult(AddLockAdminContract())
     }
+
+    // "Lock the phone when 'My phone is being taken' starts" (SPEC 5.4; round 2, group 1.7): device
+    // admin with the force-lock policy only (LockAdmin.kt).
+    Function("lockAdminSupported") { LockAdmin.supported(context) }
+
+    Function("lockAdminActive") { LockAdmin.isActive(context) }
+
+    // Android's own "Activate device admin app?" screen, with Saakshi's explanation on it. Resolves
+    // whether the admin is on afterwards.
+    AsyncFunction("lockAdminRequest") Coroutine { explanation: String ->
+      if (!LockAdmin.isActive(context)) {
+        try {
+          lockAdminActivation.launch(AddLockAdminInput(explanation))
+        } catch (error: ActivityNotFoundException) {
+          throw CodedException("ERR_NO_DEVICE_ADMIN", "This phone has no device admin screen", error)
+        }
+      }
+      LockAdmin.isActive(context)
+    }
+
+    // Switches it off from Saakshi's Settings. Resolves whether it is still on (false once off).
+    AsyncFunction("lockAdminRemove") Coroutine { ->
+      LockAdmin.removeAndWait(context)
+    }
+
+    // Locks the screen now. Resolves false if the admin isn't on.
+    AsyncFunction("lockNow") { LockAdmin.lockNow(context) }
 
     // Opens the contacts app's picker for phone numbers. The picker grants this app read access to
     // the one number picked, so READ_CONTACTS is never requested.

@@ -1,11 +1,13 @@
 import { File, Paths } from 'expo-file-system';
 import { useSyncExternalStore } from 'react';
+import { AppState } from 'react-native';
 
 import { bugMode } from '@/modules/bugmode';
 import { liveLength } from '@/modules/location';
 import { isSecretCodeSet, requireSecretCode } from '@/modules/secretcode';
 import { alertController, liveInviteNow, startLiveLocation, stopLiveLocation, textTrustedContacts } from '@/modules/sos';
 
+import { lockSetting } from './lockScreenInstance';
 import { PhoneTakenController, type PhoneTakenState } from './phoneTaken';
 
 const FILE_NAME = 'phone-taken.json';
@@ -40,7 +42,15 @@ export const phoneTaken = new PhoneTakenController({
   },
   // The silence alarm's heartbeat (round 2, group 3.5) goes here.
   heartbeat: { start: () => undefined, stop: () => undefined },
+  // Android, if the user switched it on in Settings: device admin's force-lock (group 1.7).
+  lockScreen: () => lockSetting.lockNow(),
   now: () => new Date(),
+});
+
+// "Now lock your phone" stays until the app goes to the background: the screen locked, or the
+// user left Saakshi.
+AppState.addEventListener('change', (state) => {
+  if (state === 'background') phoneTaken.appInBackground();
 });
 
 export function usePhoneTaken(): PhoneTakenState {

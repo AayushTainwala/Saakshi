@@ -28,6 +28,8 @@ function setup(overrides: Partial<PhoneTakenDeps> = {}) {
     alert: jest.fn(async (link?: string) => void order.push(`alert ${link ?? 'without link'}`)),
     textLink: jest.fn(async (_invite: string, to: 'all' | 'not-alerted') => void order.push(`link to ${to}`)),
     heartbeat: { start: jest.fn(), stop: jest.fn() },
+    // iPhone, or Android with the device admin off: the screen can't be locked by Saakshi.
+    lockScreen: jest.fn(async () => false),
     now: () => new Date('2026-11-06T10:40:00Z'),
     liveWaitMs: 50,
     ...overrides,
@@ -158,5 +160,166 @@ describe('"My phone is being taken" (round 2, group 1.3)', () => {
     await taken.retry('pocket');
     expect(deps.startPocket).toHaveBeenCalledTimes(2);
     expect(taken.getState().pocket).toBe('on');
+  });
+});
+
+describe('"My phone is being taken" locks the screen, or asks for it (round 2, group 1.7)', () => {
+  /** Android with the device admin switched on: the lock succeeds. */
+  const lockOn = (order: string[]) =>
+    jest.fn(async () => {
+      order.push('lock');
+      return true;
+    });
+
+  it('locks the screen once, after every part has started', async () => {
+    const order: string[] = [];
+    const lockScreen = lockOn(order);
+    const { taken } = setup({
+      startPocket: jest.fn(async () => void order.push('pocket')),
+      startLive: jest.fn(async () => {
+        order.push('live');
+        return { link: 'https://live/#tok', invite: 'invite' };
+      }),
+      alert: jest.fn(async () => void order.push('alert')),
+      textLink: jest.fn(async () => void order.push('link')),
+      lockScreen,
+    });
+    await taken.start();
+    expect(lockScreen).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(['pocket', 'live', 'alert', 'link', 'lock']);
+    // Locked by Saakshi: no reminder.
+    expect(taken.getState().lockReminder).toBe(false);
+  });
+
+  it('waits for a slow recording, a slow link and the alert before it locks', async () => {
+    const order: string[] = [];
+    const pocket = gate<void>();
+    const link = gate<{ link: string; invite: string }>();
+    const lockScreen = lockOn(order);
+    const { taken } = setup({
+      startPocket: jest.fn(() => pocket.promise.then(() => void order.push('pocket'))),
+      startLive: jest.fn(() => link.promise.then((value) => (order.push('live'), value))),
+      alert: jest.fn(async () => void order.push('alert')),
+      textLink: jest.fn(async () => void order.push('link')),
+      lockScreen,
+    });
+    const starting = taken.start();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(order).toEqual(['alert']);
+    expect(lockScreen).not.toHaveBeenCalled();
+    link.open({ link: 'https://live/#late', invite: 'late' });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(lockScreen).not.toHaveBeenCalled();
+    pocket.open();
+    await starting;
+    expect(order).toEqual(['alert', 'live', 'link', 'pocket', 'lock']);
+    expect(lockScreen).toHaveBeenCalledTimes(1);
+  });
+
+  it('still locks when a part failed, once the others have started', async () => {
+    const order: string[] = [];
+    const lockScreen = lockOn(order);
+    const { taken } = setup({
+      startPocket: jest.fn(async () => {
+        throw new Error('microphone denied');
+      }),
+      lockScreen,
+    });
+    await taken.start();
+    expect(lockScreen).toHaveBeenCalledTimes(1);
+    expect(taken.getState()).toMatchObject({ pocket: 'failed', lockReminder: false });
+  });
+
+  it('never locks when it does not start', async () => {
+    const lockScreen = jest.fn(async () => true);
+    const noCode = setup({ codeIsSet: jest.fn(async () => false), lockScreen });
+    expect(await noCode.taken.start()).toBe('no-code');
+    expect(lockScreen).not.toHaveBeenCalled();
+
+    const twice = setup({ lockScreen });
+    await twice.taken.start();
+    expect(await twice.taken.start()).toBe('already');
+    await twice.taken.retry('live');
+    await twice.taken.retry('pocket');
+    expect(lockScreen).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks the user to lock the phone where Saakshi can\'t (iPhone; Android without the admin)', async () => {
+    const { taken, deps } = setup();
+    await taken.start();
+    expect(deps.lockScreen).toHaveBeenCalledTimes(1);
+    expect(taken.getState().lockReminder).toBe(true);
+  });
+
+  it('asks, too, if locking fails', async () => {
+    const { taken } = setup({
+      lockScreen: jest.fn(async () => {
+        throw new Error('admin switched off');
+      }),
+    });
+    await taken.start();
+    expect(taken.getState().lockReminder).toBe(true);
+  });
+
+  it('shows no reminder until everything has started', async () => {
+    const pocket = gate<void>();
+    const { taken } = setup({ startPocket: jest.fn(() => pocket.promise) });
+    const starting = taken.start();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(taken.getState()).toMatchObject({ alert: 'sent', live: 'on', pocket: 'starting', lockReminder: false });
+    pocket.open();
+    await starting;
+    expect(taken.getState().lockReminder).toBe(true);
+  });
+
+  it('keeps the reminder until the app goes to the background, and not across a restart', async () => {
+    const { taken, reopen } = setup();
+    await taken.start();
+    expect(taken.getState().lockReminder).toBe(true);
+    expect(reopen().getState()).toMatchObject({ active: true, lockReminder: false });
+    taken.appInBackground();
+    expect(taken.getState()).toMatchObject({ active: true, lockReminder: false });
+  });
+
+  it('does not keep the phone unlocked while location hangs: locks after the wait, and location carries on', async () => {
+    const order: string[] = [];
+    const lockScreen = lockOn(order);
+    const stalled = gate<{ link: string; invite: string }>();
+    const { taken } = setup({
+      startLive: jest.fn(() => stalled.promise),
+      alert: jest.fn(async () => void order.push('alert')),
+      textLink: jest.fn(async () => void order.push('link')),
+      lockScreen,
+      lockWaitMs: 50,
+    });
+    const starting = taken.start();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(order).toEqual(['alert', 'lock']);
+    expect(taken.getState().live).toBe('starting');
+    stalled.open({ link: 'https://live/#late', invite: 'late' });
+    expect(await starting).toBe('started');
+    expect(order).toEqual(['alert', 'lock', 'link']);
+    expect(taken.getState().live).toBe('on');
+    expect(lockScreen).toHaveBeenCalledTimes(1);
+  });
+
+  it('carries on recording and sharing once the screen is locked: nothing is stopped', async () => {
+    const order: string[] = [];
+    const { taken, deps } = setup({ lockScreen: lockOn(order) });
+    await taken.start();
+    // The screen locks: the app goes to the background.
+    taken.appInBackground();
+    expect(order).toEqual(['lock']);
+    expect(deps.stopPocket).not.toHaveBeenCalled();
+    expect(deps.stopLive).not.toHaveBeenCalled();
+    expect(deps.heartbeat.stop).not.toHaveBeenCalled();
+    expect(taken.getState()).toMatchObject({ active: true, pocket: 'on', live: 'on', alert: 'sent' });
+  });
+
+  it('clears the reminder when it is stopped with the code', async () => {
+    const { taken } = setup();
+    await taken.start();
+    expect(await taken.stop()).toBe(true);
+    expect(taken.getState()).toEqual(IDLE);
   });
 });
