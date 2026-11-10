@@ -6,7 +6,7 @@ import { summarize } from '../locker/summary';
 import { recordName } from '../naming';
 import { formatIST } from '../ui/format';
 import type { CaptureMode, EndReason, EvidenceItem, SessionState } from '../types';
-import { CERTIFICATE_NAME, README_NAME, RECORDS_FOLDER } from './layout';
+import { CERTIFICATE_NAME, keyFileName, README_NAME, RECORDS_FOLDER } from './layout';
 
 /** A sealed file as it goes into a bundle. */
 export type BundledRecord = {
@@ -64,6 +64,7 @@ export function buildManifest(
   hasCertificate: boolean,
   checkpoints: readonly BundledCheckpoint[] = [],
   name: string = bundleRecordName(session),
+  keys: readonly DeviceKeyFile[] = [],
 ) {
   return {
     type: BUNDLE_TYPE,
@@ -93,6 +94,8 @@ export function buildManifest(
       sha256: c.record.file.sha256,
       recordSha256: c.recordSha256,
     })),
+    // From 0.11: the key files in the bundle, in the order the records first use the keys.
+    ...(keys.length ? { keys: keys.map((key, index) => ({ file: keyFileName(index + 1), keyId: key.keyId })) } : {}),
     witness: session.witness,
     certificate: hasCertificate ? CERTIFICATE_NAME : null,
     timestamps: [],
@@ -169,13 +172,31 @@ function describeAttestation(key: DeviceKeyFile): string {
 export function hashReport(
   session: SessionState,
   records: readonly BundledRecord[],
-  key: DeviceKeyFile,
+  /** The key or keys that signed the records, in the order the records first use them. */
+  signedBy: DeviceKeyFile | readonly DeviceKeyFile[],
   createdAt: Date,
   unsealed: number,
   checkpoints: readonly BundledCheckpoint[] = [],
   name: string = bundleRecordName(session),
 ): string {
   const first = records[0]?.record;
+  const keys = Array.isArray(signedBy) ? (signedBy as readonly DeviceKeyFile[]) : [signedBy as DeviceKeyFile];
+  // One key, as nearly always: two lines. More (the phone's key was made again part-way, format
+  // 0.11): each key with its file, and which records it signed.
+  const keyLines =
+    keys.length === 1
+      ? [`Signing key:      ${keys[0].keyId} (ES256, ${keys[0].storage})`, `Key attestation:  ${describeAttestation(keys[0])}`]
+      : [
+          `Signing keys:     ${keys.length}. The phone's signing key was made again while this was recorded; each record's "key.id" names the key that signed it.`,
+          ...keys.flatMap((key, index) => {
+            const signed = [...records, ...checkpoints].filter((r) => r.record.key.id === key.keyId).map((r) => r.record.sequence);
+            const range = signed.length ? `records ${String(Math.min(...signed)).padStart(4, '0')} to ${String(Math.max(...signed)).padStart(4, '0')}` : 'no record';
+            return [
+              `  ${keyFileName(index + 1)}:  ${key.keyId} (ES256, ${key.storage}); ${range}`,
+              `      Key attestation:  ${describeAttestation(key)}`,
+            ];
+          }),
+        ];
   const lines = [
     'SAAKSHI HASH REPORT',
     `Evidence bundle format ${FORMAT_VERSION} (docs/spec/evidence-bundle.md)`,
@@ -185,8 +206,7 @@ export function hashReport(
     `Report made:      ${formatIST(createdAt.toISOString(), true)}`,
     `Device:           ${first ? describeDevice(first.device) : 'unknown'}`,
     `App:              ${first ? `${first.app.id} ${first.app.version} (build ${first.app.build})` : 'unknown'}`,
-    `Signing key:      ${key.keyId} (ES256, ${key.storage})`,
-    `Key attestation:  ${describeAttestation(key)}`,
+    ...keyLines,
     'Hash algorithms:  SHA-256 (primary), SHA-1, MD5',
     '',
     `FILES (${records.length})`,

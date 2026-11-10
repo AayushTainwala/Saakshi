@@ -12,7 +12,9 @@ export function bundleFilesOf(
   app: AppInfo,
   certificate: Uint8Array | null = null,
 ) {
-  const plan = planBundle({ store: locker.store, id, key, now, app, certificate });
+  // The key's file is on the phone, where the plan looks for the key that signed the records.
+  locker.store.writeKeyJson(key.keyId, JSON.stringify(key, null, 2));
+  const plan = planBundle({ store: locker.store, id, now, app, certificate });
   const files = new Map<string, Uint8Array>();
   for (const entry of plan.entries) {
     files.set(entry.name, 'bytes' in entry ? entry.bytes : locker.files.get(locker.store.mediaUri(id, entry.media.file))!);

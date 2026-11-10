@@ -11,6 +11,12 @@ export const RECORDS_FOLDER = 'Signed records';
 export const HASH_REPORT_NAME = 'Hash report.txt';
 export const CERTIFICATE_NAME = 'Certificate Part A.pdf';
 export const README_NAME = 'README.txt';
+/**
+ * The files of the keys that signed a bundle's records (format 0.11): `device-key.json` for the
+ * key of the first record, and `device-key 2.json`, `device-key 3.json` and so on for any other
+ * key, in the order the records first use them. Nearly every bundle has only the first.
+ */
+export const keyFileName = (number: number) => (number <= 1 ? 'device-key.json' : `device-key ${number}.json`);
 
 const extension = (name: string) => /\.[^./]+$/.exec(name)?.[0] ?? '';
 

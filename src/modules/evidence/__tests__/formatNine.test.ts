@@ -32,8 +32,8 @@ describe('bundle format 0.9', () => {
   it('records the low-battery handover: the file closes as "low-battery" and the next file of the clip follows', async () => {
     const { records } = await handedOver({ startedFrom: 'phone-taken' });
     expect(records.map((r) => [r.version, r.segment, r.capture.endReason, r.capture.gapBeforeMs])).toEqual([
-      ['0.10', { clip: 0, index: 0 }, 'low-battery', null],
-      ['0.10', { clip: 0, index: 1 }, 'stopped', 0],
+      ['0.11', { clip: 0, index: 0 }, 'low-battery', null],
+      ['0.11', { clip: 0, index: 1 }, 'stopped', 0],
     ]);
   });
 
@@ -70,7 +70,7 @@ describe('bundle format 0.9', () => {
     // The README names the record too, from the same name.
     expect(new TextDecoder().decode(files.get('README.txt'))).toContain('2026-11-06 10-40 IST Pocket recording');
     const manifest = JSON.parse(new TextDecoder().decode(files.get('manifest.json')));
-    expect(manifest).toMatchObject({ version: '0.10', name: '2026-11-06 10-40 IST Pocket recording' });
+    expect(manifest).toMatchObject({ version: '0.11', name: '2026-11-06 10-40 IST Pocket recording' });
   });
 
   it('fails a record whose new members are malformed (re-signed, so only their shape is wrong)', async () => {

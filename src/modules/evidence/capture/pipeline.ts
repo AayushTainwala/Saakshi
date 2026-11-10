@@ -13,6 +13,8 @@ export type SealInput = {
   hashedAt: Date;
   /** The record before this one in the session's chain, or null for the first. */
   previous: ChainLink | null;
+  /** The key that signed that record, if known: a record signed by another key says so (format 0.11). */
+  previousKeyId?: string | null;
 };
 
 /** What the sealing step needs for a checkpoint of a file still being written (format 0.5). */
@@ -21,9 +23,31 @@ export type CheckpointSealInput = {
   sequence: number;
   checkpoint: CheckpointInput;
   previous: ChainLink | null;
+  previousKeyId?: string | null;
 };
 
-export type SealResult = { record: { file: string; recordId: string }; recordSha256: string };
+export type SealResult = {
+  record: { file: string; recordId: string };
+  recordSha256: string;
+  /** The key that signed the record (format 0.11). */
+  keyId?: string;
+};
+
+/** The key that signed the session's last record, read from that record; null if there is none. */
+function lastKeyId(store: LockerStore, state: SessionState): string | null {
+  let last: { sequence: number; file: string } | null = null;
+  for (const entry of [...state.items, ...(state.checkpoints ?? [])]) {
+    if (entry.status !== 'sealed' || !entry.record) continue;
+    if (!last || entry.sequence > last.sequence) last = { sequence: entry.sequence, file: entry.record.file };
+  }
+  if (!last) return null;
+  try {
+    const record = JSON.parse(store.readRecordText(state.id, last.file)) as { key?: { id?: unknown } };
+    return typeof record.key?.id === 'string' ? record.key.id : null;
+  } catch {
+    return null;
+  }
+}
 
 /** The session's last sealed record, file or checkpoint, as the next record's `previous`. */
 export function lastLink(state: SessionState): ChainLink | null {
@@ -76,6 +100,8 @@ export class CaptureSession {
   private clips = 0;
   private sequence = 0;
   private last: ChainLink | null = null;
+  /** The key that signed the last record in the chain, so that the next can say if it changed. */
+  private lastKey: string | null = null;
   private listeners = new Set<() => void>();
 
   constructor(private readonly deps: PipelineDeps) {}
@@ -92,6 +118,7 @@ export class CaptureSession {
     session.sequence = nextSequence(state);
     session.clips = state.items.reduce((max, item) => Math.max(max, (item.segment?.clip ?? -1) + 1), 0);
     session.last = lastLink(state);
+    session.lastKey = lastKeyId(deps.store, state);
     markActive(state.id);
     return session;
   }
@@ -229,11 +256,13 @@ export class CaptureSession {
           digests,
           hashedAt,
           previous: this.last,
+          previousKeyId: this.lastKey,
         });
         item.record = sealed.record;
         item.recordSha256 = sealed.recordSha256;
         item.status = 'sealed';
         this.last = { id: sealed.record.recordId, recordSha256: sealed.recordSha256, fileSha256: digests.sha256 };
+        this.lastKey = sealed.keyId ?? this.lastKey;
       }
     } catch (error) {
       item.status = 'failed';
@@ -259,11 +288,12 @@ export class CaptureSession {
     };
     try {
       if (!this.deps.sealCheckpoint) throw new Error('No checkpoint sealer');
-      const sealed = await this.deps.sealCheckpoint({ session, sequence, checkpoint, previous: this.last });
+      const sealed = await this.deps.sealCheckpoint({ session, sequence, checkpoint, previous: this.last, previousKeyId: this.lastKey });
       item.record = sealed.record;
       item.recordSha256 = sealed.recordSha256;
       item.status = 'sealed';
       this.last = { id: sealed.record.recordId, recordSha256: sealed.recordSha256, fileSha256: checkpoint.sha256 };
+      this.lastKey = sealed.keyId ?? this.lastKey;
     } catch (error) {
       // An unsigned checkpoint is not kept, and gives its place in the chain back: the next one, a
       // few seconds later, vouches for these bytes too.

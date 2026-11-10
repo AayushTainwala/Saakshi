@@ -1,6 +1,6 @@
 # Saakshi evidence bundle format
 
-**Version 0.10** (10 November 2026, repair round A, group 2: free storage, stage one; 0.9 was 6 November 2026, round 2, written by the app from round 2, group 1.5; 0.8 and the versions before it: 0.5, 0.6 and 0.7 were also 6 November 2026, 0.3 and 0.4 were 5 November 2026, 0.2 was 21 October 2026, 0.1 was 20 October 2026). Status: in use by the app from its first release; may change before 1.0, always with a new version number.
+**Version 0.11** (10 November 2026, repair round A, group 3: one file per signing key; 0.10 was the same day, repair round A, group 2: free storage, stage one; 0.9 was 6 November 2026, round 2, written by the app from round 2, group 1.5; 0.8 and the versions before it: 0.5, 0.6 and 0.7 were also 6 November 2026, 0.3 and 0.4 were 5 November 2026, 0.2 was 21 October 2026, 0.1 was 20 October 2026). Status: in use by the app from its first release; may change before 1.0, always with a new version number.
 
 This document defines how Saakshi records the integrity of photos and videos, and the bundle it exports. It is written so that anyone (a lawyer, a court-appointed expert, another app) can check a bundle with standard tools and without Saakshi. Other apps and forks may produce and read this format. The key words MUST, SHOULD and MAY are used as in RFC 2119.
 
@@ -17,8 +17,8 @@ What this format does and does not show:
 - **Piece:** before 0.5 (body-cam) and 0.6 (bug mode), these modes saved a long recording as consecutive files of a fixed short length ("pieces"), each sealed as it was saved. Since then each records one continuous file, and a follow-on file of the same recording starts only as a fail-safe (section 3, step 7). The original files are never joined; a joined copy for sharing (section 11a) is a copy, with its own record. (In the record they are described by `segment`.)
 - **Cut-off safe:** a file that stays playable up to the moment its recording was cut off (the app killed, the phone forced off), because its container needs nothing written at the end (section 3).
 - **Record:** a small JSON document, one per file, describing it. Records are signed and chained.
-- **Device key:** an ECDSA P-256 key pair created once per app install inside the phone's security hardware. Its private half never leaves the hardware.
-- **Bundle:** a ZIP file holding a session's files, records, the device key's public part with its attestation, and the reports.
+- **Device key:** an ECDSA P-256 key pair created inside the phone's security hardware, normally once per app install. Its private half never leaves the hardware. If the hardware no longer holds it (the app's files were moved to another phone, say), the app makes a new one; from 0.11 the phone keeps a file for each key it has had, and the records say when the key changed (section 6).
+- **Bundle:** a ZIP file holding a session's files, records, the public part of the device key that signed them with its attestation (from 0.11, of each key if there was more than one), and the reports.
 
 ## 2. Algorithms
 
@@ -73,7 +73,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 ```json
 {
   "type": "saakshi.evidence.record",
-  "version": "0.10",
+  "version": "0.11",
   "id": "3f0a1c9e-5d0b-4a8e-9a3c-2f1b7c6d5e4f",
   "session": "8c2d4b6a-1e3f-4a5b-9c7d-0e1f2a3b4c5d",
   "sequence": 3,
@@ -128,7 +128,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 
 | Member | Meaning |
 |---|---|
-| `type`, `version` | Always `"saakshi.evidence.record"` and `"0.10"` for this version. Versions are compared as listed in section 12, not as numbers: 0.10 comes after 0.9. |
+| `type`, `version` | Always `"saakshi.evidence.record"` and `"0.11"` for this version. Versions are compared as listed in section 12, not as numbers: 0.10 and 0.11 come after 0.9. |
 | `id` | UUID (version 4) of this record. |
 | `session` | UUID of the capture session. |
 | `sequence` | Position in the session's chain, from 0, counting every record in the order it was made: each file's record when the file closed, and from 0.5 each checkpoint (section 4a). |
@@ -151,7 +151,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 | `locationStatus` | `"fixed"` (a position is given), `"denied"` (the user did not allow location) or `"unavailable"` (allowed, but no fix in time). |
 | `device` | As reported by the operating system. `modelName` may be null. The IMEI is not readable by apps and is not recorded; the user adds it to the certificate. |
 | `app` | The app's identifier, version and build number. |
-| `key` | The key identifier (section 2) of the device key that signed this record, and its algorithm. |
+| `key` | The key identifier (section 2) of the device key that signed this record (`id`), and its algorithm. From 0.11, optionally `replaces`: the identifier of the key before this one, which says in signed data that the signing key changed (section 6). It is present in the first record a new key signs, and in any record whose key differs from the key of the record before it in the chain; absent otherwise, and absent in a phone's first key's records. |
 
 The record has no member for the signature. The signature is a separate file (section 5), so the record file is exactly the bytes that were signed.
 
@@ -162,7 +162,7 @@ A checkpoint is signed while a body-cam file (from 0.5) or a bug-mode file (from
 ```json
 {
   "type": "saakshi.evidence.checkpoint",
-  "version": "0.10",
+  "version": "0.11",
   "id": "5d1e…",
   "session": "8c2d4b6a-1e3f-4a5b-9c7d-0e1f2a3b4c5d",
   "sequence": 7,
@@ -217,7 +217,17 @@ Upload parts get a body-cam or Pocket-recording file off the phone while it is s
 
 ## 6. Device key and attestation
 
-The app creates one device key per install, the first time it needs to sign, and never exports the private key.
+The app creates a device key the first time it needs to sign, and never exports the private key. Normally there is one per install.
+
+**One file per key (from 0.11).** The phone keeps a file for each device key it has had, `keys/<keyId>.json` in the app's storage, in the form below. A key's file is written when the key is made and rewritten only for that key (its attestation arriving); no key's file is ever replaced by another key's. Up to 0.10 the phone kept a single `device-key.json` and wrote each new key over it, so a recording signed by an earlier key could no longer be checked; that file is moved to `keys/<its keyId>.json` the first time the app opens after the update.
+
+**A key that is gone (from 0.11).** Before signing each record the app asks the security hardware which key it holds. If it holds none, the app makes a new key. If the key is not the one this phone had last, the earlier key is gone from the hardware (for example, the app's files were moved to another phone, whose hardware never held it). Then:
+- the earlier key's file stays, unchanged;
+- the new key's file carries `replaces`, the earlier key's `keyId`;
+- the first record the new key signs carries the same in `key.replaces` (section 4). If the app is interrupted before it notes that this has been said, the next record says it again;
+- in a session's chain, any record whose `key.id` differs from that of the record before it carries that earlier key's id in `key.replaces`. The chain itself is unbroken across the change: `previous` links the records as always.
+
+Recording is never refused because the key changed. `replaces` is the phone's own statement, signed by the new key; it does not prove that the two keys were on the same phone.
 
 **Android.** An Android Keystore key (`EC`, `secp256r1`, purpose `SIGN`, digest `SHA-256`), in StrongBox where the phone has it and otherwise in the Trusted Execution Environment, with no user-authentication requirement (so it can sign while recording). It is created with a Key Attestation challenge of 32 random bytes. The attestation is the certificate chain the Keystore returns for the key. Its leaf certificate's public key is the device key, and its attestation extension (OID `1.3.6.1.4.1.11129.2.1.17`) states:
 
@@ -234,12 +244,12 @@ The chain ends at one of Google's hardware attestation roots. Phones without har
 
 Apple's attestation object (CBOR, with a certificate chain to Apple's App Attest root) then states that the genuine Saakshi app, on a genuine Apple device, vouched for this device key's public key. `attestKey` needs the internet once. Until it succeeds, records are still signed, and the attestation is added to later bundles. Because the attestation binds the key and not a time, it covers records signed before it.
 
-**Device key file.** `device-key.json` in each bundle:
+**Device key file.** `device-key.json` in each bundle (from 0.11, the file of the key that signed the bundle's records, not of whichever key the phone holds when the bundle is made; section 7):
 
 ```json
 {
   "type": "saakshi.device-key",
-  "version": "0.10",
+  "version": "0.11",
   "keyId": "…",
   "algorithm": "ES256",
   "publicKeySpki": "<Base64 of DER SubjectPublicKeyInfo>",
@@ -259,6 +269,8 @@ Apple's attestation object (CBOR, with a certificate chain to Apple's App Attest
 - `storage` is `"strongbox"`, `"tee"`, `"secure-enclave"` or `"software"`.
 - On iPhone, `attestation` is `{ "format": "apple-app-attest", "keyId": "<Base64>", "attestationObject": "<Base64>", "clientDataHash": "<Base64>" }`.
 - `attestation` is null, with a reason in `attestationError`, when none could be obtained.
+- `version` is the format version when the file was last written.
+- `replaces` (from 0.11, optional): the `keyId` of the key this phone had before, when this key was made because that one was gone. Absent for a phone's first key.
 
 ## 7. Bundle
 
@@ -286,7 +298,10 @@ Signed records/0074 video 1.json.sig
 …
 manifest.json
 device-key.json
+device-key 2.json                                   (from 0.11, only if a second key signed some records)
 ```
+
+**The key files (from 0.11).** A bundle carries the file of each device key that signed one of its records: the key's own file as the phone keeps it (section 6). `device-key.json` is the file of the key that signed the first record in the chain. Nearly every bundle has only that. If the records name more than one key (the key was made again part-way through the recording), each other key's file is `device-key 2.json`, `device-key 3.json` and so on, in the order the records first use the keys. A reader works the names out from the signed records' `key.id`, in `sequence` order. A bundle has no key file that no record names. Up to 0.10 a bundle carried one `device-key.json`, the key the phone held when the bundle was made.
 
 Up to 0.7 the layout was `manifest.json`, `device-key.json`, `media/<file.name>`, `records/<sequence>.json` and `.json.sig`, `hash-report.txt`, `certificate-part-a.pdf` and `README.txt`, and the bundle was named `saakshi-<first 8 characters of session>-<YYYYMMDD-HHMM>.zip`.
 
@@ -295,7 +310,7 @@ Up to 0.7 the layout was `manifest.json`, `device-key.json`, `media/<file.name>`
 ```json
 {
   "type": "saakshi.evidence.bundle",
-  "version": "0.10",
+  "version": "0.11",
   "session": "8c2d4b6a-…",
   "name": "2026-11-05 10-40 IST Body-cam",
   "createdAt": "2026-11-05T06:15:00.000Z",
@@ -306,6 +321,9 @@ Up to 0.7 the layout was `manifest.json`, `device-key.json`, `media/<file.name>`
   ],
   "checkpoints": [
     { "record": "Signed records/0000 video 1 checkpoint 0.json", "signature": "Signed records/0000 video 1 checkpoint 0.json.sig", "recordId": "…", "recording": "9b3f…", "checkpoint": 0, "size": 3801088, "sha256": "…", "recordSha256": "…" }
+  ],
+  "keys": [
+    { "file": "device-key.json", "keyId": "…" }
   ],
   "witness": [
     { "sentAt": "2026-11-05T05:20:12.000Z", "chainHead": "…", "recipients": 2, "result": "sent" }
@@ -318,6 +336,7 @@ Up to 0.7 the layout was `manifest.json`, `device-key.json`, `media/<file.name>`
 - `name` (from 0.8) is the record's name, as in the bundle's file name.
 - `records` lists the files' records: where each record, its signature and its original are in the bundle, and (from 0.8) the record's `id` and the app's name for the file (`fileName`, the record's `file.name`). A reader finds a record's original through this list; up to 0.7 it is `media/<file.name>`. Because the manifest is not signed, a reader works each name out from the signed record (above) rather than trusting it, and checks that every file in `Original files/` is some record's: then the file at each readable name is the one checked against a signed record.
 - `checkpoints` (from 0.5) lists the checkpoint records. Both kinds are in the records folder, numbered by `sequence`.
+- `keys` (from 0.11) lists the key files in the bundle and each one's `keyId`, in the order the records first use the keys. Like the rest of the manifest it is not signed: a reader works it out from the records.
 - `witness` lists every witness message the app opened for the user (section 9), including ones the user cancelled. `recipients` is how many recipients the app filled in; 0 means the user chose them in the SMS app. `result` is what the phone reported: `"sent"`, `"cancelled"` or `"unknown"` (Android always reports "unknown").
 - `certificate` is null when no certificate has been made.
 - `Hash report.txt` is a plain-text table of every file's name in the bundle and in its record, its size, SHA-256, SHA-1 and MD5, every record's name and SHA-256, how many checkpoints each body-cam or bug-mode file has and what the last one covers, and the chain head, with times in IST. It is the hash report the Schedule asks to be enclosed. A certificate made from 0.8 names the files as the bundle does.
@@ -379,7 +398,7 @@ ID: 8c2d4b6a-1e3f-4a5b-9c7d-0e1f2a3b4c5d
 With standard tools (`unzip`, `sha256sum`, `openssl`):
 
 1. Unzip the bundle.
-2. **Public key:** save the `publicKeyPem` value from `device-key.json` as `key.pem`. Check that `openssl pkey -pubin -in key.pem -outform DER | sha256sum` equals `keyId`, and equals `key.id` in every record.
+2. **Public key:** save the `publicKeyPem` value from `device-key.json` as `key.pem`. Check that `openssl pkey -pubin -in key.pem -outform DER | sha256sum` equals `keyId`, and equals `key.id` in every record. From 0.11, if the bundle has `device-key 2.json` or more, do the same for each (as `key2.pem` and so on): each record is checked with the key file whose `keyId` equals its `key.id`, every record must name a key that is in the bundle, and every key file must be named by some record. Where a record's `key.id` differs from that of the record before it, the record must be of version 0.11 or later and its `key.replaces` must equal the earlier record's `key.id`.
 3. **Signatures:** for each record, run `openssl dgst -sha256 -verify key.pem -signature "Signed records/0000 video 1 checkpoint 0.json.sig" "Signed records/0000 video 1 checkpoint 0.json"` (up to 0.7: `records/0000.json`). It must print `Verified OK`.
 4. **Files:** for each file's record, find its original: from 0.8 at the name section 7 gives from the record, which the manifest's `media` and the hash report also give; up to 0.7, `media/<file.name>`. Its `sha256sum` must equal `file.sha256`, and its size `file.size`. From 0.8, every file in `Original files/` must be some record's original, and each record's own name must be the one section 7 gives: otherwise a name a person reads, such as when a video started, could be wrong.
 4a. **Checkpoints (from 0.5):** for each checkpoint record, find the file's record with the same `recording`, and that file's original as in step 4. `head -c <file.size of the checkpoint> "<original>" | sha256sum` must equal the checkpoint's `file.sha256`. The checkpoints of one file have rising numbers (a number may be missing, if that checkpoint could not be signed), each covers more bytes than the last, and all come before the file's record in the chain.
@@ -388,7 +407,7 @@ With standard tools (`unzip`, `sha256sum`, `openssl`):
    - Android: verify the certificate chain up to a Google hardware attestation root, check the leaf's public key equals the device key, and read the attestation extension (package name `in.aayushtainwala.saakshi`, the app's signing-certificate digest published with each release, security level, verified-boot state). Also check Google's attestation revocation list.
    - iPhone: verify the App Attest object as Apple documents for servers ("Validating apps that connect to your server"), with App ID `<Team ID>.in.aayushtainwala.saakshi` and `clientDataHash` equal to SHA-256 of the device key's DER public key.
 
-`tools/verify-bundle.mjs` in the Saakshi repository runs steps 2–5 with Node.js and no other dependencies, step 4a included (it reads each file once and takes the SHA-256 of every checkpointed prefix on the way). The tool reads versions 0.1 to 0.10, lists each file it checked, and does not yet check attestation chains (step 6). From 0.10 it accepts the end reasons `"storage-full"` and `"storage-sound-only"`, fails a record of an earlier version that ends with either, fails `"storage-sound-only"` in a record that is not body-cam's, and fails either in a record marked `interrupted`. From 0.9 it also checks the shape of `capture.batteryPercent` (a whole number from 0 to 100) and `capture.startedFrom` ("pocket" or "phone-taken", only with `capture.mode` "bug"), and fails a record of an earlier version that carries either. For a 0.8 bundle it works out every name from the signed records and fails on any that differ, in the folders or in the manifest. For any bundle it fails on:
+`tools/verify-bundle.mjs` in the Saakshi repository runs steps 2–5 with Node.js and no other dependencies, step 4a included (it reads each file once and takes the SHA-256 of every checkpointed prefix on the way). The tool reads versions 0.1 to 0.11, lists each file it checked, and does not yet check attestation chains (step 6). From 0.11 it checks each record against the key its `key.id` names, among `device-key.json` and any `device-key 2.json` and later; fails a record that names a key not in the bundle, a key file that no record names or that is under another name than its place gives it, a change of key that the record does not say in `key.replaces`, a change of key in a record older than 0.11, and `key.replaces` in a record older than 0.11; and says where the key changes. From 0.10 it accepts the end reasons `"storage-full"` and `"storage-sound-only"`, fails a record of an earlier version that ends with either, fails `"storage-sound-only"` in a record that is not body-cam's, and fails either in a record marked `interrupted`. From 0.9 it also checks the shape of `capture.batteryPercent` (a whole number from 0 to 100) and `capture.startedFrom` ("pocket" or "phone-taken", only with `capture.mode` "bug"), and fails a record of an earlier version that carries either. For a 0.8 bundle it works out every name from the signed records and fails on any that differ, in the folders or in the manifest. For any bundle it fails on:
 - a file that is not part of the bundle's one layout (for example a copy in a look-alike folder, or at the top);
 - a file in the originals' or records' folder that no record accounts for;
 - names a computer may treat as the same (they differ only in case, or in how a letter is written);
@@ -456,6 +475,7 @@ To check a joined copy: verify its record's signature as in section 10, step 3; 
 - **0.8** (6 November 2026): the bundle, its folders and its files have names a person can read (section 7): `Saakshi <record name>.zip`, `Original files/`, `Signed records/`, `Hash report.txt`, `Certificate Part A.pdf`; the manifest gains `name` and, for each record, `recordId` and `fileName`, and is how a reader finds a record's original; README.txt is in English and Hindi. No record member was added or removed.
 - **0.9** (6 November 2026, specified for round 2): the low-battery handover at 5% instead of the 3% stop (`capture.endReason: "low-battery"`, section 4); optional `capture.batteryPercent` in file and checkpoint records; optional `capture.startedFrom` (`"pocket"` or `"phone-taken"`); upload parts and their lengthening schedule (section 4b); bug mode is called Pocket recording in names and in the witness text, with `capture.mode` still `"bug"`. No required member was added or removed. Written by the app from round 2, group 1.5 (`FORMAT_VERSION` "0.9"; `tools/verify-bundle.mjs` reads it). The battery level is read when each record is signed, right after its file closes or its checkpoint is made, and is left out of a file sealed after a cut-off. Round 2, group 1.6 (9 November 2026) changed only how Android body-cam saves power after the handover (no 480p, no camera rebuild: the same size at half the bit rate); no member changed, so it stays 0.9.
 - **0.10** (10 November 2026, repair round A, group 2: free storage, stage one): new `capture.endReason` values `"storage-sound-only"` (body-cam's video file closed at the keep-free amount, the recording carrying on as sound only) and `"storage-full"` (the app stopped the recording for lack of room); on Android, body-cam's sound-only files are ADTS AAC, checkpointed at the end of whole frames (section 3, steps 2, 8a and 9). No record member was added or removed; only the version and the allowed `endReason` values changed. `tools/verify-bundle.mjs` reads it, and older bundles still verify.
+- **0.11** (10 November 2026, repair round A, group 3: one file per signing key): the phone keeps a file for each device key it has had and never writes one key's file over another's; a bundle carries the file of the key that signed its records, and of each key if the records name more than one (`device-key 2.json` and so on; manifest `keys`); a record says that the signing key changed in the new optional member `key.replaces`; the key file gains the optional member `replaces` (sections 4, 6, 7 and 10). No required member was added or removed. `tools/verify-bundle.mjs` reads it and checks each record against the key it names; older bundles still verify.
 - **Witness message v1** (6 November 2026): section 9. The message's format is versioned on its own; the bundle format is unchanged by it.
 - **Later (planned):** OpenTimestamps proofs for each chain head and record, in `timestamps/<recordSha256>.ots`, listed in the manifest's `timestamps`; upload state for copies in the user's cloud drive (`uploads`, section 4b, built with E7).
 - **1.1 of the app** (planned): C2PA Content Credentials and sensor readings.

@@ -9,7 +9,24 @@ export type Signer = {
   keyId: string;
   /** ES256 signature, DER, over the UTF-8 bytes of `body`. */
   sign: (body: string) => Promise<Uint8Array>;
+  /**
+   * From 0.11: this key is new, made because the phone's earlier key (this id) was gone, and no
+   * signed record has said so yet. The next record says it (`key.replaces`).
+   */
+  replaces?: string;
+  /** Called once a record saying `replaces` has been written. */
+  said?: () => void;
 };
+
+/**
+ * What a record says about a change of key (`key.replaces`, format 0.11): the key of the record
+ * before it in the chain, if that differs from the key signing now; otherwise the phone's earlier
+ * key, if this key is new and that has not been said yet.
+ */
+function replacedKey(signer: Signer, previousKeyId: string | null | undefined): string | undefined {
+  if (previousKeyId && previousKeyId !== signer.keyId) return previousKeyId;
+  return signer.replaces;
+}
 
 export type SealerDeps = {
   store: LockerStore;
@@ -69,9 +86,10 @@ export function createSealer(deps: SealerDeps) {
       device: deps.device(),
       app: deps.app(),
       keyId: signer.keyId,
+      keyReplaces: replacedKey(signer, input.previousKeyId),
     });
 
-    return write(deps, input.session.id, item.sequence, record.id, canonicalize(record), signer);
+    return write(deps, input.session.id, item.sequence, record.id, canonicalize(record), signer, record.key.replaces);
   };
 }
 
@@ -105,8 +123,9 @@ export function createCheckpointSealer(deps: SealerDeps) {
       device: deps.device(),
       app: deps.app(),
       keyId: signer.keyId,
+      keyReplaces: replacedKey(signer, input.previousKeyId),
     });
-    return write(deps, input.session.id, input.sequence, record.id, canonicalize(record), signer);
+    return write(deps, input.session.id, input.sequence, record.id, canonicalize(record), signer, record.key.replaces);
   };
 }
 
@@ -117,9 +136,12 @@ async function write(
   recordId: string,
   body: string,
   signer: Signer,
+  replaces: string | undefined,
 ): Promise<SealResult> {
   const signature = await signer.sign(body);
   const name = recordFileName(sequence);
   deps.store.writeRecord(sessionId, name, body, signature);
-  return { record: { file: name, recordId }, recordSha256: await deps.sha256Hex(body) };
+  // The phone's new key has now been said in a signed record.
+  if (replaces && replaces === signer.replaces) signer.said?.();
+  return { record: { file: name, recordId }, recordSha256: await deps.sha256Hex(body), keyId: signer.keyId };
 }

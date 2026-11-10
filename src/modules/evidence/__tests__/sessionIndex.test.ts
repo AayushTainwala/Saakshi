@@ -190,12 +190,13 @@ describe('session.json is written beside and swapped in', () => {
     expect(ctx.locker.store.listPending(id)).toEqual([{ name: 'a.json', marker }]);
   });
 
-  it('does the same for the device-key file', () => {
+  it('does the same for a signing key\'s file', () => {
     const ctx = setup();
-    ctx.locker.store.writeDeviceKeyJson('{"keyId":"one"}');
+    const keyId = 'ab'.repeat(32);
+    ctx.locker.store.writeKeyJson(keyId, '{"attestation":null}');
     ctx.locker.failNextReplace();
-    expect(() => ctx.locker.store.writeDeviceKeyJson('{"keyId":"two"}')).toThrow();
-    expect(ctx.locker.store.readDeviceKeyJson()).toBe('{"keyId":"one"}');
+    expect(() => ctx.locker.store.writeKeyJson(keyId, '{"attestation":{}}')).toThrow();
+    expect(ctx.locker.store.readKeyJson(keyId)).toBe('{"attestation":null}');
   });
 });
 

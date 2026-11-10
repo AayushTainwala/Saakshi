@@ -15,6 +15,17 @@ export type DeviceInfo = {
 
 export type AppInfo = { id: string | null; version: string | null; build: string | null };
 
+/**
+ * The key that signed a record. From 0.11, `replaces` says in plain data that the signing key
+ * changed: it is the id of the key before this one, in the first record a new key signs, and in a
+ * record whose key differs from that of the record before it in the chain. Absent otherwise.
+ */
+export type RecordKey = { id: string; algorithm: 'ES256'; replaces?: string };
+
+export function recordKey(keyId: string, replaces?: string | null): RecordKey {
+  return { id: keyId, algorithm: 'ES256', ...(replaces && replaces !== keyId ? { replaces } : {}) };
+}
+
 /** A record as defined in docs/spec/evidence-bundle.md, section 4. */
 export type EvidenceRecord = {
   type: typeof RECORD_TYPE;
@@ -64,7 +75,7 @@ export type EvidenceRecord = {
   locationStatus: LocationSnapshot['status'];
   device: DeviceInfo;
   app: AppInfo;
-  key: { id: string; algorithm: 'ES256' };
+  key: RecordKey;
 };
 
 export type RecordInput = {
@@ -92,6 +103,8 @@ export type RecordInput = {
   device: DeviceInfo;
   app: AppInfo;
   keyId: string;
+  /** From 0.11: the key before this one, when this record is to say that the key changed. */
+  keyReplaces?: string | null;
 };
 
 /** The 0.9 members, present only when known (bundle spec section 4). */
@@ -156,7 +169,7 @@ export function buildRecord(input: RecordInput): EvidenceRecord {
     ...locationOf(input.location),
     device: input.device,
     app: input.app,
-    key: { id: input.keyId, algorithm: 'ES256' },
+    key: recordKey(input.keyId, input.keyReplaces),
   };
 }
 
@@ -193,7 +206,7 @@ export type CheckpointRecord = {
   locationStatus: EvidenceRecord['locationStatus'];
   device: DeviceInfo;
   app: AppInfo;
-  key: { id: string; algorithm: 'ES256' };
+  key: RecordKey;
 };
 
 export type CheckpointRecordInput = {
@@ -217,6 +230,8 @@ export type CheckpointRecordInput = {
   device: DeviceInfo;
   app: AppInfo;
   keyId: string;
+  /** From 0.11: the key before this one, when this record is to say that the key changed. */
+  keyReplaces?: string | null;
 };
 
 export function buildCheckpointRecord(input: CheckpointRecordInput): CheckpointRecord {
@@ -242,6 +257,6 @@ export function buildCheckpointRecord(input: CheckpointRecordInput): CheckpointR
     ...locationOf(input.location),
     device: input.device,
     app: input.app,
-    key: { id: input.keyId, algorithm: 'ES256' },
+    key: recordKey(input.keyId, input.keyReplaces),
   };
 }

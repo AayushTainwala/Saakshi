@@ -6,7 +6,9 @@ import { INDEX_FILE, joinLog, LOG_FILE, logLine, parseIndex, parseLog, rebuildSe
 /**
  * The evidence locker on disk, inside the app's private documents directory:
  *
- *   evidence/device-key.json
+ *   evidence/keys/<key id>.json                   one file for each signing key this phone has had;
+ *                                                  a key's file is never replaced by another key's
+ *   evidence/key-change.json                      a new key waiting to be said in a signed record
  *   evidence/sessions/<session id>/session.json   the locker's bookkeeping (unsigned), replaced in
  *                                                  one step whenever it changes
  *   evidence/sessions/<session id>/session.log    the bookkeeping's checkpoints and witness
@@ -57,9 +59,23 @@ export interface LockerStore {
   listPending(sessionId: string): { name: string; marker: PendingMarker }[];
   writePending(sessionId: string, name: string, marker: PendingMarker): void;
   deletePending(sessionId: string, name: string): void;
-  readDeviceKeyJson(): string | null;
-  writeDeviceKeyJson(json: string): void;
+  /**
+   * A signing key's own file, `keys/<key id>.json` (repair round A, group 3), or null if this
+   * phone has none for it. The old single `device-key.json` is moved there first, once.
+   */
+  readKeyJson(keyId: string): string | null;
+  /** Writes one key's file, in one step. No other key's file is touched. */
+  writeKeyJson(keyId: string, json: string): void;
+  /** The ids of the keys that have a file. */
+  listKeyIds(): string[];
+  /** A new key waiting to be said in a signed record (integrity/deviceKey.ts), or null. */
+  readKeyChange(): string | null;
+  /** Notes it, or with null removes the note once it has been said. */
+  writeKeyChange(json: string | null): void;
 }
+
+/** A key id: the SHA-256 of the public key, 64 lowercase hex characters. Also a safe file name. */
+export const KEY_ID = /^[0-9a-f]{64}$/;
 
 /** What `repair` did, by session id. */
 export type RepairReport = { rebuilt: string[]; damaged: string[]; caughtUp: string[]; leftovers: number };
@@ -130,6 +146,26 @@ export function createLocker(files: LockerFiles, now: () => Date = () => new Dat
     return removed;
   }
 
+  const keyUri = (keyId: string) => join(files.rootUri, 'keys', `${keyId}.json`);
+
+  /**
+   * Before repair round A, group 3, the phone kept one `device-key.json` and wrote each new key
+   * over it. The first time anything asks for a key after the update, that file is moved to
+   * `keys/<its key id>.json`. Nothing is deleted: if it can't be read, or a file for that key is
+   * already there, it stays where it is.
+   */
+  function moveOldKeyFile(): void {
+    const old = join(files.rootUri, 'device-key.json');
+    try {
+      if (!files.stat(old)) return;
+      const keyId: unknown = (JSON.parse(files.readText(old)) as { keyId?: unknown }).keyId;
+      if (typeof keyId !== 'string' || !KEY_ID.test(keyId) || files.stat(keyUri(keyId))) return;
+      files.move(old, keyUri(keyId));
+    } catch {
+      // It stays where it is, and is tried again next time.
+    }
+  }
+
   const store: LockerStore = {
     createSession(id, createdAt) {
       const dir = dirOf(id);
@@ -180,7 +216,13 @@ export function createLocker(files: LockerFiles, now: () => Date = () => new Dat
     },
 
     repair(options = {}) {
-      const report: RepairReport = { rebuilt: [], damaged: [], caughtUp: [], leftovers: removeLeftovers(files.rootUri) };
+      moveOldKeyFile();
+      const report: RepairReport = {
+        rebuilt: [],
+        damaged: [],
+        caughtUp: [],
+        leftovers: removeLeftovers(files.rootUri) + removeLeftovers(join(files.rootUri, 'keys')),
+      };
       for (const id of files.sessionIds()) {
         if (options.skip?.(id)) continue;
         const dir = dirOf(id);
@@ -271,10 +313,32 @@ export function createLocker(files: LockerFiles, now: () => Date = () => new Dat
       files.remove(join(dirOf(sessionId), 'pending', name));
     },
 
-    readDeviceKeyJson: () => textOrNull(join(files.rootUri, 'device-key.json')),
+    readKeyJson(keyId) {
+      if (!KEY_ID.test(keyId)) return null;
+      moveOldKeyFile();
+      return textOrNull(keyUri(keyId));
+    },
 
-    writeDeviceKeyJson(json) {
-      files.replaceText(join(files.rootUri, 'device-key.json'), json);
+    writeKeyJson(keyId, json) {
+      if (!KEY_ID.test(keyId)) throw new Error('Not a key id');
+      moveOldKeyFile();
+      files.replaceText(keyUri(keyId), json);
+    },
+
+    listKeyIds() {
+      moveOldKeyFile();
+      return files
+        .list(join(files.rootUri, 'keys'))
+        .filter((entry) => !entry.folder && entry.name.endsWith('.json') && KEY_ID.test(entry.name.slice(0, -5)))
+        .map((entry) => entry.name.slice(0, -5));
+    },
+
+    readKeyChange: () => textOrNull(join(files.rootUri, 'key-change.json')),
+
+    writeKeyChange(json) {
+      const uri = join(files.rootUri, 'key-change.json');
+      if (json === null) files.remove(uri);
+      else files.replaceText(uri, json);
     },
   };
   return store;

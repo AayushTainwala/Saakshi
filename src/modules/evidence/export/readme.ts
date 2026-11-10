@@ -18,8 +18,32 @@ export function readme(input: {
   /** A record and a file of this bundle, for the example commands. */
   exampleRecord: string;
   exampleMedia: string;
+  /**
+   * The other key files in the bundle ("device-key 2.json", ...), when the phone's signing key was
+   * made again while this was recorded (format 0.11). Nearly always there are none.
+   */
+  otherKeyFiles?: readonly string[];
 }): string {
   const { name, fileName, exampleRecord, exampleMedia } = input;
+  const others = input.otherKeyFiles ?? [];
+  const moreKeysEn = others.length
+    ? `
+  ${others.join(', ')}
+      The phone's signing key was made again while this was recorded (for example, the app's
+      files were moved to a new phone, where the old key does not exist). ${others.length === 1 ? 'This file holds' : 'These files hold'} the
+      later ${others.length === 1 ? 'key' : 'keys'}. Each record's "key.id" names the key that signed it, and the first record signed
+      by a new key says so in "key.replaces". Check each record with the key it names.
+`
+    : '';
+  const moreKeysHi = others.length
+    ? `
+  ${others.join(', ')}
+      इस रिकॉर्डिंग के दौरान फ़ोन की साइनिंग की दोबारा बनी (जैसे, ऐप की फ़ाइलें नए फ़ोन पर ले
+      जाई गईं, जहाँ पुरानी की नहीं होती)। ${others.length === 1 ? 'इस फ़ाइल में बाद की की है।' : 'इन फ़ाइलों में बाद की कीज़ हैं।'} हर रिकॉर्ड का "key.id"
+      बताता है कि उस पर किस की से हस्ताक्षर हुआ, और नई की से हस्ताक्षरित पहला रिकॉर्ड यह बात
+      "key.replaces" में कहता है। हर रिकॉर्ड को उसी की से जाँचें जिसका वह नाम लेता है।
+`
+    : '';
   // A byte-order mark and Windows line ends, so that Notepad on an older PC shows the Hindi and the
   // lines as they are; other readers ignore both.
   return `\ufeffSAAKSHI EVIDENCE BUNDLE / साक्षी सबूत बंडल
@@ -63,7 +87,7 @@ WHAT IS IN IT
   device-key.json
       The phone's public key, which checks the signatures, and, if the phone could make one, an
       attestation: a statement signed through Google or Apple about the key and the app.
-
+${moreKeysEn}
   manifest.json
       A list of everything in the bundle, for software. It also gives each file's name inside the
       app, which is the name in its record ("file.name").
@@ -154,7 +178,7 @@ present, is Part A, filled in by the app. The app cannot provide Part B.
   device-key.json
       फ़ोन की पब्लिक की (public key), जिससे हस्ताक्षरों की जाँच होती है, और अगर फ़ोन बना सका तो
       एक attestation: Google या Apple के ज़रिए हस्ताक्षरित बयान, उस की और ऐप के बारे में।
-
+${moreKeysHi}
   manifest.json
       बंडल में जो कुछ है उसकी सूची, सॉफ़्टवेयर के लिए। इसमें हर फ़ाइल का ऐप के अंदर का नाम भी है,
       जो उसके रिकॉर्ड में लिखा नाम है ("file.name")।

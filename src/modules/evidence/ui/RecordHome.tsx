@@ -18,7 +18,7 @@ export function RecordHome() {
   const sessions = useSessions();
 
   // Create the signing key ahead of the first recording and, on iPhone, retry App Attest until it
-  // succeeds (it needs the internet once). Failures are kept in device-key.json, never shown here.
+  // succeeds (it needs the internet once). Failures are kept in the key's own file, never shown here.
   useEffect(() => {
     attestIfNeeded(fileLocker).catch(() => undefined);
     // Seal anything a crash or forced power-off cut off last time (spec E1).

@@ -12,6 +12,10 @@ import { app, handedOver } from './handedOver';
 // two new end reasons for free storage, stage one. "storage-sound-only": a body-cam video file
 // closed at the keep-free amount, sound carrying on in the next file. "storage-full": the app
 // stopped the recording cleanly for lack of room.
+//
+// The records here are written exactly as 0.10 wrote them, so this also shows that a bundle made
+// before format 0.11 (repair round A, group 3) still verifies with today's checker.
+jest.mock('../constants', () => ({ ...jest.requireActual('../constants'), FORMAT_VERSION: '0.10' }));
 
 const VERIFY = join(__dirname, '../../../../tools/verify-bundle.mjs');
 const cleanup: string[] = [];

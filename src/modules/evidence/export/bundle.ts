@@ -57,13 +57,14 @@ async function write(id: string, open: (fileName: string) => BundleOutput | Prom
   await fillMissingCrc(fileLocker, hashFile, id);
   const session = fileLocker.readSession(id);
   if (!session) throw new Error('No such session');
-  const key = await attestIfNeeded(fileLocker);
+  // On iPhone, the present key's App Attest binding is tried again before a bundle is made. The
+  // bundle carries the key that signed this recording, which the plan takes from the records.
+  await attestIfNeeded(fileLocker);
   const now = new Date();
   const certificate = new File(fileLocker.sessionFileUri(id, CERTIFICATE_FILE));
   const plan = planBundle({
     store: fileLocker,
     id,
-    key,
     now,
     app: appInfo(),
     certificate: session.certificate && certificate.exists ? certificate.bytesSync() : null,
