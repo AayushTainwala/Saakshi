@@ -43,8 +43,11 @@ export function planBundle(input: {
   const body: PlannedEntry[] = [];
   for (const { item, body: text, bundled } of sealed) {
     const { record, recordPath, mediaPath } = bundled;
+    const crc32 = item.digests!.crc32;
+    // Bookkeeping made again from the signed records has no CRC-32s; export/crc.ts fills them in first.
+    if (crc32 === null) throw new Error(`${item.media} has no CRC-32 yet; read it with fillMissingCrc first.`);
     body.push(
-      { name: mediaPath, media: { file: item.media, size: record.file.size, crc32: item.digests!.crc32, modified: new Date(record.capture.endedAt) } },
+      { name: mediaPath, media: { file: item.media, size: record.file.size, crc32, modified: new Date(record.capture.endedAt) } },
       { name: recordPath, bytes: encode(text) },
       { name: `${recordPath}.sig`, bytes: store.readRecordBytes(id, `${bundled.recordFile}.sig`) },
     );

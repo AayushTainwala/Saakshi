@@ -12,7 +12,7 @@ import { BundleBusyError, shareBundle } from '../export/bundle';
 import { type ExportFolder, ExportFolderError, exportToFolder, pickExportFolder, readExportFolder, saveExportFolder } from '../export/folder';
 import { JoinError } from '../export/joinedCopy';
 import { shareKind, shareTarget } from '../export/shareTarget';
-import { needsCopy, playVideo, shareFile, shareJoinedCopy } from '../export/videoActions';
+import { needsCopy, playVideo, shareFile, shareJoinedCopy, shareOriginal } from '../export/videoActions';
 import { runCheck } from '../locker/actions';
 import { deleteSession, SessionBusyError } from '../locker/delete';
 import { fileLocker } from '../locker/store';
@@ -23,6 +23,7 @@ import { sendWitnessMessage, SmsUnavailableError } from '../witness/send';
 import type { EvidenceItem, MediaKind, SessionState } from '../types';
 import { formatBytes, formatIST } from './format';
 import { endReasonLabel } from './endReasons';
+import { DamagedRecord } from './DamagedRecord';
 import { kindLabel, lengthLabel } from './labels';
 import { RecordingPlayer } from './RecordingPlayer';
 import { Thumbnail } from './RecordRow';
@@ -89,7 +90,9 @@ function ItemCard({ item, session }: { item: EvidenceItem; session: SessionState
       ? t('locker.itemSealed')
       : item.status === 'failed'
         ? t('locker.itemFailed', { error: item.error ?? '' })
-        : t('locker.itemPending');
+        : item.noRecord
+          ? t('locker.itemNoRecord')
+          : t('locker.itemPending');
   return (
     <Card>
       {inLocker && (item.kind === 'photo' || item.kind === 'video') ? (
@@ -113,9 +116,18 @@ function ItemCard({ item, session }: { item: EvidenceItem; session: SessionState
         {formatIST(item.startedAt, true)}
         {item.digests ? ` · ${formatBytes(item.digests.size)}` : ''}
       </AppText>
-      <AppText color={item.status === 'failed' ? 'danger' : item.status === 'sealed' ? 'success' : 'textMuted'}>
+      <AppText color={item.status === 'failed' ? 'danger' : item.status === 'sealed' ? 'success' : item.noRecord ? 'warning' : 'textMuted'}>
         {status}
       </AppText>
+      {/* A file found without a signed record when the index was rebuilt: it can still be shared out as it is. */}
+      {item.noRecord ? (
+        <Button
+          variant="secondary"
+          label={t('damaged.share')}
+          busy={sharing}
+          onPress={() => void run(() => shareOriginal(fileLocker.mediaUri(session.id, item.media), t('damaged.share')), setSharing)}
+        />
+      ) : null}
       {ended ? <AppText color={item.interrupted ? 'warning' : 'textMuted'}>{t('ended.label', { reason: ended })}</AppText> : null}
       {item.digests ? (
         <AppText variant="mono" selectable accessibilityLabel={t('locker.sha256')}>
@@ -172,6 +184,9 @@ export function SessionDetail({ id }: { id: string }) {
       </Screen>
     );
   }
+
+  // Its index can't be read and can't be made again: it is still listed, with its files to share.
+  if (session.damaged) return <DamagedRecord session={session} />;
 
   const sealed = session.items.filter((item) => item.status === 'sealed').length;
   const summary = summarize(session, (item) => recordModeOf(session.id, item));
@@ -349,6 +364,16 @@ export function SessionDetail({ id }: { id: string }) {
       <AppText color="textMuted">{t('list.started', { time: formatIST(summary.startedAt, true) })}</AppText>
       {endedHow && summary.kind !== 'camera' ? (
         <AppText color={last?.interrupted ? 'warning' : 'textMuted'}>{t('ended.label', { reason: endedHow })}</AppText>
+      ) : null}
+
+      {session.rebuilt ? (
+        <Card>
+          <AppText variant="label" color="warning">
+            {t('rebuilt.title')}
+          </AppText>
+          <AppText>{t('rebuilt.body', { time: formatIST(session.rebuilt.at) })}</AppText>
+          <AppText color="textMuted">{t('rebuilt.lost')}</AppText>
+        </Card>
       ) : null}
 
       {summary.kind !== 'camera' && summary.videos + summary.sounds > 0 ? (

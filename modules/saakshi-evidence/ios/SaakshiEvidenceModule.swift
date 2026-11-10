@@ -165,6 +165,16 @@ public class SaakshiEvidenceModule: Module {
       throw Exception(name: "ERR_UNSUPPORTED", description: "Remuxing is only needed for Android recordings")
     }
 
+    // Replaces a small file in one step (AtomicFile.swift; repair round A, group 1). Synchronous,
+    // so the locker's bookkeeping is written from JavaScript in the order things happen.
+    Function("writeTextAtomic") { (uri: URL, text: String) throws -> Void in
+      guard uri.isFileURL else {
+        throw Exception(name: "ERR_FILE_URI", description: "Not a local file URI: \(uri)")
+      }
+      try FileManager.default.createDirectory(at: uri.deletingLastPathComponent(), withIntermediateDirectories: true)
+      try AtomicFile.replace(uri, with: Data(text.utf8))
+    }
+
     // Reads the file once and returns its size, SHA-256, SHA-1, MD5 and CRC-32.
     // Runs in a detached task so a large file doesn't hold up the module's queue.
     AsyncFunction("hashFile") { (uri: URL) async throws -> [String: Any] in
