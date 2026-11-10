@@ -4,8 +4,10 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { useSyncExternalStore } from 'react';
 
+import { readBatteryPercent } from '@/platform/battery';
+
 import { createLiveApi, type LivePoint } from './api';
-import { type LiveShare, LiveShareController, type Tracker } from './share';
+import { type LiveShare, LiveShareController, type Tracker, withBattery } from './share';
 
 const TASK = 'saakshi-live-location';
 const FILE_NAME = 'live-share.json';
@@ -22,21 +24,31 @@ function toPoint(position: Location.LocationObject): LivePoint {
 }
 
 /**
+ * The updates' settings, the same in saving mode (owner, 9 Nov 2026: positions keep full accuracy
+ * at 5% battery, and are only sent less often). Group 1.6 had iPhone drop to about 100 m in saving
+ * mode; that was undone in group 1.7, to be revisited once a phone test shows what a coarser
+ * position would save.
+ */
+export const TRACKING_OPTIONS: Location.LocationTaskOptions = {
+  accuracy: Location.Accuracy.High,
+  timeInterval: 30_000,
+  distanceInterval: 20,
+  pausesUpdatesAutomatically: false,
+  showsBackgroundLocationIndicator: true,
+  activityType: Location.ActivityType.Other,
+};
+
+/**
  * Position updates that carry on with the screen locked, with only "while using" permission:
  * Android runs them in a location foreground service with a notification; iPhone shows the blue
  * location indicator. Both must be started while the app is on screen.
  */
-const tracker: Tracker = {
+export const tracker: Tracker = {
   async start(notice) {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') throw new LocationDeniedError('Location permission was not granted');
     await Location.startLocationUpdatesAsync(TASK, {
-      accuracy: Location.Accuracy.High,
-      timeInterval: 30_000,
-      distanceInterval: 20,
-      pausesUpdatesAutomatically: false,
-      showsBackgroundLocationIndicator: true,
-      activityType: Location.ActivityType.Other,
+      ...TRACKING_OPTIONS,
       foregroundService: {
         notificationTitle: notice.title,
         notificationBody: notice.body,
@@ -80,7 +92,7 @@ export function registerLiveLocationTask(): void {
   if (TaskManager.isTaskDefined(TASK)) return;
   TaskManager.defineTask<{ locations: Location.LocationObject[] }>(TASK, async ({ data, error }) => {
     if (error || !data?.locations?.length) return;
-    await liveShare.receive(data.locations.map(toPoint));
+    await liveShare.receive(withBattery(data.locations.map(toPoint), await readBatteryPercent()));
   });
   void liveShare.retryStops();
 }

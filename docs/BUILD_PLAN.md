@@ -18,7 +18,22 @@ How v1 ([SPEC.md](SPEC.md)) gets built and shipped: releases, architecture, buil
 4. **Beta for about 50 testers:** a TestFlight public link (needs Apple's beta review) and a Google Play closed test (a new developer account needs 12 or more testers for 14 days before production). The bar: every feature tested on at least one iPhone and two different Android phones, the sign-offs done, the design applied, the privacy texts current, and the release checklist in BUILD_HANDOFF.md clear.
 5. **Public release** on GitHub, the App Store and Google Play.
 
-Still to build after R1 and R2: E3 (public timestamp), E7 (Google Drive), and whatever the owner decides on G1 and G2 (rights and safety guides), which are set for v1.1 in the spec.
+Still to build after R1 and R2: E3 (public timestamp), and whatever the owner decides on G1 and G2 (rights and safety guides), which are set for v1.1 in the spec. E7 (Google Drive) is built in round 2.
+
+### Round 2 (decided 6 Nov 2026, after the owner's SOS test)
+
+The redesign of the SOS page and of how a phone being taken is protected, with the pieces it needs. Decisions: [SPEC.md](SPEC.md) sections 4 (E1, E7, E8, low battery), 5 and 6 (G5). The work, in parts a builder takes one at a time: [briefs/2026-11-06-round-2.md](briefs/2026-11-06-round-2.md).
+
+| Part | What | Needs from the owner first |
+|---|---|---|
+| **1** | Bugs; Pocket recording moved to Record; the SOS page's three swipes; the secret code; Settings; alerts with both links and the battery level; low battery at 5% (bundle format 0.9); then follow-ups (1.6) | nothing |
+| **2** | E7: uploads to the user's own cloud (Google Drive and iCloud Drive; built so the owner can designate others), in upload parts that lengthen | Google Cloud project; iCloud container (guide) |
+| **3** | Saakshi-to-Saakshi (pairing, encrypted alerts, push, the received-alerts page) and the silence alarm | Apple push key, Google notification service (guide) |
+| **4** | The first-open walkthrough, with the phone's own protections | the power-off research (done before Part 4 starts) |
+
+**Order.** Part 1 first and alone: it changes the SOS page, Settings and the recorders that every other part touches. Then Parts 2 and 3 can run as two builders at once (they share only the server and the cloud sign-in). Part 4 last, because it sets up everything the earlier parts built. The owner tests Saakshi-to-Saakshi at the end of the round, with a friend's phone.
+
+**After the round:** Telegram and email for contacts, the iPhone Shortcut test, Google Play's emergency-SMS permission, the wording review (all wording, English and Hindi, in one later test round), the design pass.
 
 ## 2. Architecture
 
@@ -84,3 +99,4 @@ The rules are in [CLAUDE.md](../CLAUDE.md). In short:
    - **Network access:** Custom. Tick "Also include default list of common package managers", and add `expo.dev`, `*.expo.dev` and `*.expo.io` to Allowed domains.
    - **Environment variables:** `BASH_DEFAULT_TIMEOUT_MS=600000` and `BASH_MAX_TIMEOUT_MS=1800000`.
 5. **Start the streams** with the prompts in [BUILD_HANDOFF.md](BUILD_HANDOFF.md).
+6. **Round 2 setup, in one early sitting** (the plain guide is in the owner's vault, "Round 2 setup guide"): (a) an **Apple push key** (`.p8`) for notifications to iPhones; (b) a **Google Cloud project**, with Firebase added for notifications to Android phones, and the **Drive** permission screen and sign-in for E7; (c) an **iCloud container** for iCloud Drive copies. No paid maps (owner, 9 Nov 2026), so no Maps key. The keys and the notification service account are kept in Supabase's and EAS's secret stores, never in the repository. Parts 2 and 3 cannot be finished without them.

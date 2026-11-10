@@ -29,6 +29,25 @@
         android:resource="@xml/saakshi_quick_widget_info" />
     </receiver>
 
+    <!--
+      "Lock the phone when 'My phone is being taken' starts" (SPEC 5.4; round 2, group 1.7): device
+      admin with the force-lock policy only, switched on by the user. BIND_DEVICE_ADMIN here is the
+      permission a sender needs (only the system holds it); Saakshi requests no permission for this.
+      Keep the receiver's name: Android switches the admin off if it changes in an update.
+    -->
+    <receiver
+      android:name="expo.modules.saakshisos.LockAdminReceiver"
+      android:description="@string/saakshi_lock_admin_description"
+      android:exported="true"
+      android:permission="android.permission.BIND_DEVICE_ADMIN">
+      <meta-data
+        android:name="android.app.device_admin"
+        android:resource="@xml/saakshi_lock_admin" />
+      <intent-filter>
+        <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+      </intent-filter>
+    </receiver>
+
     <receiver
       android:name="expo.modules.saakshisos.QuickBootReceiver"
       android:exported="true">

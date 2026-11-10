@@ -1,3 +1,5 @@
+import { batteryToShare } from '@/platform/battery';
+
 import type { LiveApi, LivePoint } from './api';
 import { viewerLink } from './config';
 
@@ -9,11 +11,25 @@ export type LiveShare = {
   viewToken: string;
   link: string;
   startedAt: string;
+  /** When the server deletes it. A persistent share's end moves on with every position. */
   expiresAt: string;
+  /**
+   * "My phone is being taken" (SPEC 5.4): no fixed end; the server keeps it while the phone
+   * reports, and deletes it a week after the last position. Absent in shares saved before round 2.
+   */
+  persistent?: boolean;
   lastSentAt: string | null;
   /** Positions not yet accepted by the server (no signal), oldest first. */
   pending: LivePoint[];
+  /**
+   * Saving mode (round 2, group 1.5): at 5% battery in body-cam or Pocket recording, positions go
+   * to the server in one burst every 5 minutes, not as they come. Absent in older shares.
+   */
+  saving?: boolean;
 };
+
+/** In saving mode, positions are sent at most this often. */
+export const SAVING_SEND_MS = 5 * 60 * 1000;
 
 type Saved = {
   version: 1;
@@ -21,6 +37,22 @@ type Saved = {
   /** Shares stopped while offline; the server is told when the signal returns. */
   unstopped: { shareId: string; writeSecret: string }[];
 };
+
+/**
+ * The battery level goes with the newest position of each delivery: it is the level now, so the
+ * older ones in the same delivery (iPhone can hold a few back) are left without one. Only at 20%
+ * or less (SPEC 5.2; round 2, group 1.6): above that, or when the phone can't read it, no position
+ * carries `bat`.
+ */
+export function withBattery(points: LivePoint[], reading: number | null): LivePoint[] {
+  const battery = batteryToShare(reading);
+  if (battery === null || points.length === 0) return points;
+  let newest = 0;
+  points.forEach((point, i) => {
+    if (Date.parse(point.at) >= Date.parse(points[newest].at)) newest = i;
+  });
+  return points.map((point, i) => (i === newest ? { ...point, bat: battery } : point));
+}
 
 /** Positions kept on the phone while there's no signal; the oldest are dropped first. */
 export const MAX_PENDING = 120;
@@ -70,14 +102,30 @@ export class LiveShareController {
     return () => this.listeners.delete(listener);
   };
 
-  /** Starts sharing for some hours, or returns the share already running. */
-  start(hours: number, notice: TrackerNotice): Promise<LiveShare> {
+  /**
+   * Starts sharing for some hours, or returns the share already running. With `persistent`, the
+   * share has no fixed end; a share already running is made persistent, keeping its link.
+   */
+  start(hours: number, notice: TrackerNotice, options: { persistent?: boolean } = {}): Promise<LiveShare> {
     return this.serial(async () => {
       const saved = this.load();
-      if (saved.active && !this.expired(saved.active)) return saved.active;
+      if (saved.active && !this.expired(saved.active)) {
+        const running = saved.active;
+        if (!options.persistent || running.persistent) return running;
+        const ends = await this.deps.api.keep(running.shareId, running.writeSecret);
+        if (ends !== null) {
+          const kept: LiveShare = { ...running, persistent: true, expiresAt: ends };
+          this.save({ ...saved, active: kept });
+          return kept;
+        }
+        // It had already ended on the server: start afresh below.
+        await this.deps.tracker.stop().catch(() => undefined);
+        this.save({ ...saved, active: null });
+      }
 
+      const persistent = options.persistent === true;
       const writeSecret = this.deps.randomHex(32);
-      const started = await this.deps.api.start(await this.deps.sha256Hex(writeSecret), hours);
+      const started = await this.deps.api.start(await this.deps.sha256Hex(writeSecret), hours, persistent);
       const share: LiveShare = {
         ...started,
         writeSecret,
@@ -85,8 +133,9 @@ export class LiveShareController {
         startedAt: this.deps.now().toISOString(),
         lastSentAt: null,
         pending: [],
+        ...(persistent ? { persistent: true } : {}),
       };
-      this.save({ ...saved, active: share });
+      this.save({ ...this.load(), active: share });
       try {
         await this.deps.tracker.start(notice);
       } catch (error) {
@@ -99,6 +148,21 @@ export class LiveShareController {
     });
   }
 
+  /**
+   * Saving mode on or off (round 2, group 1.5). Positions are found as before, at full accuracy,
+   * and kept and sent every 5 minutes, on both phones (owner, 9 Nov 2026; group 1.7 undid 1.6's
+   * coarser iPhone positions). The phone's location updates are never touched for it: a
+   * backgrounded app may not start them again (Android refuses a foreground service then, and
+   * iPhone can't start location updates).
+   */
+  setSaving(on: boolean): Promise<void> {
+    return this.serial(async () => {
+      const saved = this.load();
+      if (!saved.active || !!saved.active.saving === on) return;
+      this.save({ ...saved, active: { ...saved.active, saving: on } });
+    });
+  }
+
   /** New positions from the phone. Sends them with anything still waiting. */
   receive(points: LivePoint[]): Promise<void> {
     return this.serial(async () => {
@@ -108,12 +172,21 @@ export class LiveShareController {
       if (this.expired(share)) return this.end(saved);
 
       const pending = [...share.pending, ...points].slice(-MAX_PENDING);
+      // Saving mode: held until 5 minutes after the last send, then sent in one burst.
+      const sentAt = share.lastSentAt ? Date.parse(share.lastSentAt) : null;
+      if (share.saving && sentAt !== null && this.deps.now().getTime() - sentAt < SAVING_SEND_MS) {
+        this.save({ ...saved, active: { ...share, pending } });
+        return;
+      }
       let sent = 0;
+      let expiresAt = share.expiresAt;
       try {
         while (sent < pending.length) {
           const batch = pending.slice(sent, sent + BATCH);
           const ends = await this.deps.api.push(share.shareId, share.writeSecret, batch);
           if (ends === null) return this.end(saved);
+          // A persistent share's end moves on with each position.
+          expiresAt = ends;
           sent += batch.length;
         }
       } catch {
@@ -123,6 +196,7 @@ export class LiveShareController {
         ...saved,
         active: {
           ...share,
+          expiresAt,
           pending: pending.slice(sent),
           lastSentAt: sent > 0 ? this.deps.now().toISOString() : share.lastSentAt,
         },

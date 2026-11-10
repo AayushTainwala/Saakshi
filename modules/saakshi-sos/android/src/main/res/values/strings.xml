@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="saakshi_quick_widget_label">Saakshi quick alert</string>
-  <string name="saakshi_quick_widget_description">Opens the code pad that alerts your trusted contacts</string>
+  <string name="saakshi_quick_widget_description">Opens Saakshi\'s SOS screen</string>
   <string name="saakshi_quick_widget_text">SOS</string>
   <string name="saakshi_quick_channel">Quick alert</string>
+  <!-- Shown under Saakshi in Android's list of device admin apps (round 2, group 1.7). -->
+  <string name="saakshi_lock_admin_description">Locks the screen when \"My phone is being taken\" starts. It does nothing else.</string>
 </resources>

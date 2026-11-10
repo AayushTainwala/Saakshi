@@ -4,7 +4,7 @@ import * as Sharing from 'expo-sharing';
 
 import { CERTIFICATE_FILE, chainHead } from '../export/contents';
 import { ensureDeviceKey } from '../integrity/deviceKey';
-import { loadSealed } from '../locker/records';
+import { loadCheckpoints, loadSealed } from '../locker/records';
 import { fileLocker } from '../locker/store';
 import { type CertificateDetails, certificateHtml, emptyDetails } from './html';
 
@@ -41,7 +41,7 @@ export async function makeCertificate(sessionId: string, details: CertificateDet
   const html = certificateHtml({
     details,
     records,
-    chainHead: chainHead(records)!,
+    chainHead: chainHead(records, loadCheckpoints(fileLocker, sessionId).map((entry) => entry.bundled))!,
     keyId: key.keyId,
     sessionId,
     generatedAt: now,

@@ -6,8 +6,9 @@ import type { ComposerResult, SmsChannels } from '../alert/channels';
 import { AlertController, type AlertDeps } from '../alert/controller';
 import type { TrustedContact } from '../contacts/store';
 
-const asha: TrustedContact = { id: '1', name: 'Asha', phone: '+919876543210' };
-const ravi: TrustedContact = { id: '2', name: 'Ravi', phone: '+919123456789' };
+const all = { sos: true, live: true, witness: true };
+const asha: TrustedContact = { id: '1', name: 'Asha', phone: '+919876543210', uses: all, method: 'sms' };
+const ravi: TrustedContact = { id: '2', name: 'Ravi', phone: '+919123456789', uses: all, method: 'sms' };
 
 const fixed: FixResult = {
   status: 'fixed',
@@ -34,7 +35,16 @@ function setup(options: { direct?: boolean; contacts?: TrustedContact[]; where?:
     locate: jest.fn(async () => options.where ?? fixed),
     now: () => new Date('2026-10-20T09:02:00Z'),
     channels,
-    labels: () => ({ title: 'Alert', location: 'Location', noLocation: 'No location', sent: 'Sent', live: 'Live location' }),
+    labels: () => ({
+      title: 'Alert',
+      location: 'Location',
+      noLocation: 'No location',
+      accuracy: (m: number) => `within ${m} m`,
+      live: 'Live location',
+      battery: (p: number) => `Battery: ${p}%`,
+      sent: 'Sent',
+    }),
+    battery: async () => 82,
   };
   return { controller: new AlertController(deps), channels, deps };
 }
@@ -149,6 +159,36 @@ describe('AlertController', () => {
     expect(controller.state).toEqual({ phase: 'failed', error: 'no-sms' });
   });
 
+  it('carries the battery level only at 20% or less, and none when it is not known (round 2, groups 1.4 and 1.6)', async () => {
+    const { controller, channels, deps } = setup();
+    const battery = (read: () => Promise<number | null>) => ((deps as { battery: () => Promise<number | null> }).battery = read);
+    await controller.start({ immediate: true });
+    expect(channels.composer.send).toHaveBeenLastCalledWith(expect.anything(), expect.not.stringContaining('Battery'));
+    controller.dismiss();
+    battery(async () => 14);
+    await controller.start({ immediate: true });
+    expect(channels.composer.send).toHaveBeenLastCalledWith(expect.anything(), expect.stringContaining('Battery: 14%'));
+    controller.dismiss();
+    battery(async () => {
+      throw new Error('no reading');
+    });
+    await controller.start({ immediate: true });
+    expect(channels.composer.send).toHaveBeenLastCalledWith(expect.anything(), expect.not.stringContaining('Battery'));
+  });
+
+  it('waits for a live link only as long as it waits for the position', async () => {
+    const { controller, channels } = setup();
+    (controller as unknown as { deps: { liveWaitMs: number } }).deps.liveWaitMs = 30;
+    await controller.start({ immediate: true, liveLink: new Promise((resolve) => setTimeout(() => resolve('https://live/#soon'), 5)) });
+    expect(channels.composer.send).toHaveBeenLastCalledWith(expect.anything(), expect.stringContaining('Live location: https://live/#soon'));
+    expect(controller.lastLiveLink).toBe('https://live/#soon');
+    controller.dismiss();
+
+    await controller.start({ immediate: true, liveLink: new Promise((resolve) => setTimeout(() => resolve('https://live/#late'), 200)) });
+    expect(channels.composer.send).toHaveBeenLastCalledWith(expect.anything(), expect.not.stringContaining('Live location'));
+    expect(controller.lastLiveLink).toBeNull();
+  });
+
   it('ignores a second start while one is under way', async () => {
     jest.useFakeTimers();
     const { controller, deps } = setup({ direct: true });
@@ -164,6 +204,15 @@ function setupDeps(channels: SmsChannels): AlertDeps {
     locate: async () => fixed,
     now: () => new Date('2026-10-20T09:02:00Z'),
     channels,
-    labels: () => ({ title: 'Alert', location: 'Location', noLocation: 'No location', sent: 'Sent', live: 'Live location' }),
+    labels: () => ({
+      title: 'Alert',
+      location: 'Location',
+      noLocation: 'No location',
+      accuracy: (m: number) => `within ${m} m`,
+      live: 'Live location',
+      battery: (p: number) => `Battery: ${p}%`,
+      sent: 'Sent',
+    }),
+    battery: async () => 82,
   };
 }

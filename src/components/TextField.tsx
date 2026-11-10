@@ -1,16 +1,19 @@
+import { useContext } from 'react';
 import { StyleSheet, TextInput, type TextInputProps, View } from 'react-native';
 
 import { radius, spacing, touchTarget, typography, useTheme } from '@/theme';
 
 import { AppText } from './AppText';
+import { KeyboardRevealContext } from './keyboard';
 
 export type TextFieldProps = Omit<TextInputProps, 'style'> & {
   label: string;
   hint?: string;
 };
 
-export function TextField({ label, hint, multiline, ...rest }: TextFieldProps) {
+export function TextField({ label, hint, multiline, onFocus, ...rest }: TextFieldProps) {
   const { colors } = useTheme();
+  const keyboard = useContext(KeyboardRevealContext);
   return (
     <View style={styles.field}>
       <AppText variant="label">{label}</AppText>
@@ -31,6 +34,11 @@ export function TextField({ label, hint, multiline, ...rest }: TextFieldProps) {
             textAlignVertical: multiline ? 'top' : 'center',
           },
         ]}
+        onFocus={(event) => {
+          // The page keeps this field above the keyboard (`Screen`).
+          keyboard?.focused(null);
+          onFocus?.(event);
+        }}
         {...rest}
       />
     </View>

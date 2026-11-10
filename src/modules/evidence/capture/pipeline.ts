@@ -1,7 +1,8 @@
+import type { ChainLink } from '../integrity/record';
 import { markActive, markInactive } from '../locker/active';
 import type { LockerStore } from '../locker/store';
 import { extensionOf, mediaFileName, mediaTypeFor } from '../locker/media';
-import type { ClosedFile, EvidenceItem, FileDigests, SessionState } from '../types';
+import type { CheckpointInput, CheckpointItem, ClosedFile, EvidenceItem, FileDigests, SessionState } from '../types';
 
 /** What the sealing step needs to write and sign a record for one file. */
 export type SealInput = {
@@ -10,11 +11,44 @@ export type SealInput = {
   file: ClosedFile;
   digests: FileDigests;
   hashedAt: Date;
-  /** The sealed item before this one in the session, or null for the first. */
-  previous: EvidenceItem | null;
+  /** The record before this one in the session's chain, or null for the first. */
+  previous: ChainLink | null;
+};
+
+/** What the sealing step needs for a checkpoint of a file still being written (format 0.5). */
+export type CheckpointSealInput = {
+  session: SessionState;
+  sequence: number;
+  checkpoint: CheckpointInput;
+  previous: ChainLink | null;
 };
 
 export type SealResult = { record: { file: string; recordId: string }; recordSha256: string };
+
+/** The session's last sealed record, file or checkpoint, as the next record's `previous`. */
+export function lastLink(state: SessionState): ChainLink | null {
+  let best: { sequence: number; link: ChainLink } | null = null;
+  for (const item of state.items) {
+    if (item.status !== 'sealed' || !item.record || !item.recordSha256 || !item.digests) continue;
+    if (best && best.sequence > item.sequence) continue;
+    best = { sequence: item.sequence, link: { id: item.record.recordId, recordSha256: item.recordSha256, fileSha256: item.digests.sha256 } };
+  }
+  for (const checkpoint of state.checkpoints ?? []) {
+    if (checkpoint.status !== 'sealed' || !checkpoint.record || !checkpoint.recordSha256) continue;
+    if (best && best.sequence > checkpoint.sequence) continue;
+    best = {
+      sequence: checkpoint.sequence,
+      link: { id: checkpoint.record.recordId, recordSha256: checkpoint.recordSha256, fileSha256: checkpoint.sha256 },
+    };
+  }
+  return best?.link ?? null;
+}
+
+/** The next free position in the session's chain. */
+function nextSequence(state: SessionState): number {
+  const all = [...state.items.map((i) => i.sequence), ...(state.checkpoints ?? []).map((c) => c.sequence)];
+  return all.reduce((max, n) => Math.max(max, n + 1), 0);
+}
 
 export type PipelineDeps = {
   store: LockerStore;
@@ -24,12 +58,16 @@ export type PipelineDeps = {
   hash?: (uri: string) => Promise<FileDigests>;
   /** Writes and signs the record. Needs `hash`. */
   seal?: (input: SealInput) => Promise<SealResult>;
+  /** Writes and signs a checkpoint record (format 0.5). */
+  sealCheckpoint?: (input: CheckpointSealInput) => Promise<SealResult>;
 };
 
 /**
  * Takes each file as the camera closes it, in order, through: hash → move into the locker →
  * write and sign the record. Files are processed one at a time so that each record can chain
- * to the one before it, while the camera carries on recording (body-cam and bug mode pieces).
+ * to the one before it, while the camera carries on recording (body-cam and bug mode). Checkpoints
+ * of files still being written (body-cam, format 0.5) go through the same queue, so the chain
+ * holds files and checkpoints in the order they came.
  */
 export class CaptureSession {
   private state: SessionState | null = null;
@@ -37,7 +75,7 @@ export class CaptureSession {
   private waiting = 0;
   private clips = 0;
   private sequence = 0;
-  private lastSealed: EvidenceItem | null = null;
+  private last: ChainLink | null = null;
   private listeners = new Set<() => void>();
 
   constructor(private readonly deps: PipelineDeps) {}
@@ -51,9 +89,9 @@ export class CaptureSession {
     if (!state) throw new Error('No such session');
     const session = new CaptureSession(deps);
     session.state = state;
-    session.sequence = state.items.reduce((max, item) => Math.max(max, item.sequence + 1), 0);
+    session.sequence = nextSequence(state);
     session.clips = state.items.reduce((max, item) => Math.max(max, (item.segment?.clip ?? -1) + 1), 0);
-    session.lastSealed = [...state.items].reverse().find((item) => item.status === 'sealed') ?? null;
+    session.last = lastLink(state);
     markActive(state.id);
     return session;
   }
@@ -75,6 +113,10 @@ export class CaptureSession {
     return this.state?.items ?? [];
   }
 
+  get checkpoints(): readonly CheckpointItem[] {
+    return this.state?.checkpoints ?? [];
+  }
+
   /** Reserves the number of the next video in this session. */
   nextClip(): number {
     return this.clips++;
@@ -87,10 +129,11 @@ export class CaptureSession {
 
   /** Queues a closed file. Resolves when it has been hashed, moved and sealed (or has failed). */
   add(file: ClosedFile): Promise<EvidenceItem> {
-    const sequence = this.sequence++;
     this.waiting++;
     this.emit();
-    const result = this.queue.then(() => this.process(file, sequence));
+    // The position in the chain is taken when the file's turn comes, so files and checkpoints are
+    // numbered in the order they are chained.
+    const result = this.queue.then(() => this.process(file, this.sequence++));
     this.queue = result.then(
       () => undefined,
       () => undefined,
@@ -99,6 +142,19 @@ export class CaptureSession {
       this.waiting--;
       this.emit();
     });
+  }
+
+  /**
+   * Queues a checkpoint of a file still being written: a signed record of its length so far and
+   * the SHA-256 of those bytes, chained after whatever came before it.
+   */
+  addCheckpoint(checkpoint: CheckpointInput): Promise<CheckpointItem> {
+    const result = this.queue.then(() => this.processCheckpoint(checkpoint));
+    this.queue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
   }
 
   /** Resolves once every queued file is done. */
@@ -134,6 +190,9 @@ export class CaptureSession {
       status: 'saved',
       ...(file.interrupted ? { interrupted: true } : {}),
       ...(file.endReason ? { endReason: file.endReason } : {}),
+      ...(file.recording ? { recording: file.recording } : {}),
+      ...(file.mode ? { mode: file.mode } : {}),
+      ...(typeof file.rotationDegrees === 'number' ? { rotationDegrees: file.rotationDegrees } : {}),
     };
     const releaseMarker = () => {
       if (file.pendingMarker) this.deps.store.deletePending(session.id, file.pendingMarker);
@@ -152,6 +211,10 @@ export class CaptureSession {
       const hashedAt = this.deps.now();
       item.digests = digests;
       item.status = 'hashed';
+      // The recorder fingerprinted every byte as it wrote them; the file must be exactly those bytes.
+      if (file.written && (file.written.sha256 !== digests.sha256 || file.written.size !== digests.size)) {
+        item.writtenMismatch = true;
+      }
       const movedUri = this.deps.store.moveMedia(session.id, file.uri, item.media);
       this.commit(item);
       // From here the file is in the locker with its fingerprint noted; a crash now leaves a
@@ -165,12 +228,12 @@ export class CaptureSession {
           file: { ...file, uri: movedUri },
           digests,
           hashedAt,
-          previous: this.lastSealed,
+          previous: this.last,
         });
         item.record = sealed.record;
         item.recordSha256 = sealed.recordSha256;
         item.status = 'sealed';
-        this.lastSealed = item;
+        this.last = { id: sealed.record.recordId, recordSha256: sealed.recordSha256, fileSha256: digests.sha256 };
       }
     } catch (error) {
       item.status = 'failed';
@@ -178,6 +241,47 @@ export class CaptureSession {
     }
 
     this.commit(item);
+    return item;
+  }
+
+  private async processCheckpoint(checkpoint: CheckpointInput): Promise<CheckpointItem> {
+    const session = this.session();
+    const sequence = this.sequence++;
+    const item: CheckpointItem = {
+      sequence,
+      recording: checkpoint.recording,
+      index: checkpoint.index,
+      bytes: checkpoint.bytes,
+      sha256: checkpoint.sha256,
+      at: checkpoint.at.toISOString(),
+      status: 'failed',
+      ...(checkpoint.mode ? { mode: checkpoint.mode } : {}),
+    };
+    try {
+      if (!this.deps.sealCheckpoint) throw new Error('No checkpoint sealer');
+      const sealed = await this.deps.sealCheckpoint({ session, sequence, checkpoint, previous: this.last });
+      item.record = sealed.record;
+      item.recordSha256 = sealed.recordSha256;
+      item.status = 'sealed';
+      this.last = { id: sealed.record.recordId, recordSha256: sealed.recordSha256, fileSha256: checkpoint.sha256 };
+    } catch (error) {
+      // An unsigned checkpoint is not kept, and gives its place in the chain back: the next one, a
+      // few seconds later, vouches for these bytes too.
+      this.sequence = sequence;
+      item.error = error instanceof Error ? error.message : String(error);
+      this.emit();
+      return item;
+    }
+    const current = this.session();
+    this.state = {
+      ...current,
+      checkpoints: [...(current.checkpoints ?? []).filter((c) => c.sequence !== sequence), item].sort(
+        (a, b) => a.sequence - b.sequence,
+      ),
+      updatedAt: this.deps.now().toISOString(),
+    };
+    this.deps.store.writeSession(this.state);
+    this.emit();
     return item;
   }
 

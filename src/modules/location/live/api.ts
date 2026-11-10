@@ -1,12 +1,19 @@
 import { LIVE_SERVER } from './config';
 
-export type LivePoint = { lat: number; lng: number; acc: number | null; at: string };
+/**
+ * One position for the server. `bat` is the battery level, 0 to 100, when the phone sent it, or
+ * absent (round 2, group 1.4); the server keeps it with the position and the viewer shows it.
+ */
+export type LivePoint = { lat: number; lng: number; acc: number | null; at: string; bat?: number | null };
 
 export type StartedShare = { shareId: string; viewToken: string; expiresAt: string };
 
-/** The four calls to the live-location server (supabase/migrations). */
+/** The calls to the live-location server (supabase/migrations). */
 export type LiveApi = {
-  start(writeHashHex: string, hours: number): Promise<StartedShare>;
+  /** With `persistent`, the share has no fixed end: it lasts a week after the phone last reports. */
+  start(writeHashHex: string, hours: number, persistent?: boolean): Promise<StartedShare>;
+  /** Makes a running share persistent from now; resolves to its new end, or null if it has ended. */
+  keep(shareId: string, writeSecret: string): Promise<string | null>;
   /** Resolves to when the share ends, or null if it has ended (or was stopped). */
   push(shareId: string, writeSecret: string, points: LivePoint[]): Promise<string | null>;
   /** True if the server had something to delete. */
@@ -43,8 +50,10 @@ export function createLiveApi(fetchImpl: Fetch = fetch, server = LIVE_SERVER): L
   }
 
   return {
-    async start(writeHashHex, hours) {
-      const rows = (await rpc('live_start', { write_hash_hex: writeHashHex, hours })) as {
+    async start(writeHashHex, hours, persistent = false) {
+      // An ordinary share is asked for exactly as before round 2.
+      const args = persistent ? { write_hash_hex: writeHashHex, hours, persistent: true } : { write_hash_hex: writeHashHex, hours };
+      const rows = (await rpc('live_start', args)) as {
         share_id: string;
         view_token: string;
         expires_at: string;
@@ -52,6 +61,9 @@ export function createLiveApi(fetchImpl: Fetch = fetch, server = LIVE_SERVER): L
       const row = rows[0];
       if (!row) throw new LiveServerError(500, 'The server did not start a share');
       return { shareId: row.share_id, viewToken: row.view_token, expiresAt: row.expires_at };
+    },
+    async keep(shareId, writeSecret) {
+      return (await rpc('live_keep', { share_id: shareId, write_secret: writeSecret })) as string | null;
     },
     async push(shareId, writeSecret, points) {
       return (await rpc('live_push', { share_id: shareId, write_secret: writeSecret, points })) as string | null;

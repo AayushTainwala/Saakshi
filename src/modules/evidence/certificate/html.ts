@@ -99,7 +99,7 @@ export function certificateHtml(input: CertificateInput): string {
   const { details: d, records } = input;
   const first = records[0].record;
   const hashes = records
-    .map((r) => `<tr><td>media/${escapeHtml(r.mediaFile)}</td><td class="mono">${r.record.file.sha256}</td></tr>`)
+    .map((r) => `<tr><td>${escapeHtml(r.mediaPath)}</td><td class="mono">${r.record.file.sha256}</td></tr>`)
     .join('');
 
   const draft = FORM_TEXT_REVIEWED
@@ -107,12 +107,12 @@ export function certificateHtml(input: CertificateInput): string {
     : '<p class="draft">DRAFT: the text of this form has not yet had its final legal review.</p>';
 
   const reportRows = records
-    .map(({ record, mediaFile, recordFile, recordSha256 }) => {
+    .map(({ record, mediaPath, recordPath, recordSha256 }) => {
       const f = record.file;
       return `<tr>
         <td>${String(record.sequence).padStart(4, '0')}</td>
-        <td>media/${escapeHtml(mediaFile)}<br/>${formatIST(record.capture.startedAt, true)} to ${formatIST(record.capture.endedAt, true)}<br/>${escapeHtml(formatPlace(record))}<br/>${f.size.toLocaleString('en-IN')} bytes</td>
-        <td class="mono">SHA-256: ${f.sha256}<br/>SHA-1: ${f.sha1}<br/>MD5: ${f.md5}<br/>Record (records/${escapeHtml(recordFile)}) SHA-256: ${recordSha256}</td>
+        <td>${escapeHtml(mediaPath)}<br/>Started ${formatIST(record.capture.startedAt, true)}<br/>Ended ${formatIST(record.capture.endedAt, true)}<br/>${escapeHtml(formatPlace(record))}<br/>${f.size.toLocaleString('en-IN')} bytes</td>
+        <td class="mono">SHA-256: ${f.sha256}<br/>SHA-1: ${f.sha1}<br/>MD5: ${f.md5}<br/>Record (${escapeHtml(recordPath)}) SHA-256: ${recordSha256}</td>
       </tr>`;
     })
     .join('');

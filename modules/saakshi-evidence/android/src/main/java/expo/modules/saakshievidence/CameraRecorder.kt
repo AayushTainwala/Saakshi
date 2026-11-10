@@ -20,6 +20,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import java.util.UUID
 import org.json.JSONObject
 
 /**
@@ -30,12 +31,16 @@ import org.json.JSONObject
  * closing index: a cut-off file plays up to the cut. On Android 7 it falls back to MP4 and says so.
  *
  * One recorder serves the evidence camera (one file from start to stop, with a preview) and
- * body-cam mode (fixed pieces, no preview, run inside BodyCamService so it carries on with the
- * screen off). It writes a marker for each file in `pendingDir` when the file starts and updates
- * it when the file closes, so the app can find and seal a file that was cut off.
+ * body-cam mode (one continuous file from start to stop, no preview, run inside BodyCamService so
+ * it carries on with the screen off). It writes a marker for each file in `pendingDir` when the
+ * file starts and updates it when the file closes, so the app can find and seal a file that was
+ * cut off. With `checkpointMillis`, it also fingerprints the file while writing it (Checkpointer)
+ * and sends `onCheckpoint` every so often (fix round 1, group 2a).
  */
 object CameraRecorder {
   private val PIECE_TOKEN = Any()
+  /** A file whose stop failed is kept if it has checkpoints or at least this much (about 1 s of video). */
+  private const val KEEP_AFTER_FAILED_STOP_BYTES = 256L * 1024
 
   /** RFC 3339 in UTC with milliseconds, as the records use. (java.time needs Android 8.) */
   fun iso(millis: Long): String =
@@ -45,12 +50,16 @@ object CameraRecorder {
   data class Config(
     val outputDir: File,
     val pendingDir: File,
-    /** Body-cam pieces: length in milliseconds. Null records one file from start to stop. */
+    /** Pieces: length in milliseconds. Null records one file from start to stop. */
     val pieceMillis: Long?,
     /** 720 or 1080. */
     val quality: Int,
     val clip: Int,
     val mode: String,
+    /** Checkpoints every this many milliseconds while writing an MPEG-TS file. Null: none. */
+    val checkpointMillis: Long? = null,
+    /** Whether files are named as clip and piece in their records (body-cam), even with no pieces. */
+    val segmented: Boolean = pieceMillis != null,
   )
 
   /** Event name and body, forwarded to JavaScript by the module. */
@@ -67,11 +76,25 @@ object CameraRecorder {
   private var persistentSurface: Surface? = null
   private var videoSize: Size = Size(1280, 720)
   private var sensorOrientation = 90
+  /** The front camera's picture turns the other way as the phone turns (fix round 1, group 4). */
+  private var front = false
+  /** The zoom asked for, as a ratio of the camera's normal view (1.0), within [minZoom, maxZoom]. */
+  private var zoomRatio = 1f
+  private var minZoom = 1f
+  private var maxZoom = 1f
+  private var activeArray: android.graphics.Rect? = null
+  /** Each open has its own number; a camera that opens after a newer open or a close is closed at once. */
+  private var openToken = 0
   private var deviceDegrees = 0
   private var orientationListener: OrientationEventListener? = null
 
   private var config: Config? = null
   private var recorder: MediaRecorder? = null
+  /** Random id of the file being written; its checkpoints and its record carry it. */
+  private var currentRecording: String? = null
+  @Volatile private var checkpointer: Checkpointer? = null
+  private var checkpointThread: HandlerThread? = null
+  private var checkpointHandler: Handler? = null
   private var currentFile: File? = null
   private var currentStartedAt: Long? = null
   private var pieceIndex = 0
@@ -80,6 +103,17 @@ object CameraRecorder {
   private var currentGap: Long? = null
   /** Degrees to turn the picture upright, for MPEG-TS, which has no field for it. Null for MP4. */
   private var currentRotation: Int? = null
+  /**
+   * Saving mode (round 2, groups 1.5 and 1.6): from 5% battery, each new file is at the same
+   * picture size, with a lower video bit rate and 15 frames a second where the camera offers it.
+   * The camera's session and the persistent surface stay as they are (owner, 9 Nov 2026: the camera
+   * is never rebuilt in the middle of a recording). It ends when the phone is charged; from then
+   * the next file is at the normal quality.
+   */
+  private var lowPower = false
+  /** Whether the file being written was started in saving mode: its frame rate stays until it ends. */
+  private var fileSaving = false
+  private var fpsRanges: Array<android.util.Range<Int>>? = null
 
   val isRecording: Boolean get() = recorder != null
   val isOpen: Boolean get() = device != null
@@ -109,21 +143,50 @@ object CameraRecorder {
 
   // ---- Camera ---------------------------------------------------------------------------------
 
-  /** Opens the back camera. `quality` decides the recording size; the preview, if any, matches it. */
+  /** The first camera facing this way (`"front"` or `"back"`), as the phone lists them. */
+  fun cameraIdFor(manager: CameraManager, facing: String): String {
+    val wanted = if (facing == "front") CameraCharacteristics.LENS_FACING_FRONT else CameraCharacteristics.LENS_FACING_BACK
+    return manager.cameraIdList.firstOrNull { id ->
+      manager.getCameraCharacteristics(id).get(CameraCharacteristics.LENS_FACING) == wanted
+    } ?: manager.cameraIdList.first()
+  }
+
+  /**
+   * How far a camera can zoom, as ratios of its normal view: below 1 on phones whose camera can
+   * switch to a wider lens by itself (Android 11 and later), else from 1 to its digital zoom.
+   */
+  fun zoomRange(characteristics: CameraCharacteristics): Pair<Float, Float> {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      characteristics.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE)?.let { return it.lower to it.upper }
+    }
+    return 1f to (characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM) ?: 1f)
+  }
+
+  /**
+   * Opens the back or front camera. `quality` decides the recording size; the preview, if any,
+   * matches it. The front camera can't be switched to during a recording (close and open again).
+   */
   @SuppressLint("MissingPermission") // The app asks for CAMERA and RECORD_AUDIO before opening.
-  fun open(context: Context, quality: Int) {
+  fun open(context: Context, quality: Int, facing: String = "back") {
     appContext = context.applicationContext
     post {
       if (device != null) return@post
+      val token = ++openToken
       val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-      val cameraId = manager.cameraIdList.firstOrNull { id ->
-        manager.getCameraCharacteristics(id).get(CameraCharacteristics.LENS_FACING) ==
-          CameraCharacteristics.LENS_FACING_BACK
-      } ?: manager.cameraIdList.first()
+      val cameraId = cameraIdFor(manager, facing)
       val characteristics = manager.getCameraCharacteristics(cameraId)
+      front = characteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT
+      zoomRange(characteristics).let { (low, high) ->
+        minZoom = low
+        maxZoom = high
+      }
+      zoomRatio = 1f.coerceIn(minZoom, maxZoom)
+      activeArray = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
       sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
       val map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
-      videoSize = chooseSize(map?.getOutputSizes(MediaRecorder::class.java) ?: emptyArray(), quality)
+      val recordSizes = map?.getOutputSizes(MediaRecorder::class.java) ?: emptyArray()
+      fpsRanges = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
+      videoSize = chooseSize(recordSizes, quality)
       makePreviewSurface()
 
       orientationListener = object : OrientationEventListener(context.applicationContext) {
@@ -135,12 +198,28 @@ object CameraRecorder {
       preparePersistentSurface()
       manager.openCamera(cameraId, object : CameraDevice.StateCallback() {
         override fun onOpened(camera: CameraDevice) {
+          if (token != openToken || device != null) {
+            // Closed, or switched again, while it was opening.
+            camera.close()
+            return
+          }
           device = camera
           rebuildSession()
-          emit("onRecorderReady", mapOf("width" to videoSize.width, "height" to videoSize.height))
+          emit("onRecorderReady", mapOf(
+            "width" to videoSize.width,
+            "height" to videoSize.height,
+            "facing" to if (front) "front" else "back",
+            "minZoom" to minZoom.toDouble(),
+            "maxZoom" to maxZoom.toDouble(),
+          ))
         }
 
         override fun onDisconnected(camera: CameraDevice) {
+          if (device !== camera) {
+            // A camera from an earlier open: not the one in use.
+            camera.close()
+            return
+          }
           // Another app or the system took the camera (for example, the app left the screen
           // without a foreground service). Close the file cleanly.
           finishCurrent("camera-lost")
@@ -149,6 +228,11 @@ object CameraRecorder {
         }
 
         override fun onError(camera: CameraDevice, error: Int) {
+          if (device !== camera) {
+            camera.close()
+            if (token == openToken) emit("onRecorderError", mapOf("message" to "Camera error $error"))
+            return
+          }
           finishCurrent("error")
           camera.close()
           device = null
@@ -160,7 +244,12 @@ object CameraRecorder {
 
   fun close() {
     post {
+      openToken++
       finishCurrent("stopped")
+      lowPower = false
+      checkpointThread?.quitSafely()
+      checkpointThread = null
+      checkpointHandler = null
       session?.close()
       session = null
       device?.close()
@@ -259,8 +348,116 @@ object CameraRecorder {
       targets.forEach { addTarget(it) }
       set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
       set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+      // Saving mode: 15 frames a second from the camera, where it offers a range up to 15, for as
+      // long as the file started in saving mode is written.
+      if (fileSaving && recorder != null) savingFpsRange()?.let { set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
+      applyZoom(this)
     }.build()
     s.setRepeatingRequest(request, null, handler)
+  }
+
+  /** Android 11+: the zoom ratio itself. Before: the centre of the sensor, cropped (digital zoom). */
+  private fun applyZoom(builder: CaptureRequest.Builder) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      builder.set(CaptureRequest.CONTROL_ZOOM_RATIO, zoomRatio)
+      return
+    }
+    val area = activeArray ?: return
+    if (zoomRatio <= 1f) return
+    val width = (area.width() / zoomRatio).toInt()
+    val height = (area.height() / zoomRatio).toInt()
+    // The crop is measured from the active array's own top left.
+    val left = (area.width() - width) / 2
+    val top = (area.height() - height) / 2
+    @Suppress("DEPRECATION")
+    builder.set(CaptureRequest.SCALER_CROP_REGION, android.graphics.Rect(left, top, left + width, top + height))
+  }
+
+  /** Zooms, while previewing or recording; clamped to what the camera can do. */
+  fun setZoom(ratio: Float) {
+    post {
+      zoomRatio = ratio.coerceIn(minZoom, maxZoom)
+      applyRepeatingRequest()
+    }
+  }
+
+  /** A frame-rate range that tops out at 15, preferring exactly 15; null if the camera has none. */
+  private fun savingFpsRange(): android.util.Range<Int>? {
+    val ranges = fpsRanges ?: return null
+    return ranges.firstOrNull { it.lower == 15 && it.upper == 15 } ?: ranges.filter { it.upper == 15 }.maxByOrNull { it.lower }
+  }
+
+  /**
+   * The video bit rate of a new file (round 2, group 1.6). Normal: 3 Mbit/s at 720p, 6 Mbit/s at
+   * 1080p. Saving mode: half that, which at 15 frames a second gives each frame the same number of
+   * bits as at the normal rate, so each frame is about as sharp as before while the file (and its
+   * upload) is half the size. Where the camera has no 15 frames a second, the file stays at its
+   * usual rate and each frame gets half the bits.
+   */
+  private fun videoBitRate(): Int {
+    val normal = if (videoSize.height >= 1080) 6_000_000 else 3_000_000
+    return if (lowPower) normal / 2 else normal
+  }
+
+  /**
+   * The frame rate the recorder is told: 15 in saving mode when the camera sends 15 a second (a
+   * range that tops out at 15), else 30, the rate the camera then sends. The encoder spreads the
+   * bit rate over this many frames, so it must match what the camera really sends.
+   */
+  private fun videoFrameRate(): Int = if (lowPower && savingFpsRange() != null) 15 else 30
+
+  /**
+   * The low-battery handover at 5% (round 2, groups 1.5 and 1.6; bundle format 0.9): the file being
+   * written closes cleanly with `reason` and the next file of the same clip starts, on the same
+   * path as a piece of fixed length. With `saving`, the new file has a lower bit rate and, where
+   * the camera offers it, 15 frames a second (the capture request's frame-rate range). The picture
+   * size, the persistent surface and the capture session stay as they are.
+   */
+  fun handOver(reason: String, saving: Boolean) {
+    post {
+      if (recorder == null) {
+        // Not recording yet (the service's start is still on its way): the first file follows it.
+        lowPower = saving
+        return@post
+      }
+      // Saving power must never stop the recording. Whatever fails here, a new file is started
+      // (in saving mode if it can be, else at the normal settings) and the camera is sent to it.
+      try {
+        session?.stopRepeating()
+        finishCurrent(reason)
+      } catch (e: Exception) {
+        // finishCurrent lets go of the recorder before anything in it can throw; the old file's
+        // marker is then sealed as cut off when the app next opens.
+        emit("onRecorderError", mapOf("message" to "The file before the low-battery handover didn't close cleanly: ${e.message ?: e}"))
+      }
+      lowPower = saving
+      pieceIndex++
+      if (recorder == null && config != null) {
+        try {
+          startFile()
+        } catch (e: Exception) {
+          emit("onRecorderError", mapOf("message" to "The low-battery handover failed: ${e.message ?: e}"))
+          if (recorder == null && lowPower) {
+            try {
+              lowPower = false
+              startFile()
+            } catch (again: Exception) {
+              emit("onRecorderError", mapOf("message" to "Recording could not carry on after the low-battery handover: ${again.message ?: again}"))
+            }
+          }
+        }
+      }
+      try {
+        applyRepeatingRequest()
+      } catch (e: Exception) {
+        emit("onRecorderError", mapOf("message" to "The camera couldn't be sent to the new file: ${e.message ?: e}"))
+      }
+    }
+  }
+
+  /** Saving mode on or off (off when the phone is charged): it applies from the next file. */
+  fun setSaving(on: Boolean) {
+    post { lowPower = on }
   }
 
   // ---- Recording ------------------------------------------------------------------------------
@@ -269,6 +466,8 @@ object CameraRecorder {
     post {
       if (recorder != null) return@post
       this.config = config
+      // lowPower is not reset here: a handover that came before this start (the battery already at
+      // 5%) applies to the first file. It is reset when a recording ends (stopRecording, close).
       pieceIndex = 0
       lastEndedAt = null
       config.outputDir.mkdirs()
@@ -283,6 +482,8 @@ object CameraRecorder {
     post {
       handler?.removeCallbacksAndMessages(PIECE_TOKEN)
       finishCurrent("stopped")
+      // The next recording starts at the normal quality: saving mode doesn't carry into it.
+      lowPower = false
       applyRepeatingRequest()
       config = null
     }
@@ -319,8 +520,8 @@ object CameraRecorder {
       r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
     }
     r.setOutputFile(file.absolutePath)
-    r.setVideoEncodingBitRate(if (videoSize.height >= 1080) 6_000_000 else 3_000_000)
-    r.setVideoFrameRate(30)
+    r.setVideoEncodingBitRate(videoBitRate())
+    r.setVideoFrameRate(videoFrameRate())
     r.setVideoSize(videoSize.width, videoSize.height)
     r.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
     r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
@@ -332,8 +533,12 @@ object CameraRecorder {
     return r
   }
 
-  /** Camera2's formula for the back camera: sensor orientation plus the phone's rotation. */
-  private fun rotationHint(): Int = (sensorOrientation + deviceDegrees) % 360
+  /**
+   * Camera2's formula: the sensor's orientation plus the phone's rotation for the back camera, minus
+   * it for the front camera, whose picture turns the other way.
+   */
+  private fun rotationHint(): Int =
+    if (front) (sensorOrientation - deviceDegrees + 360) % 360 else (sensorOrientation + deviceDegrees) % 360
 
   private fun startFile() {
     val cfg = config ?: return
@@ -358,8 +563,11 @@ object CameraRecorder {
     val startedAt = System.currentTimeMillis()
     r.start()
     recorder = r
+    fileSaving = lowPower
     currentFile = file
     currentStartedAt = startedAt
+    val recording = UUID.randomUUID().toString()
+    currentRecording = recording
     val gap = lastEndedAt?.let { startedAt - it }
     currentGap = gap
     writeMarker(cfg, file, startedAt, null, null, gap)
@@ -370,43 +578,127 @@ object CameraRecorder {
       "index" to pieceIndex,
       "cutoffSafe" to cutoffSafe,
       "rotationDegrees" to currentRotation,
+      "recording" to recording,
     ))
+    val every = cfg.checkpointMillis
+    if (every != null && useTs) startCheckpoints(Checkpointer(file), every, file, recording, startedAt, cfg.clip, pieceIndex)
+  }
+
+  // ---- Checkpoints (fix round 1, group 2a) ---------------------------------------------------
+
+  /** Reads the growing file on its own thread, so the camera thread never waits for storage. */
+  private fun startCheckpoints(
+    tracker: Checkpointer, every: Long, file: File, recording: String, startedAt: Long, clip: Int, index: Int,
+  ) {
+    checkpointer = tracker
+    val h = checkpointHandler ?: HandlerThread("SaakshiCheckpoints").let { t ->
+      t.start()
+      checkpointThread = t
+      Handler(t.looper).also { checkpointHandler = it }
+    }
+    var count = 0
+    val tick = object : Runnable {
+      override fun run() {
+        try {
+          // Taken and sent under the tracker's lock, which finish() also takes: a checkpoint is
+          // always sent before the file's close event, so it chains before the file's record.
+          synchronized(tracker) {
+            val snapshot = tracker.checkpoint()
+            if (snapshot != null) {
+              emit("onCheckpoint", mapOf(
+                "recording" to recording,
+                "uri" to "file://${file.absolutePath}",
+                "kind" to "video",
+                "clip" to clip,
+                "index" to index,
+                "checkpoint" to count,
+                "bytes" to snapshot.bytes.toDouble(),
+                "sha256" to snapshot.sha256,
+                "at" to iso(System.currentTimeMillis()),
+                "startedAt" to iso(startedAt),
+              ))
+              count++
+            }
+          }
+        } catch (e: Exception) {
+          // Say so once, and stop checkpointing this file; recording carries on.
+          emit("onRecorderError", mapOf("message" to "Checkpoint failed: ${e.message ?: e}"))
+          return
+        }
+        if (checkpointer === tracker) h.postDelayed(this, every)
+      }
+    }
+    h.postDelayed(tick, every)
+  }
+
+  /** Stops checkpoints and fingerprints the whole, closed file. Null when there were no checkpoints. */
+  private fun finishCheckpoints(file: File?): Checkpointer.Snapshot? {
+    val tracker = checkpointer ?: return null
+    checkpointer = null
+    checkpointHandler?.removeCallbacksAndMessages(null)
+    // The TS writer flushes its last packets when it is destroyed, which can be just after
+    // MediaRecorder.release() returns: wait until the file stops growing (at most about a second).
+    if (file != null) {
+      var last = -1L
+      for (i in 0 until 20) {
+        val now = file.length()
+        if (now == last) break
+        last = now
+        Thread.sleep(50)
+      }
+    }
+    return try {
+      tracker.finish()
+    } catch (e: Exception) {
+      emit("onRecorderError", mapOf("message" to "Final fingerprint failed: ${e.message ?: e}"))
+      null
+    }
   }
 
   private fun finishCurrent(reason: String) {
     val r = recorder ?: return
     val file = currentFile
     val startedAt = currentStartedAt
+    val recording = currentRecording
+    val hadCheckpoints = checkpointer?.let { it.checkpointsTaken > 0 } ?: false
     recorder = null
     var ok = true
     try {
       r.stop()
     } catch (e: RuntimeException) {
-      // Thrown when no data was recorded (stop right after start). The file is unusable.
+      // Thrown when no data was recorded (stop right after start), and also when the media server
+      // died mid-recording (for example, the phone ran out of space). Then what is on disk stays.
       ok = false
     } finally {
       r.release()
     }
+    // The writer has closed the file (and flushed its last packets): fingerprint all of it.
+    val whole = finishCheckpoints(file)
+    val keep = ok || hadCheckpoints || (file?.length() ?: 0L) >= KEEP_AFTER_FAILED_STOP_BYTES
+    val endReason = if (ok) reason else "error"
     val endedAt = System.currentTimeMillis()
     lastEndedAt = endedAt
     val cfg = config
     if (file != null && startedAt != null && cfg != null) {
-      if (!ok) {
+      if (!keep) {
         file.delete()
         File(cfg.pendingDir, "${file.name}.json").delete()
         return
       }
-      writeMarker(cfg, file, startedAt, endedAt, reason, null)
+      writeMarker(cfg, file, startedAt, endedAt, endReason, null)
       emit("onRecordingClosed", mapOf(
         "uri" to "file://${file.absolutePath}",
         "startedAt" to iso(startedAt),
         "endedAt" to iso(endedAt),
         "clip" to cfg.clip,
         "index" to pieceIndex,
-        "endReason" to reason,
+        "endReason" to endReason,
         "gapBeforeMs" to currentGap,
         "cutoffSafe" to cutoffSafe,
         "rotationDegrees" to currentRotation,
+        "recording" to recording,
+        "finalSize" to whole?.bytes?.toDouble(),
+        "finalSha256" to whole?.sha256,
       ))
     }
   }
@@ -418,7 +710,8 @@ object CameraRecorder {
     val json = existing ?: JSONObject().apply {
       put("file", "file://${file.absolutePath}")
       put("kind", "video")
-      put("segment", if (cfg.pieceMillis != null) JSONObject().put("clip", cfg.clip).put("index", pieceIndex) else JSONObject.NULL)
+      put("segment", if (cfg.segmented) JSONObject().put("clip", cfg.clip).put("index", pieceIndex) else JSONObject.NULL)
+      put("recording", currentRecording ?: JSONObject.NULL)
       put("startedAt", iso(startedAt))
       put("mode", cfg.mode)
       put("gapBeforeMs", gapBeforeMs ?: JSONObject.NULL)

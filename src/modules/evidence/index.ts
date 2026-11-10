@@ -9,13 +9,26 @@
  */
 import type { CaptureSession } from './capture/pipeline';
 
-export type { BatteryAction } from './battery/monitor';
-export { useLowBattery } from './battery/useLowBattery';
 export { BodyCamScreen } from './bodycam/BodyCamScreen';
+/** For E7: body-cam upload parts, each a byte range ending on a signed checkpoint. */
+export { setBodyCamPartListener, type UploadPart } from './bodycam/parts';
+/** For the secret code's reset, offered only while nothing runs. */
+export { isBodyCamRunning } from './bodycam/running';
 export { CaptureScreen } from './capture/CaptureScreen';
 export { createEvidenceSession } from './capture/deps';
-export { type AudioPiecesHandle, piecePaths, startAudioPieces } from './capture/pieces';
+/** Bug mode (E8): one continuous, checkpointed sound file per recording. */
+export {
+  type SoundCheckpoint,
+  type SoundClosed,
+  type SoundHandlers,
+  type SoundRecorderNative,
+  type SoundRecordingHandle,
+  soundRecorder,
+  startSoundRecording,
+} from './sound/recording';
 export { CertificateForm } from './ui/CertificateForm';
+export { CertificateProfile } from './ui/CertificateProfile';
+export { PhotoViewer } from './ui/PhotoViewer';
 export { RecordHome } from './ui/RecordHome';
 export { SessionDetail } from './ui/SessionDetail';
 export type {

@@ -1,62 +1,117 @@
-import type { CaptureSession, EndReason, EvidenceItem } from '@/modules/evidence';
+import type { CaptureSession, EndReason } from '@/modules/evidence';
+import type { BatteryAction } from '@/platform/battery';
 
 import { WitnessThrottle } from './witness';
-
-/** Bug mode's pieces are this long (spec E8: 1–3 minutes). */
-export const BUG_PIECE_SECONDS = 120;
 
 export type BugEngine = {
   session: CaptureSession;
   stop: (reason?: EndReason) => Promise<void>;
+  /** The low-battery handover: the file closes as "low-battery" and a new one continues. */
+  handOver: () => Promise<void>;
 };
 
-/** Copies a sealed piece to the user's cloud (E7). Provided by the cloud module once it exists. */
-export type PieceUploader = (piece: { sessionId: string; item: EvidenceItem }) => Promise<void>;
+/**
+ * The newest signed record of a bug-mode recording: a checkpoint (about every 10 seconds while the
+ * file is written) or a file's own record (when it closes). Its SHA-256 is the chain head, which
+ * vouches for everything recorded before it.
+ */
+export type SignedPoint = {
+  sequence: number;
+  recordSha256: string;
+  /** What it covers up to: the checkpoint's time, or the file's end. */
+  at: string;
+};
 
 export type BugDeps = {
-  startEngine: () => Promise<BugEngine>;
+  /** Starts recording; `onProblem` hears what goes wrong while it records. */
+  startEngine: (onProblem: (message: string) => void, options: { startedFrom: StartedFrom }) => Promise<BugEngine>;
+  /**
+   * Watches the battery while recording (round 2, group 1.5): the warnings, the 5% handover and
+   * the end of saving mode on charging. Returns the function that stops watching.
+   */
+  watchBattery?: (onAction: (action: BatteryAction) => void) => () => void;
+  /** Saving mode on or off: live location sends every 5 minutes while it is on. */
+  savingMode?: (on: boolean) => void;
   /** Texts the message to trusted contacts with no tap; resolves to how many texts went, or 0. */
   witness: (message: string) => Promise<number>;
   /** How many texts a witness message costs now (one per contact), or 0 if it can't go. */
   witnessCost: () => Promise<number>;
-  witnessText: (item: EvidenceItem, pieces: number) => string;
+  /** The witness text for the newest signed record of a recording that started at `startedAt`. */
+  witnessText: (latest: SignedPoint, startedAt: string) => string;
   liveActivity: {
     start: () => Promise<void>;
-    update: (pieces: number) => Promise<void>;
+    /** `signedAt`: the time the newest signed record covers up to. */
+    update: (signedAt: string) => Promise<void>;
     end: () => Promise<void>;
   };
-  uploader: () => PieceUploader | null;
   now: () => Date;
+};
+
+/** How a recording was started (bundle format 0.9, `capture.startedFrom`; written by group 1.5). */
+export type StartedFrom = 'pocket' | 'phone-taken';
+
+export type StartOptions = {
+  startedFrom?: StartedFrom;
+  /**
+   * Saakshi's own Lock Screen Live Activity (iPhone). "My phone is being taken" turns it off, so the
+   * locked screen shows less (SPEC 5.4); iOS's orange microphone dot still shows.
+   */
+  liveActivity?: boolean;
 };
 
 export type BugState = {
   running: boolean;
+  startedFrom: StartedFrom | null;
+  /** Whether Saakshi's Live Activity is shown for this recording. */
+  liveActivity: boolean;
+  /** At 5% battery: the file closed and a new one carries on, in saving mode until charging. */
+  saving: boolean;
+  /** The last battery warning, as a percentage, or null. */
+  batteryWarning: number | null;
   startedAt: string | null;
   sessionId: string | null;
-  /** Pieces hashed, signed and chained. */
-  sealed: number;
+  /** Checkpoints signed while the file was being written. */
+  checkpoints: number;
+  /** Files closed, hashed, signed and chained. */
+  files: number;
+  /** Files that could not be signed (kept as they are). */
   failed: number;
+  /** What the newest signed record (checkpoint or file) covers up to. */
+  lastSignedAt: string | null;
   witnessed: number;
   lastWitnessAt: string | null;
   error: string | null;
+  /** The latest thing that went wrong while recording (recording carries on, or tries to). */
+  problem: { message: string; at: string } | null;
 };
 
 const IDLE: BugState = {
   running: false,
+  startedFrom: null,
+  liveActivity: false,
+  saving: false,
+  batteryWarning: null,
   startedAt: null,
   sessionId: null,
-  sealed: 0,
+  checkpoints: 0,
+  files: 0,
   failed: 0,
+  lastSignedAt: null,
   witnessed: 0,
   lastWitnessAt: null,
   error: null,
+  problem: null,
 };
 
+/** The Live Activity is updated at most this often (checkpoints come every 10 seconds). */
+const ACTIVITY_UPDATE_MS = 60_000;
+
 /**
- * Bug mode (spec E8): the phone records sound in fixed pieces until stopped or the battery runs
- * out. Each piece is sealed by the evidence module as it is saved; then its chain head is texted to
- * trusted contacts where the phone can send with no tap (within Android's limit), and the piece is
- * handed to the cloud uploader (E7) when there is one.
+ * Bug mode (spec E8): the phone records sound as one continuous file until stopped or the battery
+ * runs out (fix round 1, as for body-cam). About every 10 seconds the evidence module signs a
+ * checkpoint of the file into the session's chain; when the file closes it is sealed. After a new
+ * signed record, the newest chain head is texted to trusted contacts where the phone can send with
+ * no tap, at most once every 10 minutes (WitnessThrottle). Upload parts for E7 are the engine's.
  */
 export class BugModeController {
   private current: BugState = IDLE;
@@ -64,8 +119,11 @@ export class BugModeController {
   private engine: BugEngine | null = null;
   private unsubscribe: (() => void) | null = null;
   private seen = new Set<number>();
+  private newest: SignedPoint | null = null;
   private throttle = new WitnessThrottle();
+  private lastActivityUpdate: number | null = null;
   private starting: Promise<void> | null = null;
+  private unwatchBattery: (() => void) | null = null;
   private work: Promise<void> = Promise.resolve();
 
   constructor(private readonly deps: BugDeps) {}
@@ -77,10 +135,21 @@ export class BugModeController {
     return () => this.listeners.delete(listener);
   };
 
-  /** Starts recording. Resolves once the first piece is recording; ignored while running. */
-  start(): Promise<void> {
-    if (this.current.running) return Promise.resolve();
-    this.starting ??= this.begin().finally(() => {
+  /**
+   * Starts recording. Resolves once recording has started. While it already runs, nothing restarts,
+   * but `liveActivity: false` still takes the Live Activity away ("My phone is being taken" started
+   * over a Pocket recording).
+   */
+  async start(options: StartOptions = {}): Promise<void> {
+    if (this.starting) await this.starting.catch(() => undefined);
+    if (this.current.running) {
+      if (options.liveActivity === false && this.current.liveActivity) {
+        this.set({ ...this.current, liveActivity: false });
+        await this.deps.liveActivity.end().catch(() => undefined);
+      }
+      return;
+    }
+    this.starting ??= this.begin({ startedFrom: options.startedFrom ?? 'pocket', liveActivity: options.liveActivity !== false }).finally(() => {
       this.starting = null;
     });
     return this.starting;
@@ -91,6 +160,9 @@ export class BugModeController {
     const engine = this.engine;
     if (!engine) return;
     this.engine = null;
+    this.unwatchBattery?.();
+    this.unwatchBattery = null;
+    if (this.current.saving) this.deps.savingMode?.(false);
     try {
       await engine.stop(reason);
     } finally {
@@ -98,59 +170,126 @@ export class BugModeController {
       await this.work;
       this.unsubscribe?.();
       this.unsubscribe = null;
-      await this.deps.liveActivity.end().catch(() => undefined);
-      this.set({ ...this.current, running: false });
+      if (this.current.liveActivity) await this.deps.liveActivity.end().catch(() => undefined);
+      this.set({ ...this.current, running: false, liveActivity: false });
     }
   }
 
-  /** Lets the work queued for sealed pieces (witness texts, uploads) finish. For tests. */
+  /** Lets the work queued for new signed records (witness texts, the Live Activity) finish. For tests. */
   settled(): Promise<void> {
     return this.work;
   }
 
-  private async begin(): Promise<void> {
+  private async begin(options: { startedFrom: StartedFrom; liveActivity: boolean }): Promise<void> {
     this.seen = new Set();
+    this.newest = null;
+    this.lastActivityUpdate = null;
     try {
-      const engine = await this.deps.startEngine();
+      const engine = await this.deps.startEngine(
+        (message) => {
+          if (this.current.running) this.set({ ...this.current, problem: { message, at: this.deps.now().toISOString() } });
+        },
+        { startedFrom: options.startedFrom },
+      );
       this.engine = engine;
-      this.set({ ...IDLE, running: true, startedAt: this.deps.now().toISOString(), sessionId: engine.session.id });
+      this.set({
+        ...IDLE,
+        running: true,
+        startedFrom: options.startedFrom,
+        liveActivity: options.liveActivity,
+        startedAt: this.deps.now().toISOString(),
+        sessionId: engine.session.id,
+      });
       this.unsubscribe = engine.session.subscribe(() => this.scan(engine.session));
-      await this.deps.liveActivity.start().catch(() => undefined);
+      this.unwatchBattery = this.deps.watchBattery?.((action) => this.onBattery(action)) ?? null;
+      if (options.liveActivity) await this.deps.liveActivity.start().catch(() => undefined);
     } catch (error) {
       this.set({ ...IDLE, error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
 
-  /** Picks out pieces that have just been sealed or have failed. */
+  /**
+   * Low battery (SPEC E1, E8; round 2, group 1.5): warnings at 10% and 5%; at 5% the file closes
+   * cleanly and a new one continues until the phone dies, with saving mode on; charging ends it.
+   * Nothing stops the recording.
+   */
+  private onBattery(action: BatteryAction): void {
+    const engine = this.engine;
+    if (!engine || !this.current.running) return;
+    if (action.type === 'warn') return this.set({ ...this.current, batteryWarning: action.percent });
+    if (action.type === 'low') {
+      this.set({ ...this.current, saving: true, batteryWarning: 5 });
+      void engine.handOver().catch(() => undefined);
+      this.deps.savingMode?.(true);
+      return;
+    }
+    this.set({ ...this.current, saving: false });
+    this.deps.savingMode?.(false);
+  }
+
+  /** Picks out checkpoints and files that have just been signed, and files that failed. */
   private scan(session: CaptureSession): void {
+    let { checkpoints, files, failed } = this.current;
+    let newest = this.newest;
+    for (const checkpoint of session.checkpoints) {
+      if (this.seen.has(checkpoint.sequence) || checkpoint.status !== 'sealed' || !checkpoint.recordSha256) continue;
+      this.seen.add(checkpoint.sequence);
+      checkpoints++;
+      if (!newest || checkpoint.sequence > newest.sequence) {
+        newest = { sequence: checkpoint.sequence, recordSha256: checkpoint.recordSha256, at: checkpoint.at };
+      }
+    }
     for (const item of session.items) {
       if (this.seen.has(item.sequence)) continue;
-      if (item.status === 'sealed') {
+      if (item.status === 'sealed' && item.recordSha256) {
         this.seen.add(item.sequence);
-        this.set({ ...this.current, sessionId: session.id, sealed: this.current.sealed + 1 });
-        const pieces = this.current.sealed;
-        this.work = this.work.then(() => this.afterSealed(session.id!, item, pieces));
+        files++;
+        if (!newest || item.sequence > newest.sequence) {
+          newest = { sequence: item.sequence, recordSha256: item.recordSha256, at: item.endedAt };
+        }
       } else if (item.status === 'failed') {
         this.seen.add(item.sequence);
-        this.set({ ...this.current, failed: this.current.failed + 1 });
+        failed++;
       }
+    }
+    const changed = newest !== this.newest;
+    if (
+      !changed &&
+      checkpoints === this.current.checkpoints &&
+      files === this.current.files &&
+      failed === this.current.failed &&
+      session.id === this.current.sessionId
+    ) {
+      return;
+    }
+    this.newest = newest;
+    this.set({ ...this.current, sessionId: session.id, checkpoints, files, failed, lastSignedAt: newest?.at ?? null });
+    if (changed && newest) {
+      const latest = newest;
+      this.work = this.work.then(() => this.afterSigned(latest));
     }
   }
 
-  private async afterSealed(sessionId: string, item: EvidenceItem, pieces: number): Promise<void> {
-    await this.deps.liveActivity.update(pieces).catch(() => undefined);
+  private async afterSigned(latest: SignedPoint): Promise<void> {
+    const now = this.deps.now().getTime();
+    if (this.current.liveActivity && (this.lastActivityUpdate === null || now - this.lastActivityUpdate >= ACTIVITY_UPDATE_MS)) {
+      this.lastActivityUpdate = now;
+      await this.deps.liveActivity.update(latest.at).catch(() => undefined);
+    }
 
+    // Cheap check first: most new checkpoints come well inside the 10 minutes.
+    if (!this.throttle.due(now)) return;
+    // A later record may have come while this waited: text the newest.
+    const newest = this.newest && this.newest.sequence > latest.sequence ? this.newest : latest;
     const cost = await this.deps.witnessCost().catch(() => 0);
     if (cost > 0 && this.throttle.allow(cost, this.deps.now().getTime())) {
-      const sent = await this.deps.witness(this.deps.witnessText(item, pieces)).catch(() => 0);
+      const text = this.deps.witnessText(newest, this.current.startedAt ?? newest.at);
+      const sent = await this.deps.witness(text).catch(() => 0);
       if (sent > 0) {
         this.set({ ...this.current, witnessed: this.current.witnessed + 1, lastWitnessAt: this.deps.now().toISOString() });
       }
     }
-
-    const upload = this.deps.uploader();
-    if (upload) await upload({ sessionId, item }).catch(() => undefined);
   }
 
   private set(state: BugState): void {

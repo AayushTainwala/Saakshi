@@ -2,9 +2,9 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-private let codePadURL = URL(string: "saakshi://codepad")!
+private let sosURL = URL(string: "saakshi://sos")!
 
-/// A control for Control Center, the Lock Screen and the Action Button: opens the code pad.
+/// A control for Control Center, the Lock Screen and the Action Button: opens the SOS screen.
 struct QuickAlertControl: ControlWidget {
   var body: some ControlWidgetConfiguration {
     StaticControlConfiguration(kind: "in.aayushtainwala.saakshi.quick-alert") {
@@ -13,7 +13,7 @@ struct QuickAlertControl: ControlWidget {
       }
     }
     .displayName("Saakshi quick alert")
-    .description("Opens the code pad that alerts your trusted contacts.")
+    .description("Opens Saakshi's SOS screen.")
   }
 }
 
@@ -31,17 +31,17 @@ struct QuickAlertProvider: TimelineProvider {
   }
 }
 
-/// A Lock Screen or Home Screen widget that opens the code pad. From the Lock Screen, iPhone asks
+/// A Lock Screen or Home Screen widget that opens the SOS screen. From the Lock Screen, iPhone may ask
 /// for Face ID or the passcode first.
 struct QuickAlertWidget: Widget {
   var body: some WidgetConfiguration {
     StaticConfiguration(kind: "SaakshiQuickAlert", provider: QuickAlertProvider()) { _ in
       QuickAlertView()
-        .widgetURL(codePadURL)
+        .widgetURL(sosURL)
         .containerBackground(.background, for: .widget)
     }
     .configurationDisplayName("Saakshi quick alert")
-    .description("Opens the code pad that alerts your trusted contacts.")
+    .description("Opens Saakshi's SOS screen.")
     .supportedFamilies([.accessoryCircular, .accessoryRectangular, .systemSmall])
   }
 }

@@ -2,13 +2,896 @@
 
 The pickup file for build sessions. Each stream keeps its own section current: status, what was done, what's next, questions for the owner. Read [CLAUDE.md](../CLAUDE.md) first.
 
-## Where things stand (21 Oct 2026)
+## Where things stand (21 Oct 2026; fix round 1 from 5 Nov; round 2 decided 6 Nov)
 
-- **Merged into `main`:** #1–#9. That is R1 and R2 as planned, apart from E3 and E7, plus the law checks against the Gazette of India (#9). Typecheck, lint, all tests and both native builds pass on `main`.
+- **Round 2 (6 Nov 2026):** Part 1 built (groups 1.1 to 1.5, five stacked pull requests, #31 to #36), not yet run on a phone. Group 1.6, the owner's follow-ups of 9 Nov, merged (https://github.com/AayushTainwala/Saakshi/pull/41). Group 1.7 (locking the phone when "My phone is being taken" starts) built on `round-2/1-7-lock-screen`. See "Round 2" below.
+- **Merged into `main`:** #1–#9. That is R1 and R2 as planned, apart from E3 and E7, plus the law checks against the Gazette of India (#9). Since then: the owner's docs and briefs (#10–#15), and fix round 1, groups 1, 2 and 2a (#16–#18; see "Fix round 1" below). Typecheck, lint, all tests and both native builds pass on `main`.
 - **Pace:** no 24-hour deadline (owner, 21 Oct). The next goal is a beta for about 50 testers on iPhone and Android; see BUILD_PLAN.md, section 1, "Road to the beta".
 - **First Release run (21 Oct, iOS only):** the owner set up iOS credentials and the App Store Connect API key with EAS (role App Manager). The EAS build succeeded; the **Submit to TestFlight step failed**. Its log is visible only to someone signed in to GitHub, so the cause isn't known yet. The owner is submitting that build from his Mac with `eas submit --platform ios --latest`. **Stream D:** find the cause and fix the workflow.
 - **Owner's phone testing:** round 1 on iPhone through TestFlight, with a checklist and his notes on a claude.ai page (https://claude.ai/artifact/BQU34AZ76SbRZpBKE5iyc6). Android follows when his phone arrives (about 23 Oct). The review session turns his notes into fix work for the streams.
 - **Streams:** each opens pull requests into `main`; the owner or a review session merges them.
+
+## Round 2 (SOS redesign, Pocket recording, phone taken, Saakshi-to-Saakshi; decided 6 Nov 2026)
+
+The owner's decisions after his SOS test are in `docs/SPEC.md` (sections 4, 5, 6), `docs/spec/evidence-bundle.md` (0.9) and `docs/BUILD_PLAN.md` ("Round 2"). The work, in parts, is **[docs/briefs/2026-11-06-round-2.md](briefs/2026-11-06-round-2.md)**. Read it, then this section.
+
+| Part and group | State |
+|---|---|
+| 1.1 Contacts keyboard bug | Merged: https://github.com/AayushTainwala/Saakshi/pull/31. Not yet run on a phone. |
+| 1.2 Secret code, Settings | Merged: https://github.com/AayushTainwala/Saakshi/pull/32. Not yet run on a phone. |
+| 1.3 SOS swipes, Pocket recording, "My phone is being taken" | Split in two, as the brief allows. Both merged. **A** (the page, the move, the quick trigger): https://github.com/AayushTainwala/Saakshi/pull/33. **B** ("My phone is being taken", Stop gating, the server migration): https://github.com/AayushTainwala/Saakshi/pull/34. Not yet run on a phone. |
+| 1.4 Alerts (both links, battery level, calm Share my location) | Merged: https://github.com/AayushTainwala/Saakshi/pull/35. Not yet run on a phone. |
+| 1.5 Low battery at 5%, bundle format 0.9 | Merged: https://github.com/AayushTainwala/Saakshi/pull/36. Not yet run on a phone. |
+| 1.6 Follow-ups (passcode-only reset; battery only at 20% or less; Android 5% without a camera rebuild; recovery code; swipe distance; saving-mode GPS) | Merged: https://github.com/AayushTainwala/Saakshi/pull/41. Not yet run on a phone. |
+| 1.7 Lock the phone when "My phone is being taken" starts (Android device admin, force-lock only; on-screen reminder), and two follow-ups to 1.6 | Built on `round-2/1-7-lock-screen`, pull request open. Google Play's policy was checked first: no rule forbids it (below). Not yet run on a phone. |
+| 2.1–2.3 E7, Google Drive and iCloud Drive | Not started (needs the owner's Google Cloud project; owner's guide "Round 2 setup guide" is in his vault) |
+| 3.1 Protocol `docs/spec/alerts.md` | Not started. **Documents only; needs the owner's review before Part 3 code.** May start with Part 1. |
+| 3.2–3.5 Server, pairing, receiving, silence alarm | Not started (needs the Apple push key and Google's notification service) |
+| 4 First-open walkthrough | Not started. Research for the phone-setup page is done: `docs/research/power-off-locks.md` (#29). Ship only the rows it marks primary and tested. |
+
+**Part 1 review (7 Nov 2026).** #31 to #36 were merged into `main` on 7 Nov and reviewed there afterwards: typecheck and lint pass, 507 tests pass, CI and both native builds passed on each pull request that changed native code, and the two migrations on the live server match the repository. No legal or privacy text was changed. Nothing needs undoing. The open questions are in "Owner questions", `(Round 2)`. On 9 Nov the owner also confirmed two of the builders' "built so" calls: "I need help" goes at once after a full swipe (no countdown), and a file sealed after a cut-off carries no battery level. The swipe's distance changes in group 1.6.
+
+Questions for the owner from this round go in "Owner questions" as `- [ ] (Round 2) …`. The builders' reports go under this heading, one `### Group n.n` each.
+
+**Start prompt for Part 1** (model Opus, effort high):
+
+> You are the builder for Saakshi round 2, Part 1. Read CLAUDE.md, docs/SPEC.md (sections 4, 5, 6), docs/spec/evidence-bundle.md, docs/BUILD_HANDOFF.md ("Round 2") and docs/briefs/2026-11-06-round-2.md. Work through groups 1.1 to 1.5 in order, one branch `round-2/<group>` and one pull request each, from the latest `main`. Each needs tests, green typecheck, lint and tests, green native builds, an updated handoff and plain test steps for the owner in the description. Raise questions in the handoff as `- [ ] (Round 2) …` and do not change scope.
+
+**Start prompt for group 1.6** (follow-ups to Part 1; model Opus, effort high):
+
+> You are the builder for Saakshi round 2, group 1.6. Read CLAUDE.md, docs/SPEC.md (sections 4, 5), docs/BUILD_HANDOFF.md ("Round 2", with the Part 1 reports) and docs/briefs/2026-11-06-round-2.md, group 1.6. Do group 1.6 only, on branch `round-2/1-6-follow-ups` from the latest `main`, in one pull request. It needs tests, green typecheck, lint and tests, green native builds, an updated handoff and plain test steps for the owner in the description. Raise questions in the handoff as `- [ ] (Round 2) …` and do not change scope.
+
+**Start prompt for group 1.7** (after 1.6 is merged; model Opus, effort high):
+
+> You are the builder for Saakshi round 2, group 1.7. Read CLAUDE.md, docs/SPEC.md (section 5.4), docs/BUILD_HANDOFF.md ("Round 2") and docs/briefs/2026-11-06-round-2.md, group 1.7. Start with its step 1 (Google Play's policy on device admin) and stop if a rule forbids this use. Then do group 1.7 only, on branch `round-2/1-7-lock-screen` from the latest `main`, in one pull request. It needs tests, green typecheck, lint and tests, green native builds, an updated handoff and plain test steps for the owner in the description. Raise questions in the handoff as `- [ ] (Round 2) …` and do not change scope.
+
+**Start prompt for group 3.1 only** (the alerts protocol, documents only; model Opus, effort high; can run beside Part 1):
+
+> You are the builder for Saakshi round 2, group 3.1. Read CLAUDE.md, docs/SPEC.md (sections 4, 5, 6), docs/BUILD_HANDOFF.md ("Round 2") and docs/briefs/2026-11-06-round-2.md. Do group 3.1 only: write docs/spec/alerts.md and open one pull request that changes documents only. Do not write app or server code. Mark every legal or privacy statement `NEEDS OWNER REVIEW`. Raise questions in the handoff as `- [ ] (Round 2) …`; do not change scope.
+
+### Group 1.1: the keyboard covered the contacts form
+
+**What was wrong.** Neither phone moved the page for the keyboard:
+- **Android:** Expo SDK 58 always draws edge to edge (Android 16 makes it compulsory; Expo's `withEdgeToEdge` plugin no longer lets an app turn it off). With edge-to-edge drawing, Android no longer shrinks the window when the keyboard opens, so the keyboard simply sat over the bottom of the page.
+- **iPhone:** React Native's ScrollView does nothing for the keyboard unless asked. Even when asked (`automaticallyAdjustKeyboardInsets`), it scrolls only the focused field into view, not the Add button under it (React Native 0.88, `RCTScrollViewComponentView.mm`, `_keyboardWillChangeFrame`).
+- Also: a tap on Add while the keyboard was up only closed the keyboard; it took a second tap to add.
+
+**What was built** (in the shared `Screen`, so every page with text fields gains it):
+- The page measures where the keyboard's top edge is, and pads its own end by as much as the keyboard covers. So with the keyboard up, everything on the page, the contacts list included, can still be scrolled to.
+- When a field is focused, the page scrolls so that the field, and the rest of its group (`KeyboardGroup`, new in `src/components`), are between the top of the page and the keyboard, 16 points clear of it. On the contacts screen the group is "Or type a number", the name, the number with its hint, and Add. If the group doesn't fit, as on a small phone with the name field focused, the focused field goes to the top and the group's end is cut off, never the field. It works the same for the number pad and the text keyboard (they differ in height), and for Hindi's longer labels, because it measures rather than assumes.
+- It happens again when moving from one field to the next with the keyboard already up.
+- If a phone does shrink its window for the keyboard after all, the padding comes off again.
+- A tap on a button works the first time while the keyboard is up (`keyboardShouldPersistTaps="handled"`); a tap on empty space still closes the keyboard. This matters on iPhone, whose number pad has no key to close it.
+- No new dependency, no new strings, no native code.
+
+**Tests:** the arithmetic, with a small phone (667 points tall) and a large one (932), the number pad and the text keyboard, and English and Hindi label heights (`src/components/__tests__/keyboard.test.ts`). The contacts screen itself, on iPhone and on Android, with the phone's measurements played in: the padding, where it scrolls, moving between fields, Add working with the keyboard up, and Hindi (`src/modules/sos/__tests__/contactsKeyboard.test.tsx`).
+
+**Not verified:** nothing has run on a phone. A test can't show where a real keyboard sits, so the owner's test (in the pull request) is the real check: on a small and a large phone, both keyboards, both languages. On an iPhone whose tab bar the page runs under, the padding may leave some extra empty space at the very end of the page; that is harmless.
+
+**How Part 1's pull requests are stacked.** Each group needs the one before it (1.3's Stop needs 1.2's code; 1.4 and 1.5 build on 1.3). So each group's branch starts from the previous group's branch, and its pull request is opened against that branch, so that it shows only its own changes. Merge them in order, 1.1 first. After a merge, GitHub moves the next pull request onto `main`, or its base can be changed to `main` by hand.
+
+### Group 1.2: the secret code, and Settings
+
+**What was built:**
+- **A new module, `src/modules/secretcode`.** Other modules ask it only two things: whether a code is set (`isSecretCodeSet`), and for the code before a Stop (`requireSecretCode({ reason })`). Nothing else knows how the code is kept. Group 1.3 wires every Stop to it; in this pull request nothing calls it yet, apart from Settings.
+  - **Four digits.** Set, changed and removed in Settings. Changing or removing asks for the current code first. One digit four times (0000) and straight runs up or down (1234, 6789, 9876) are refused with a plain reason.
+  - **Kept as a salted hash in the phone's secure storage** (`expo-secure-store` 58.0.2, MIT; the iPhone Keychain, "this device only", so never in iCloud Keychain or a backup; on Android, encrypted with a key in the Android Keystore). Never in `preferences.json`, never in a log. What is stored is a random salt and the SHA-256 of salt and code.
+  - **Waits grow after wrong tries:** two cost nothing, then 30 seconds, 1, 2, 5, 15 and 30 minutes, then an hour each time. Each try is stored as wrong before the code is compared, so closing the app in the middle of a try doesn't undo it. The count and the wait's end are in the secure storage, so they survive closing the app and restarting the phone. The code screen counts the wait down in plain words ("Try again in 2 minutes").
+  - **If the secure storage can't be read,** the code screen says so, and nothing is treated as "no code". Treating it as "no code" would let someone set a new code over the real one, or stop something.
+  - **On iPhone, a reinstalled app starts with no code.** The Keychain keeps items after the app is deleted, so the app forgets a code left by an earlier install.
+  - **One code screen** (`src/app/secret-code.tsx`, full screen over the tabs). It is used for entering, setting, changing and removing the code. `requireSecretCode` opens it and answers true for the right code, false if the user backs out. If no code is set when a Stop asks, the screen asks the user to set one first, and setting it lets the Stop go through (built so).
+  - **Reset with the phone's passcode** (`expo-local-authentication` 58.0.2, MIT): "Forgot the code?" on the code screen, **only while nothing is running**: body-cam, Pocket recording (still called bug mode until 1.3) and live location are checked now, and "My phone is being taken" joins in 1.3. It is checked before the prompt and again after it. The prompt needs a phone with a screen lock; on a phone without one, the screen says to set a passcode first.
+- **Settings** now has, above the items that were there: **Trusted contacts** (the editor moved from the SOS tab to `/settings/contacts`), **Live-location length** (1, 4, 8 or 24 hours, 4 by default), **Secret code**, and **Quick trigger** (the existing setup screen moved to `/settings/trigger`; group 1.3 rewrites it). Language, appearance, the details for certificates, and About stay. The export folder is chosen from a record, as before; it isn't a Settings item yet.
+- **How each contact is reached:** each person now has a method, shown under their three ticks. Only "Text message (SMS)" can be chosen until group 3.3 adds the Saakshi app. The contacts file is now version 3. A version 2 list keeps every person and every tick, and everyone is reached by SMS (test).
+- **The live-location card on the SOS tab** now uses the Settings length instead of its own choice ("For 4 hours (change this in Settings)").
+- **App Review notes:** a short optional block for Face ID (`store/apple/review-notes.md`); all blocks still fit Apple's 4,000 bytes.
+
+**What each platform's prompt accepts** (the brief asked):
+- **iPhone:** `expo-local-authentication` uses Apple's `LAPolicy.deviceOwnerAuthentication` (read in its source, `ios/LocalAuthenticationModule.swift`). Apple: "User authentication with biometry, Apple Watch, or the device passcode … If biometry is available, enrolled, and not disabled, the system uses that first … When these options aren't available, the system prompts the user for the device passcode" ([Apple](https://developer.apple.com/documentation/localauthentication/lapolicy/deviceownerauthentication)). **So Face ID or Touch ID also resets the code when enrolled.** None of the policies Apple lists ([LAPolicy](https://developer.apple.com/documentation/localauthentication/lapolicy)) asks for the passcode alone. The app's Face ID permission text says Face ID is used only for this reset.
+- **Android:** the library asks the system's biometric prompt for `BIOMETRIC_WEAK | DEVICE_CREDENTIAL` (`LocalAuthenticationModule.kt`). That means a fingerprint or face (Class 2 or 3) when enrolled, or the screen lock's PIN, pattern or password. Android can ask for the screen lock alone (`DEVICE_CREDENTIAL` by itself, from Android 11; "DEVICE_CREDENTIAL alone is unsupported prior to API 30", [BiometricPrompt.PromptInfo.Builder](https://developer.android.com/reference/androidx/biometric/BiometricPrompt.PromptInfo.Builder)). The library doesn't offer that, so it would need code of our own. Question below.
+- New Android permissions from the library: `USE_BIOMETRIC` and `USE_FINGERPRINT` (both normal permissions, granted without asking; the second is used only on Android 8 and older).
+
+**Found:**
+- With only 10,000 four-digit codes, no hash would stop someone who could read the stored hash from trying them all. The hash keeps the code itself out of storage; the secure storage and the waits are what protect it.
+- The waits are counted on the phone's clock. Setting the clock back restarts the wait; setting it forward ends a wait early. An app can't tell the true time without the internet, and changing the clock needs the phone unlocked. Question below.
+
+**Tests (44 new):** the code rules; the wait schedule on a fake clock, with every step and the right code refused during a wait; a try stored before it is compared; persistence across a restart; the clock set back; secure storage that can't be read; set, change, remove and reset; no reset while each of the four things runs, or if one starts during the prompt; the screens (Settings shows what is stored at once after Set and after Remove, so the 6 Nov "Code saved" bug can't recur here; change; refused codes; mismatch; the wait in words; "set one first"; `requireSecretCode` answering true and, when backed out, false; Hindi); the contacts migration; the live-location length; the new Settings order.
+
+**Not verified:** nothing has run on a phone. The native builds run on the pull request (the two new Expo modules add native code). Most important to try: set a code, close the app fully, open it, and check the code is still asked for; five wrong tries, then restart the phone, and check the wait is still there; the reset with the phone's passcode, and with Face ID or a fingerprint if set up.
+
+**NEEDS OWNER REVIEW:** the new wording: `secretcode.json` (all of it), the new parts of `settings.json` (`contacts`, `live`, `trigger`), `sos.json` (`contacts.method*`, `live.length`), and the Face ID permission text (`app.json`, `src/i18n/native/*.json`), in English and Hindi.
+
+### Group 1.3A: the SOS page, Pocket recording, the quick trigger
+
+**What was built:**
+- **The SOS page** (SPEC 5.1): **Call 112** and **I need help** as swipes, then **Share my location** as a plain button, then only what is running (the alert's progress, live location) and **Quick trigger setup** (to Settings). The third swipe, **My phone is being taken**, comes with group 1.3B. The contacts card and the old alert button are gone; the contacts are in Settings (group 1.2).
+- **The swipe control** (`src/components/SwipeControl.tsx`): slide the handle all the way to the end. Let go anywhere short of the end (more than 6 points short) and it springs back; nothing happens. A second swipe while it springs back is ignored. Once a swipe has started, the page doesn't scroll it away. **With a screen reader on** (VoiceOver, TalkBack) the control is one button: double-tap opens a plain confirmation sheet, and only its confirm button acts.
+  - **Call 112** dials 112.
+  - **I need help** sends the alert as before, to the people ticked for SOS alerts (group 1.4 adds the battery level, both links and live location). The confirmation sheet says that Saakshi is not an emergency service.
+  - **Share my location** starts live location for the Settings length and texts the link to the people ticked for live location (group 1.4 makes the message calm, with the battery level). If nobody is ticked for live location, it says so and links to the contacts.
+- **Pocket recording** (SPEC E8): bug mode is now called Pocket recording everywhere the user sees it: its screen, the records list, the Android notification, the Live Activity, the microphone permission text, and Hindi ("पॉकेट रिकॉर्डिंग"). It moved to the **Record** page, beside body-cam (`/record/pocket`), described as "Sound only, like a body-cam for sound". The module (`src/modules/bugmode`) and the stored `capture.mode: "bug"` are unchanged. Bundle names, the witness message's Record line and the automatic witness text keep "Bug mode" until group 1.5 (bundle format 0.9).
+- **The quick trigger** opens the SOS screen (`saakshi://sos`); no code is typed:
+  - iPhone: the App Intent (Control Center, Lock Screen, Action Button, Shortcuts for Back Tap) is now "Open Saakshi SOS"; the widget opens `saakshi://sos`. The intent's Swift type keeps its old name, `OpenCodePadIntent`, so that a Shortcut already made with it (for Back Tap) keeps working. Pocket recording's Live Activity opens `saakshi://record/pocket`.
+  - Android: the home-screen widget and the quick notification open `saakshi://sos`.
+  - Settings → Quick trigger now has the setup steps only, and says that a locked iPhone may ask for the passcode first.
+- **Removed:** the 3-digit code pad (`/codepad`), its setting, the refused-codes list, and confiscation mode (`trigger/confiscation.ts`, `ConfiscationCard`). The old setting's file, which held the 3-digit code in plain text, is deleted when the app starts (`removeOldCodePadSetting`); contacts and every other setting stay. The `trigger` module now holds only the quick-trigger plumbing.
+- **App Review notes:** updated for the swipes, Pocket recording on the Record tab, and the quick trigger.
+
+**Built so, please confirm:**
+- After a full swipe of **I need help**, the alert goes at once. On the Android APK there is no 3-second countdown any more: the old alert button had one with Cancel, but a full swipe is already deliberate, as the code pad was.
+- How close to the end counts as a full swipe: 6 points.
+
+**Tests (15 new; the code pad's and confiscation mode's tests went with them; 445 in all):** the swipe rule; the swipe control driven by a finger (a partial swipe does nothing; a full one acts once; no second swipe while it springs back) and by a screen reader (the sheet, Cancel and Confirm); the SOS page (what is on it at rest, Call 112, "I need help" with nobody to alert, Share my location with nobody ticked); the quick trigger opening `/sos` on iPhone from a cold start and while running; the native sources using `saakshi://sos` and no code-pad names; the code pad and confiscation mode gone from the trigger module; the old setting deleted once.
+
+**Not verified:** nothing has run on a phone. The Swift and Kotlin changes compile only in the Native build workflow. Most important: how the swipe feels (on a small and a large phone, and with a thumb in a hurry), VoiceOver and TalkBack, the Action Button and Back Tap opening the SOS screen, and from a locked iPhone. A Back Tap Shortcut made before this change should still run; its action's name in Shortcuts now reads "Open Saakshi SOS".
+
+**NEEDS OWNER REVIEW:** the new and changed wording: `sos.json` (`home`, `trigger`, `bug`), `record.json` (`pocket`, `list.bug`), `common.json` (`swipe`), the widget's and intent's strings (`targets/widget/*.lproj`), the Android widget description, and the microphone permission text, in English and Hindi.
+
+### Group 1.3B: "My phone is being taken", and the code on every Stop
+
+**What was built:**
+- **The third swipe, "My phone is being taken"** (SPEC 5.4). It starts four things, each on its own, so that one failing doesn't stop the rest (`src/modules/trigger/phoneTaken.ts`):
+  - **the SOS alert** to the people ticked for SOS alerts. It waits up to 8 seconds for the live link and goes with it, or goes without it and the link follows on its own; group 1.4 adds the battery level and the map link;
+  - **live location with no fixed end** (below);
+  - **Pocket recording**, without Saakshi's Lock Screen Live Activity, so the locked screen shows less. iOS still shows its orange microphone dot, which an app can't hide. A Pocket recording already running keeps going and loses its Live Activity. The low-battery handover comes with it in group 1.5;
+  - **the silence alarm's heartbeat:** nothing yet. The seam is `heartbeat.start()` and `heartbeat.stop()` in `phoneTakenInstance.ts`, called when the mode starts, when the app restarts with it on, and when it is stopped with the code. Group 3.5 fills it in.
+- **It needs a secret code to start.** Without one, the swipe explains why and offers to set one. Once it is set, the mode starts (built so).
+- **While it runs**, the SOS page shows, in plain words, what really runs. If a part failed, or was stopped on its own with the code, it says so and offers "Try again". It also says that it can only be stopped in Saakshi with the secret code. Its state is saved, so it is still on after the app restarts. The secret code's reset is never offered while it runs.
+- **Stop needs the code, everywhere** (SPEC 5.3): body-cam's Stop, Pocket recording's Stop, live location's Stop, and this mode's Stop all open the code screen first.
+- **Body-cam's Android notification has no Stop button any more.** Tapping it still opens the app. Pocket recording's notification and the Live Activity never had one.
+- **The server** (Supabase `saakshi-live`): migration `supabase/migrations/20261106190000_live_persistent_shares.sql`, **applied on 6 Nov with your approval**.
+  - A share flagged `persistent` isn't deleted at 24 hours. Its end moves to a week after each position or check-in (`live_push`, and the new `live_keep`). The existing cron job deletes it a week after the phone last reported.
+  - `live_keep` makes a share already running persistent, keeping its link, if "My phone is being taken" starts during Share my location.
+  - `live_view` now says whether a share is persistent. The viewer page (`web/live/index.html`) then says "Shared until they stop sharing" in place of an end time a week away.
+  - Ordinary shares, and the app already on phones (which asks with two arguments), are unchanged. The `live` schema stays closed to the API.
+- **Checks run as the `anon` role** on the live server, all passing:
+  - a persistent share starts, ending a week away;
+  - a push with the secret is taken, and its end moves later. Checked across separate calls: within one transaction the database's clock stands still;
+  - a push, a keep and a stop with a wrong secret are refused;
+  - the view says persistent, with only the right position;
+  - an ordinary share from the old two-argument call ends in 4 hours, and `live_keep` turns it persistent;
+  - `live.shares`, `live.positions` and `live.keep_for` are refused to `anon` directly;
+  - both shares stop; afterwards the links show nothing, pushes are refused, and no row is left in either table.
+- **Supabase's security advisor:** the same findings as before, by design (the public functions can be called without signing in, and the tables have row-level security with no policies, so nothing reaches them directly), plus `live_keep` in the first group.
+
+**How each of these can still be stopped outside Saakshi's code screen** (the brief asked for the list; SPEC 5.4, "What this does and does not promise"):
+- **Both platforms:**
+  - switching the phone off, or a forced restart, stops everything. The recording is sealed as cut off when Saakshi next opens;
+  - airplane mode, or no signal, stops nothing on the phone. Recording carries on, and positions wait on the phone until signal returns; texts don't go;
+  - taking away the microphone or location permission in the phone's Settings stops that part;
+  - deleting the app.
+- **iPhone:**
+  - **force-quit** (swiping Saakshi away in the app switcher) is expected to end Pocket recording, body-cam's sound and live location, because they run inside the app. Apple's pages I read don't say so in so many words, and it hasn't been tested. Saakshi doesn't use the location service that iOS restarts after the app ends (significant-change monitoring; [Apple](https://developer.apple.com/documentation/corelocation/cllocationmanager/startmonitoringsignificantlocationchanges())). Apple also says a background notification is dropped "if something force quits or kills the app" ([Apple](https://developer.apple.com/documentation/usernotifications/pushing-background-updates-to-your-app)). So the silence alarm (3.5) is what covers a force-quit. On the server, a persistent share keeps its last position for a week;
+  - iOS can end an app in the background to free memory ("The system can terminate apps at any time to free up memory or other system resources", [Apple](https://developer.apple.com/documentation/corelocation/handling-location-updates-in-the-background));
+  - Control Center on the Lock Screen allows airplane mode unless it is turned off; the walkthrough (Part 4) covers this;
+  - a phone call stops sound recording for its length. A new file follows, as before.
+- **Android:**
+  - **Task Manager's Stop** (the "Active apps" list in the notification shade, Android 13 and later): "The system removes your app from memory. Therefore, your entire app stops, not just the running foreground service … The system doesn't send your app any callbacks when the user taps the Stop button" ([Android](https://developer.android.com/develop/background-work/services/fgs/handle-user-stopping)). **It can't be removed:** that page gives an app no way to opt out, and I found none for an ordinary app;
+  - Settings → Apps → Saakshi → Force stop;
+  - makers' battery managers (Xiaomi, Oppo, Vivo in particular) may stop background services; untested;
+  - swiping Saakshi away from the recent apps is expected to leave its foreground services running; untested.
+- **Inside Saakshi, without the code, still:** body-cam's stop-and-save at 3% battery, which group 1.5 removes; an ordinary live share reaching its end; and a recording ending because the app's screen was torn down (a crash).
+
+**Tests (22 new, 467 in all):** the orchestration: each part started; the alert with the link, or without it when the link is slow, with the late link sent on; each part failing on its own; Stop refused without the code, and done with it; one part failing to stop; still on after a restart, with the heartbeat resumed; no double start; a part restarted. Also: bug mode without its Live Activity, and taking it from a running recording; persistent live shares (start, keep, a share already ended on the server, the end moving with each position, and the server calls exactly as before for an ordinary share); the swipe asking for a code first, then starting; the running card, with a part stopped on its own; Stop only through the code on this mode, Pocket recording and live location; body-cam's Stop asking for the code, and its notification having no Stop.
+
+**Not verified:** nothing has run on a phone; the Kotlin change compiles only in the Native build workflow. Most important to test: the whole mode from a locked phone; that the Live Activity really doesn't appear; force-quit on iPhone (does recording and location stop, as expected?); Task Manager's Stop on Android 13 or later; the viewer page for a persistent share; the code screen over body-cam while it records.
+
+**NEEDS OWNER REVIEW:** the new wording (`sos.json` → `taken`, both languages), and the viewer's new line in English and Hindi.
+
+### Group 1.4: the alerts
+
+**What was built:**
+- **"I need help"** (SPEC 5.2). It sends one alert to the people ticked for SOS alerts, and live location starts for the Settings length (`sos/alert/help.ts`). If nobody is ticked for SOS alerts, the alert says so and no location is shared. The alert carries:
+  - the current-location map link (Google Maps), with its accuracy and the time of the fix;
+  - the live-location link;
+  - the battery level ("Battery: not known" if the phone doesn't say);
+  - the time sent.
+
+  The alert waits for the live link only while it is finding the position, up to 8 seconds; the position, the link and the battery are found at the same time. A link that comes later is texted on its own, in the calm message. When the alert carried it, the people ticked for live location but not for SOS alerts get it on its own. If live location can't start, the alert still goes.
+- **"Share my location":** a calm message to the people ticked for live location, never worded as an alert. For example: "I'm sharing my location with you until 18:40 IST. Battery 82%." and then "Follow it here: <link>". A share with no fixed end says "until I stop". "Send the link again", and the link that follows an alert or "My phone is being taken", use the same message with the battery level read at that moment.
+- **The battery level in every location update.** The phone reads the level each time positions arrive, and sends it with the newest of them. The server keeps it with that position (migration `supabase/migrations/20261106200000_live_battery.sql`, applied 6 Nov). The viewer page shows the newest level and how long ago it was sent, in English and Hindi: "Battery 82% (3 minutes ago) · बैटरी 82% (3 मिनट पहले)".
+  - **One difference from the brief, for you to confirm:** the brief says "an optional argument to `live_push`". I put the level inside each position (`"bat"`) instead. A new argument would mean dropping `live_push` and making it again, as the 1.3 migration had to for `live_start`. While two versions existed side by side, the server couldn't choose between them, and the app already on phones would stop working. A level inside the position also stays with the position it belongs to when positions wait for signal. `live_push`'s call is unchanged.
+  - A missing, non-numeric or out-of-range level is stored as unknown, and the position is still taken.
+- **Checks as the `anon` role** on the live server, passing: a push with levels 82, missing, `"abc"` and 150 is taken; the view gives 82 and three unknowns, newest first; stop; nothing left.
+- **The SMS budget.** These are the limits the tests hold the messages to, at their longest: a place far off, poor accuracy, a fix from another day, a full battery and the real link.
+
+  | Message | English | Hindi |
+  |---|---|---|
+  | "I need help" | at most 2 parts; 258 of 306 characters | at most 5 parts; 4 for a usual alert |
+  | "Share my location" | 1 part; 151 of 160 characters | at most 3 parts |
+
+  English uses only GSM characters, so the location's accuracy now reads "within 20 m" (the "±" sign isn't in GSM's alphabet and would have made the whole alert Unicode). Each link ends its line, so a full stop can't be taken into it. The viewer page also now ignores a full stop or bracket a messaging app added to the end of the link.
+- **The battery reading's shared place:** `src/platform/battery` (`monitor.ts` and `useLowBattery.ts` moved there from `evidence/battery`, plus `readBatteryPercent`). The evidence module uses it from there. There is also `src/platform/sms` (`smsParts`).
+
+**Tests (23 new, 490 in all):**
+- The message builders: every field, a missing battery or position, a fix from an earlier day, links at line ends, GSM only in English, the budget in both languages, and the calm message reading as no alert.
+- "I need help": the link in time, late, or failing.
+- The alert controller waiting for the link only as long as for the position, and carrying the battery.
+- The battery on the newest position, and kept while there is no signal.
+- The battery reader.
+- The SMS part counter.
+- The viewer page's own script, run against a stand-in page: the battery line and its age, the newest position with a level, no line without one, "until they stop sharing", and a full stop in the link.
+
+**Not verified:** on a phone. How Messages and SMS apps split and show a 2-part alert. Whether iPhone's background location task gets a battery reading every time (if not, that position has none, and the viewer shows the last one known with its age).
+
+**NEEDS OWNER REVIEW:** the new wording in `sos.json` (`message.accuracy`, `message.battery`, `message.batteryUnknown`, `message.share*`) and the viewer's battery line, in English and Hindi. The Hindi share message is written to need no gendered verb ("मेरी लोकेशन … शेयर हो रही है").
+
+### Group 1.5: low battery at 5%, and bundle format 0.9
+
+**What was built:**
+- **At 5% battery, in body-cam and in Pocket recording** (so also in "My phone is being taken"), the file being written is closed cleanly with `capture.endReason: "low-battery"` and sealed as usual, and **a new file of the same recording carries on** (the next `segment.index`, with `gapBeforeMs`), until the phone dies. It is the same path as the fail-safe new file. The records list says "Battery low: this file was closed and saved."
+- **Body-cam's new file is 480p at 15 frames a second** (1 Mbit/s), on iPhone and Android. The screen says so: "Battery at 5%: recording carries on in a new file, at 480p and 15 frames a second, to save power." Pocket recording's screen says the same without the picture.
+- **The 3% stop-and-save is gone, for every mode** (body-cam, Pocket recording and the evidence camera). The warnings at 10% and 5% stay, once each. In body-cam the 10% warning says what happens at 5%; in the evidence camera it says the camera keeps recording until the user stops it or the phone switches off.
+- **Saving mode** (`src/platform/battery/saving.ts`): it starts with the handover and ends when the phone is charging or the recording stops. While it is on:
+  - a live-location share sends its positions in one burst every 5 minutes, not as they come (below, "the battery cost");
+  - the people ticked for live location are told once per share: "Saakshi: my battery is at 5%. To save power, my location now updates every 5 minutes." Only where the phone texts with no tap (the Android APK), since the phone is usually locked by then and nobody can tap Send. Everywhere, the live page says so itself when the newest battery level is 5% or less: "The battery is low: positions may come only every 5 minutes" (English and Hindi).
+  - Uploads (group 2.3) don't exist yet; the 5-minute burst is where they will join.
+- **Plugging in** ends saving mode: live location sends as positions come again, and the next file is at the normal quality. Unplugged again while still at 5% or less, the handover happens again (a new file at lower quality); the contacts aren't told twice for the same share.
+- **Bundle format 0.9** (`docs/spec/evidence-bundle.md`, sections 4, 4a, 12):
+  - `FORMAT_VERSION` is `"0.9"`; the version strings in the tests named in the brief are updated.
+  - `capture.batteryPercent` (a whole number from 0 to 100) in every file and checkpoint record, read as the record is made. Left out when the phone doesn't say, and for a file sealed after a cut-off (the level when Saakshi next opens isn't the level when the recording ended).
+  - `capture.startedFrom` (`"pocket"` or `"phone-taken"`) in sound-only records only.
+  - "Pocket recording" replaces "Bug mode" in bundle names (`Saakshi 2026-11-06 10-40 IST Pocket recording.zip`), the manifest's `name`, the README's Record line, the witness message's Record line (it uses the same name) and the automatic witness text ("Saakshi pocket recording: recording since …"). The README's English and Hindi text had no "Bug mode" in it; it takes the name from the record, so nothing else in it changed. Old bundles keep their names and stay valid.
+  - `tools/verify-bundle.mjs` reads 0.1 to 0.9, and checks the new members: `batteryPercent` a whole number from 0 to 100, `startedFrom` one of the two values and only in a sound-only record. A 0.8 bundle still verifies (test).
+- **Native code:** iPhone `BodyCamRecorder.swift` (handover, 480p and 15 frames a second in the writer), `SoundRecorder.swift` (handover); Android `CameraRecorder.kt` (handover, 480p and 15 frames a second, the session rebuilt), `BugRecorder.kt` (handover); the two modules' bridges. If a 480p file can't be started, the new file starts at the normal quality instead: saving power never stops the recording.
+
+**Checked before building** (the brief asked; none of it is measured on a phone yet):
+- **How short the gap is at the handover.** Each new file's record says exactly, in `capture.gapBeforeMs`, so the owner's test will show the real number.
+  - iPhone, Pocket recording: none expected. The file closes and the very next piece of sound, a fraction of a second later, starts the next file; no sound is dropped between them.
+  - iPhone, body-cam: none for the sound, at most one frame for the picture. It is the path a fixed-length piece used: the frame that closes one file opens the next.
+  - Android, Pocket recording: the time Android takes to stop one sound recorder and start the next. The new recorder is started before the old file is fingerprinted, so the hashing adds nothing. I don't know how long that is on a real phone; I expect well under a second.
+  - Android, body-cam: the time to stop one recorder and start the next, plus, for the change to 480p, rebuilding the camera session (below). The sound starts with the new recorder; the picture may start a little later inside the new file, once the session is ready. I don't know how long; it needs the owner's phone.
+- **Whether a resolution change needs a new recorder session:**
+  - iPhone: **no.** The camera keeps running as it was (720p, or 1080p if chosen, at 30 frames a second). The new file's writer scales each frame to 480 on the short side and keeps every other frame. So the encoder and the storage do less work; the camera itself doesn't.
+  - Android: **yes.** The recording goes through a surface whose size is fixed when it is made, and a camera session's outputs are fixed when the session is made. So at the handover the surface is made again at 480p and the session rebuilt. The camera is asked for 15 frames a second where it offers that; where it doesn't, it sends its usual rate and the file's rate depends on the phone (untested).
+- **The battery cost of the 5-minute saving mode:** not measured. What it changes: the phone still finds its position as often as before; only sending to the server is held back to once every 5 minutes, so the mobile radio wakes less often. Changing how often the phone finds its position would mean restarting location updates, and at 5% the app is usually in the background, where it may not restart them (Android refuses to start a foreground service from the background, and iPhone doesn't let an app start location updates there). How much this saves, I don't know. Question below.
+- **Plugging in:** above. Saving mode ends, sending goes back to normal, and the next file is at the normal quality. Body-cam and Pocket recording are now one continuous file, so "the next file" is the next handover or the next recording; the file being written when the phone is plugged in stays at 480p. Question below.
+
+**Built so, please confirm:**
+- Contacts are texted about saving mode only from the Android APK; on iPhone and the Play Store build, only the live page says it (above).
+- The battery level is left out of a file sealed after a cut-off.
+
+**Tests (17 more, 507 in all):** the battery monitor (warnings once each at 10% and 5%, the handover once at 5%, never a stop, starting low, plugging in and out, an unknown level); the handover in body-cam and in Pocket recording with a fake battery drop (the file closed as low-battery, the next one following with its gap, saving mode on and off); the 3% stop gone; the new members in file and checkpoint records, left out when the battery is unknown and after a cut-off, `startedFrom` only in sound-only records; a 0.9 bundle verifying, named "Pocket recording" in its file name, README and manifest; the verifier failing malformed new members; a 0.8 bundle still verifying; live location's 5-minute bursts; the contacts told once; the live page's low-battery line; the end-reason words in English and Hindi.
+
+**Not verified:** nothing has run on a phone. The Swift and Kotlin changes compile only in the Native build workflow. Most important to test: the handover itself on both phones (the gap in `gapBeforeMs`, and that the 480p file plays and is really 15 frames a second); Android's session rebuild while recording, on a real phone; the evidence camera no longer stopping at 3%. To test without waiting for a real 5%, a phone can be run down to about 6% and recorded on from there.
+
+**The README must be checked against the owner's bundle walkthrough.** Only the record name changed in it, but the walkthrough is the reference.
+
+**NEEDS OWNER REVIEW:** the new and changed wording, in English and Hindi: `record.json` (`battery.warn`, `battery.handoverSoon`, `battery.handedOverVideo`, `battery.handedOverSound`, `battery.charging`, `ended.lowBattery`), `sos.json` (`message.saving`, `bug.witness`), and the live page's low-battery line.
+
+### Group 1.6: follow-ups to Part 1 (owner, 9 Nov 2026)
+
+**1. The code is reset with the phone's passcode only, never a face or fingerprint** (SPEC 5.3).
+- **A small native module of our own**, `modules/saakshi-device` (Swift and Kotlin, MIT, no new dependency). `expo-local-authentication` is removed; nothing else used it.
+- **iPhone:**
+  - Each reset writes a fresh random value to a keychain item and reads it back. The item's access control is `.devicePasscode` ("Constraint to access an item with a passcode", [Apple](https://developer.apple.com/documentation/security/secaccesscontrolcreateflags/devicepasscode)), kept as `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly`.
+  - The read makes iOS ask for the passcode, with Saakshi's reason (`LAContext.localizedReason` through `kSecUseAuthenticationContext`; `kSecUseOperationPrompt` is deprecated, [Apple](https://developer.apple.com/documentation/security/ksecuseoperationprompt)).
+  - Apple doesn't say in so many words that Face ID can't open such an item. It says `.userPresence` "is equivalent to specifying biometryAny, or, and devicePasscode" ([Apple](https://developer.apple.com/documentation/security/secaccesscontrolcreateflags/userpresence)), so biometry is a separate flag that Saakshi doesn't set. The owner's test (pull request, A) checks it on a phone.
+  - "Has a passcode" is `LAContext.canEvaluatePolicy(.deviceOwnerAuthentication)`, which fails with `passcodeNotSet` without one ([Apple](https://developer.apple.com/documentation/localauthentication/lapolicy/deviceownerauthentication)).
+  - A "when passcode set" item is deleted when the passcode is turned off ([Apple](https://developer.apple.com/documentation/security/ksecattraccessiblewhenpasscodesetthisdeviceonly)); the code handles that as "no screen lock".
+- **Android 11 and later:**
+  - The framework's `BiometricPrompt` with `setAllowedAuthenticators(DEVICE_CREDENTIAL)` alone, from API 30 ([Android](https://developer.android.com/reference/android/hardware/biometrics/BiometricPrompt.Builder#setAllowedAuthenticators(int))), and no negative button (Android refuses one with a device credential).
+  - With the credential alone, Android's BiometricService shows only the PIN, pattern or password and starts no sensor: "If it's only device credential, we don't need to wait…", then `STATE_SHOWING_DEVICE_CREDENTIAL` ([BiometricService.java, Android 11, LineageOS mirror](https://github.com/LineageOS/android_frameworks_base/blob/lineage-18.1/services/core/java/com/android/server/biometrics/BiometricService.java#L1811)).
+  - It needs `USE_BIOMETRIC`, a normal permission granted without asking: `authenticate` is `@RequiresPermission(USE_BIOMETRIC)`, and AuthService enforces it ([AuthService.java#L404](https://github.com/LineageOS/android_frameworks_base/blob/lineage-18.1/services/core/java/com/android/server/biometrics/AuthService.java#L404)). It is the only permission the module adds.
+  - `USE_FINGERPRINT`, which came with `expo-local-authentication`, is gone.
+- **Android 7 to 10: it can't be done, so no passcode reset there** (the brief: "never fall back to a fingerprint or face"). `KeyguardManager.createConfirmDeviceCredentialIntent` opens Settings' confirm screen, and for any app that screen also takes the fingerprint:
+  - **Android 7.1:** `ConfirmDeviceCredentialActivity` launches it as external (`true /* isExternal */`, [L97](https://github.com/LineageOS/android_packages_apps_Settings/blob/cm-14.1/src/com/android/settings/ConfirmDeviceCredentialActivity.java#L97)), and the helper sets `ALLOW_FP_AUTHENTICATION, external` ([L246](https://github.com/LineageOS/android_packages_apps_Settings/blob/cm-14.1/src/com/android/settings/ChooseLockSettingsHelper.java#L246)).
+  - **Android 8.1 and 9:** the same ([8.1](https://github.com/LineageOS/android_packages_apps_Settings/blob/lineage-15.1/src/com/android/settings/password/ChooseLockSettingsHelper.java#L266), [9](https://github.com/LineageOS/android_packages_apps_Settings/blob/lineage-16.0/src/com/android/settings/password/ChooseLockSettingsHelper.java#L286)).
+  - **Android 10:** a biometric prompt (fingerprint or face) comes first, with the PIN as its fallback (`if (isBiometricAllowed(...)) { ... showBiometricPrompt(bpBundle);`, [L218](https://github.com/LineageOS/android_packages_apps_Settings/blob/lineage-17.1/src/com/android/settings/password/ConfirmDeviceCredentialActivity.java#L218)).
+  - **No app can turn the fingerprint off:** only two extras are copied from the caller's intent (`copyOptionalExtras`), and the inner screens aren't exported. Only device-admin policies or "strong auth required" switch it off.
+  - Phone makers' own Settings apps may differ; I couldn't check them.
+  - So on those versions "Forgot the code?" says the code can't be reset there, and the screens say so before a code is chosen. Question below.
+- **The rest is as built:** the reset only while nothing is running, checked before and after the prompt.
+- **The Face ID permission text is removed:** `app.json` (`expo-local-authentication`'s plugin goes; `expo-secure-store` gets `faceIDPermission: false`, since its plugin would otherwise write its own default Face ID text), `src/i18n/native/*.json`, and the optional Face ID block of `store/apple/review-notes.md`. `store/__tests__` checks that no Face ID text or block is left. The built app's Info.plist has no `NSFaceIDUsageDescription` (checked with `npx expo config --type introspect`).
+
+**2. The battery level only at 20% or less** (SPEC 5.2).
+- **The rule lives in one place:** `src/platform/battery/share.ts`, `batteryToShare`. Above 20%, or when the level can't be read:
+  - no position carries `bat`;
+  - the alert has no battery line ("Battery: not known" and its string are gone);
+  - the calm message and "Send the link again" leave it out.
+- **The live page** shows the line only when the newest position carries a level, so a level from an older position, perhaps long out of date, isn't shown. The server is unchanged.
+- **Evidence records** still carry `capture.batteryPercent` at any level. They stay on the phone, and the brief names only what is sent.
+- **The SMS budget is unchanged.** The longest battery line is now "20%" rather than "100%":
+
+  | Message | English | Hindi |
+  |---|---|---|
+  | "I need help" | at most 2 parts; 257 of 306 characters | at most 5 parts; 4 for a usual alert |
+  | "Share my location" | 1 part; 150 of 160 characters | at most 3 parts |
+
+**3. Android body-cam at 5% without rebuilding the camera** (SPEC section 4, low battery).
+- **What stays:** the recording size, the persistent input surface and the capture session. `ensureSizeForPower` and the 480p size are removed.
+- **What changes:** the new file's `MediaRecorder` gets **half the normal video bit rate**: 1.5 Mbit/s at 720p and 3 Mbit/s at 1080p (normally 3 and 6).
+  - **Why half:** at 15 frames a second rather than 30, each frame then gets as many bits as before. So a frame is about as sharp as before (faces, plates), and the file, and later its upload, is half the size.
+  - 1 Mbit/s, the old 480p rate, would leave each 720p frame about a third fewer bits than it had at the normal rate.
+  - The power saved comes mostly from the encoder doing half the frames; the bit rate mainly saves storage and upload.
+- **The frame rate:** 15 a second comes from the capture request's frame-rate range, as before, and only where the camera offers a range that tops out at 15. The recorder is told 15 only then, else 30, so that the encoder spreads the bit rate over the frames it really gets. The range follows the file being written (`fileSaving`), so a zoom or a charger in the middle of a file doesn't change it.
+- **Two small fixes in the handover:**
+  - Saving mode now ends with the recording (`stopRecording`, `close`), so the next recording starts at the normal quality. Before, saving mode left over from a recording stopped at 5% carried into the next one. A handover that comes before the recording's start (the battery already at 5%) still applies to its first file.
+  - Whatever fails at the handover, a new file is started, in saving mode if it can be, else at the normal settings, and the camera is sent to it. Before, a failure while closing the old file could leave the recording stopped.
+- **The screen text is true on each phone:**
+  - iPhone, unchanged: "at 480p and 15 frames a second" (`battery.handedOverVideoIos`).
+  - Android: "Battery at 5%: recording carries on in a new file with less data, and 15 frames a second where the camera allows, to save power." (`battery.handedOverVideoAndroid`).
+  - The bundle spec's line on `"low-battery"` now says the same; no member changed, so it stays 0.9.
+- **The gap at the handover** on Android is now only the time to stop one recorder and start the next on the same surface, as for a fail-safe new file. It is still not measured; `capture.gapBeforeMs` will show it.
+
+**4. A recovery code on a phone with no passcode** (SPEC 5.3).
+- **When it is made:** setting the code on a phone with no screen lock makes a recovery code at the same moment and shows it once (`Your recovery code`, then "I have written it down"). The advice: write it on paper, keep it away from the phone and not as a photo on it, and anyone who has it can reset the code too.
+  - It is never stored, logged or sent; the screen holds it only until that button.
+  - A screen reader reads it character by character.
+- **The code itself:** 12 characters from 31 (the digits 2 to 9, and the capitals without I, L and O), about 2^59 possible codes. Bytes are drawn so every character is equally likely. It is shown as `7KQM-4WXH-9RTD` and typed in any case, with or without the dashes.
+- **What is kept:** a random 16-byte salt and PBKDF2-HMAC-SHA256 with 100,000 iterations (32 bytes), in the same secure-storage item as the code.
+  - The hash runs in native code: CommonCrypto on iPhone; on Android, PBKDF2 written out over the platform's `HmacSHA256`, because Android's own `PBKDF2WithHmacSHA256` exists only from Android 8 and the app supports 7.
+  - The Android code is checked on the JVM against RFC 7914's vectors and against Node's `pbkdf2Sync` (`modules/saakshi-device/verify/pbkdf2.sh`).
+  - The iteration count is stored with the hash, so a later version can raise it.
+- **The reset with it:** "Forgot the code?", then the recovery code. The rules are those of the passcode reset: only while nothing runs, checked before and after.
+  - A wrong recovery code counts towards the same waits as a wrong secret code, and none is taken during a wait.
+  - Something that can't be a recovery code (the wrong length or letters) is refused without counting, since its form is no secret.
+- **It works once (built so):** a reset removes it, and the new code comes with a new recovery code. Changing the code keeps it; removing the code removes it.
+- **A new one:** Settings → Secret code shows, on a phone with no screen lock, when the recovery code was made, and "Make a new recovery code". That asks for the secret code; the old recovery code stops working.
+- **A phone that loses its passcode later**, or a code set without one: a card on the Record page, where Saakshi opens, asks for a recovery code to be made.
+  - **When it shows:** when the code is set, the phone has no screen lock and no recovery code is kept. "Not now" hides it until Saakshi next opens.
+  - **A card, not a dialog:** nothing stands in the way when the SOS screen opens from the quick trigger. It isn't shown while anything runs, and not on the SOS page, which shows only what is running.
+- **Not shown when the code is set to start "My phone is being taken" (built so):** the mode starts at once, and the card asks later.
+- No server, no account, nothing sent.
+
+**5. How far a swipe must go** (SPEC 5.1).
+- **The rule:** the swipe counts when the handle is let go past 85% of its track, or as soon as it reaches the end (built so: at once, before the finger lifts). Let go short of 85%, it springs back.
+  - Only where the handle is counts, never how fast the finger moved, so a flick that falls short does nothing.
+  - The number is `SWIPE_CONFIRM_FRACTION` in `src/components/swipe.ts`. It replaces 1.3A's "6 points from the end".
+- **The tap:** a light one as the handle enters the region, and again if it leaves and comes back.
+  - iPhone: `UIImpactFeedbackGenerator(.light)`.
+  - Android: the window's own touch feedback (`GESTURE_THRESHOLD_ACTIVATE` from Android 14, `CLOCK_TICK` before). It follows the phone's touch-vibration setting and needs no `VIBRATE` permission, which stays blocked.
+- One finger's swipe acts once: a finger kept down at the end and moved again doesn't act a second time.
+
+**6. Saving mode's GPS** (the owner's question of 9 Nov). Read in expo-location 58's source:
+- **iPhone: yes, without a restart.**
+  - Calling `startLocationUpdatesAsync` again for the running task only updates its options (`EXTaskService registerTaskWithName`: "Task already exists. Let's just update its options."). The consumer then sets `desiredAccuracy` and `distanceFilter` on the same running `CLLocationManager` (`EXLocationTaskConsumer setOptions`); nothing is stopped.
+  - It works in the background, where the call checks only permissions it already has.
+  - Built: in saving mode the updates go to about 100 m accuracy (`Accuracy.Balanced`, at which iOS may find the position from Wi-Fi and cell towers rather than the GPS) and a new position after about 100 m. They go back to the normal 10 m and 20 m when saving mode ends.
+  - Saakshi never starts updates this way that aren't running, and a failure changes nothing. The battery saved isn't measured.
+- **Android: no.**
+  - The same call stops and restarts the updates (`LocationTaskConsumer.setOptions`: "Restart location updates", `removeLocationUpdates` then `requestLocationUpdates`).
+  - With a foreground service the library refuses it in the background (`ForegroundServiceStartNotAllowedException` when the app isn't on screen).
+  - So Android is left as built: positions are found as before and sent every 5 minutes.
+
+**An independent review of the new native code** (a separate agent, before merging, as in fix round 1) found no compile errors and three problems, all fixed in this pull request:
+- **iPhone:** Expo runs every module's async functions on one shared serial queue (`expo-modules-core`, `AsyncFunctionDefinition.swift`: `defaultQueue`). The passcode prompt blocks its keychain read for as long as the prompt is up, so it would have held up every other module's async calls. It now has its own queue (`PasscodeGate.queue`).
+- **Android:** my first version reset saving mode when a recording started. Body-cam's start reaches the camera thread later, through its service, so a 5% handover that came first would have been undone. The reset is now at the recording's end.
+- **Android, older code:** a failure while closing the old file at the handover could stop the recording (above).
+
+**Tests (59 more, 566 in all):**
+- The passcode reset's outcomes; which reset each kind of phone gets; the recovery-code reset and its rules (running before and after, shared waits).
+- The recovery code: alphabet, uniform draw, format, slow hash and its salt; checked in any case; kept only as a hash; made anew only after the code; kept on change, gone on remove and reset; a code stored before this group.
+- The screens:
+  - the recovery code shown once, and not when set for "My phone is being taken";
+  - the reset with it, and a new one after; the reminder card;
+  - no reset while running; the Android 7 to 10 message; the passcode-only wording.
+- No Face ID text or block left (store tests).
+- The battery: the 20% rule, positions, alert, calm message, controller, the viewer's newest position, and the budget.
+- The Android handover from the recorder's source (no size change or rebuild, half the bit rate, the frame rate), and the handover wording per platform in both languages.
+- The swipe: 85%, the end at once, a flick, the tap, a small and a large phone.
+- Saving mode's GPS on each platform.
+
+**Not verified:** nothing has run on a phone; the Swift and Kotlin compile only in the Native build workflow. Most important to try:
+- the passcode prompt on an iPhone with Face ID set up, and on Android 11 or later with a fingerprint;
+- the recovery code on a phone with no screen lock;
+- the Android handover at 5% (the gap, the second file's size and frame rate);
+- the swipe with a hurried thumb on a small and a large phone, both hands;
+- iPhone saving mode keeping live location going.
+
+**NEEDS OWNER REVIEW:** the new and changed wording, in English and Hindi:
+- `secretcode.json`: `about.*`, `reset.*` (`explain.*`, `noPasscode`, `failed`, `unavailable`, `noRecovery`, `oldAndroid`, `promptDetail`), `heading.recovery*`, `recovery.*` (the recovery-code screens), `settings.recovery*`, `settings.noReset` and `reminder.*`;
+- `record.json`: `battery.handedOverVideoIos` and `battery.handedOverVideoAndroid`;
+- the recovery-code screen itself.
+
+### Group 1.7: lock the phone when "My phone is being taken" starts (owner, 9 Nov 2026)
+
+**1. Google Play's policy, checked before building** (the brief's step 1). Read on 9 Nov 2026 in Play Console Help. **No rule forbids this use**, so I went ahead. What the rules say, word for word:
+- **Malware → Ransomware** ([Play Console Help, Malware](https://support.google.com/googleplay/android-developer/answer/9888380)). The full policy: "Some ransomware encrypts data on the device and demands payment to decrypt the data and/or leverage the device admin features so that it can't be removed by a typical user." One of its examples: "Leveraging device policy manager features and blocking removal by the user." Its "Key considerations" say: "Obtain explicit user consent for any device management features", "Don't use device admin features to block uninstallation", "Provide a clear and easy way for users to remove your app" and "Don't encrypt user data or lock them out of their device."
+- **Malware → Elevated Privilege Abuse** (same page). One of its examples: "Apps that abuse features to prevent them from being uninstalled or stopped." Its key considerations add: "Don't write code that prevents a user's app from being uninstalled."
+- **Deceptive Behavior → 2. Deceptive Device Settings Changes** ([Play Console Help](https://support.google.com/googleplay/android-developer/answer/9888077)): "Obtain explicit user consent before changing any device settings or features", "Clearly explain what your app will change and why", "Ensure all user consented changes are easily reversible by the user."
+- **Mobile Unwanted Software** ([Play Console Help](https://support.google.com/googleplay/android-developer/answer/9970222)): "Uninstall, where applicable, should be clear."
+- **Device and Network Abuse** and **Permissions and APIs that Access Sensitive Information** ([9888379](https://support.google.com/googleplay/android-developer/answer/9888379), [9888170](https://support.google.com/googleplay/android-developer/answer/9888170)) say nothing about device admin. No Play Console declaration form for it turned up.
+- **How the build meets them:** it is opt-in, explained before Android's own screen, and switched off in Saakshi in one tap. It declares only the force-lock policy. Removal is never blocked: Android's own uninstall offers "Deactivate & uninstall" (below). A user is never locked out of their phone: they unlock it with their own screen lock, as after pressing the power button.
+- **Google's device-admin deprecation** ([Google for Developers](https://developers.google.com/android/work/device-admin-deprecation)) deprecates the camera, keyguard and password policies. It says: "Some applications use the device admin for consumer device administration, e.g. locking and wiping a lost device. The following policies will continue to be available to enable this: USES_POLICY_WIPE_DATA, USES_POLICY_FORCE_LOCK."
+- **Play Protect's block on sideloaded apps** (CLAUDE.md's rule; [Google for Developers, Play Protect warnings](https://developers.google.com/android/play-protect/warning-dev-guidance)): the sensitive permissions are "RECEIVE_SMS, READ_SMS, NOTIFICATION_LISTENER, and ACCESSIBILITY". Device admin is not among them.
+- **My reading, not Google's:** a reviewer could still read the feature as one of the uses above, mainly if the store listing calls it a way to stop Saakshi being deleted. The release checklist item covers the listing, and a question below asks how it should be framed. Only Google's review will settle it.
+
+**2. What was built.**
+- **Android: device admin with the force-lock policy only**, in `modules/saakshi-sos`, the native module that runs Pocket recording:
+  - `LockAdminReceiver` (`LockAdmin.kt`). Its policy file, `res/xml/saakshi_lock_admin.xml`, declares `<force-lock />` and nothing else: no wipe, no password rules.
+  - The receiver is declared in the module's manifest with `android:permission="android.permission.BIND_DEVICE_ADMIN"`. That is the permission the *sender* must hold, and only the system holds it.
+  - **No permission is requested:** not `LOCK_DEVICE`, not `MANAGE_DEVICE_POLICY_*`, nothing else. The module's `uses-permission` list is unchanged (test).
+  - Android's list of device admin apps shows a short description under Saakshi: "Locks the screen when "My phone is being taken" starts. It does nothing else." (English and Hindi.)
+  - Keep the receiver's name: Android switches the admin off if the name changes in an update ([Android](https://developer.android.com/work/device-admin)).
+- **Settings → "Lock the phone when "My phone is being taken" starts"** (Android only; nothing on iPhone). A card under Secret code, and its own page (`/settings/lock`), which says:
+  - what it does: Saakshi first starts sound recording, location sharing and the alert, then locks the screen, as the power button does;
+  - that the permission lets Saakshi lock the screen and nothing else (it can't erase the phone or change the screen lock);
+  - that while it is on, Android asks for it to be switched off before Saakshi can be deleted;
+  - that it can be switched off there at any time, in one tap, or in the phone's settings.
+  - **Switch on** opens Android's own "Activate device admin app?" screen, with the same explanation passed as `EXTRA_ADD_EXPLANATION`. **Switch off** is a button in the same place (`removeActiveAdmin`; Saakshi waits up to about 2 seconds for Android to finish, since "the operation is not synchronous").
+  - **Switched off in Android's settings:** Saakshi reads the real state each time it comes back on screen, and when the page is shown, so it then shows as off.
+  - **Part 4's walkthrough** can use the same setting: `LockSettingsPanel` from `@/modules/trigger`.
+- **When "My phone is being taken" starts** (`trigger/phoneTaken.ts`):
+  - the parts start as before;
+  - once every one of them has started or failed (sound recording, location, the alert's sending and the link that follows it), Saakshi calls `lockNow()` once, if the admin is on;
+  - **but it waits for location at most 20 seconds** after the alert has gone and the recording has started (`LOCK_WAIT_MS`, built so). React Native's network calls on Android have no time limit at all ("No timeouts by default", `OkHttpClientProvider.kt`), so a stalled call on a weak signal could otherwise keep the phone unlocked for good. Location carries on starting after the lock.
+  - Recording and location carry on with the screen locked: nothing in Saakshi stops a part when the screen locks or the app goes to the background (test). They already run that way: on Android in their foreground services, on iPhone with background audio and location. Not yet run on a phone.
+  - **Why it waits for everything:** an Android app in the background can't start location (the share's server call comes first, then the location updates), and a text that needs a tap needs the screen. So when location isn't ready within the 20 seconds, it may fail once the screen is locked; the card then says so and offers "Try sharing again" after unlocking.
+- **"Now lock your phone"** (iPhone always; Android with the admin off, or if `lockNow` fails). Once everything has started, the running card moves to the top of the SOS page, headed large by "Now lock your phone", then "Press the side button." (iPhone) or "Press the power button." (Android), then "Sound recording and location sharing carry on with the screen locked." The page scrolls up to it.
+  - It stays until the app goes to the background (the screen locked, or the user left Saakshi). Then the card goes back to its usual place under the swipes; the user doesn't see it move.
+  - It is shown even if Saakshi isn't on screen at that moment: on Android, the app's state can lag behind a return from the Messages app. It then goes the next time the app goes to the background. It doesn't come back after a restart.
+  - A screen reader announces it (`accessibilityRole="alert"`, an assertive live region).
+
+**3. Android's own screens** (the brief's item 7). From Android's source, read in the LineageOS mirror of AOSP: Android 16 (`lineage-23.0`) and Android 7.1 (`cm-14.1`). **No screenshots:** this cloud session has no Android emulator. Phone makers' Settings apps (Samsung, Xiaomi, Oppo, Vivo) may word it differently; I couldn't check them.
+- **The activation screen** (Settings, `DeviceAdminAdd.java`):
+  - title: "Activate device admin app?" (Android 7: "Activate device administrator?"), [strings.xml](https://github.com/LineageOS/android_packages_apps_Settings/blob/lineage-23.0/res/values/strings.xml#L7067);
+  - then Saakshi's explanation, cut to a few lines with a button to expand it;
+  - then "Activating this admin app will allow the app Saakshi to perform the following operations:", and one item, "Lock the screen", with "Control how and when the screen locks." ([framework strings](https://github.com/LineageOS/android_frameworks_base/blob/lineage-23.0/core/res/res/values/strings.xml#L2401));
+  - the buttons: "Activate this device admin app" (Android 7: "Activate this device administrator"), "Cancel", and "Uninstall app".
+- **Deleting Saakshi while it is on:**
+  - **From Settings → Apps → Saakshi → Uninstall:** Settings opens the device admin screen instead ([AppButtonsPreferenceController.java#L222](https://github.com/LineageOS/android_packages_apps_Settings/blob/lineage-23.0/src/com/android/settings/applications/appinfo/AppButtonsPreferenceController.java#L222)). Its title is "Device admin app"; it says "This admin app is active and allows the app Saakshi to perform the following operations: Lock the screen"; and its button is "Deactivate & uninstall", which does both in one step (`uninstallPackageWithActiveAdmins`).
+  - **From the home screen** (the launcher's uninstall, through Android's package installer): the uninstall fails, and a notification says "Can't uninstall active device admin app", with a button "Manage device admin apps" ([UninstallRepository.kt#L553](https://github.com/LineageOS/android_frameworks_base/blob/lineage-23.0/packages/PackageInstaller/src/com/android/packageinstaller/v2/model/UninstallRepository.kt#L553)). Makers' launchers may differ.
+- **Found: after Saakshi locks the screen, the next unlock needs the PIN, pattern or password, not a fingerprint or face** (AOSP). `lockNow` from a device admin calls `requireStrongAuth(STRONG_AUTH_REQUIRED_AFTER_DPM_LOCK_NOW, …)` ([DevicePolicyManagerService.java#L6414](https://github.com/LineageOS/android_frameworks_base/blob/lineage-23.0/services/devicepolicy/java/com/android/server/devicepolicy/DevicePolicyManagerService.java#L6414); the same in Android 7.1). That flag is "Strong authentication is required because a device admin has requested it", and it isn't among the flags that still allow biometrics (`ALLOWING_BIOMETRIC`, [LockPatternUtils.java#L1836](https://github.com/LineageOS/android_frameworks_base/blob/lineage-23.0/core/java/com/android/internal/widget/LockPatternUtils.java#L1836)). The app doesn't say this anywhere yet; question below. It needs the owner's phone to confirm.
+
+**4. The two follow-ups to group 1.6.**
+- **Android 7 to 10 get the recovery code**, as phones with no screen lock do (`resetMethodFor` in `src/modules/secretcode/reset.ts`).
+  - Setting the code there now shows a recovery code once. "Forgot the code?" asks for it, under the same rules as before: only while nothing runs, and wrong tries count towards the waits.
+  - **The wording says why:** "On this version of Android, Saakshi can't ask for the screen lock alone (without a fingerprint or face), so …", on the code screen, in Settings, and on the reminder card. A phone with no screen lock keeps its own wording ("This phone has no screen lock, …").
+  - **A code set on Android 7 to 10 before this change** has no recovery code. The Record page's card and Settings now ask for one to be made.
+  - **"No reset" remains only for a phone that couldn't be asked about its screen lock** (the native module missing, in practice never in a real build). Its wording is now general, and `reset.oldAndroid` is renamed `reset.none`.
+- **iPhone saving mode keeps full accuracy.** Group 1.6's drop to about 100 m accuracy and 100 m distance is undone. Positions are found as before, at full accuracy (10 m, every 20 m or 30 seconds), and sent every 5 minutes, as on Android. The tracker no longer has a saving-mode setting (`TRACKING_OPTIONS` in `location/live/task.ts`). **To revisit** once a phone test shows what a coarser position would save (owner, 9 Nov 2026).
+
+**Limits found** (by the review below; left as built, since the brief asks for the lock after the alert's sending):
+- **Where the alert opens the Messages app** (the Play build, or the APK without SMS permission), the lock waits until the user comes back to Saakshi from Messages. If the phone is taken while Messages is open, nothing locks until someone returns to Saakshi. The Android APK sends by itself and isn't affected; on iPhone the message opens inside Saakshi.
+- **On Android, anything that covers Saakshi ends the reminder:** a permission dialog, the Messages app opened by "Try sharing again", or an incoming call. Android reports all of these as "background", the same as a locked screen. The brief's rule ("until the app goes to the background") is followed as written.
+- **An iPhone share running in group 1.6's coarser saving mode** would keep it until that share ends, because nothing now sets it back. It matters only if a 1.6 build was used at 5% battery, and the handoff records no such phone test.
+
+**Built so, please confirm:**
+- The lock waits until every part has started or failed, but for location at most 20 seconds after the alert has gone and the recording has started. Locking sooner would stop Android starting the location updates; waiting longer could leave the phone unlocked on a weak signal.
+- The lock happens even if a part failed (for example, the microphone was refused), once the others have started. The card says what failed when the phone is unlocked.
+- The reminder's third line, "Sound recording and location sharing carry on with the screen locked.", is mine. The brief asked only for "Now lock your phone" and the button.
+- The reminder is the running card moved to the top of the page, not a separate overlay.
+
+**Tests (32 more than on `main`, after the replaced ones; 598 pass, and one is skipped as before):**
+- The orchestrator: `lockNow` called once, after every part (a slow recording and a slow link too), only when it starts, also when a part failed, and after 20 seconds at most when location stalls (location then carries on); the reminder where Saakshi can't lock (iPhone, Android without the admin, a failed lock), only once everything has started, gone in the background and after a restart, cleared by Stop; nothing stopped when the screen locks.
+- The setting: not offered on iPhone or without device admin; switched on through Android's screen with the explanation (which names Saakshi's Settings, not "here"); cancelled; failed; never stuck busy when Android drops its answer; switched off in one step, and looked at again when Android hadn't finished; switched off in Android's settings and noticed (also through the real AppState listener); `lockNow` only while it is on.
+- The native sources: the policy file holds `force-lock` and nothing else; the receiver is protected by `BIND_DEVICE_ADMIN`, with its policy file and action; no new `uses-permission`, and no `LOCK_DEVICE` or `MANAGE_DEVICE_POLICY` anywhere; the explanation passed as `EXTRA_ADD_EXPLANATION`, `removeActiveAdmin`, only `lockNow`, the iPhone stubs.
+- The screens: the Settings page (explanation, switch on and off, Hindi), the Settings card and its place under Secret code on Android, the reminder on iPhone (side button) and Android (power button), none with the admin on, Hindi.
+- The follow-ups: Android 7 to 10's reset method and its reason; the recovery code shown, used and asked for there, with its own wording; the general "no reset" message; full accuracy in saving mode, and the tracker never touched for it.
+
+**An independent review** of the new code (a separate agent, before merging, as in group 1.6), read against the libraries' own sources, found no compile errors and no new permission, dependency or data leaving the phone. It found:
+- the lock could wait for ever on a stalled network call (fixed: at most 20 seconds for location);
+- the reminder could be skipped when Android's app state lagged behind a return from Messages (fixed: shown regardless);
+- the Settings switch could stay busy if Android dropped its answer, or show "On" after a slow switch-off (both fixed);
+- the explanation said "switch it off here" on Android's own screen (fixed: "in Saakshi's Settings");
+- the three limits above, left as built.
+
+**Not verified:** nothing has run on a phone. The Kotlin and Swift compile only in the Native build workflow. Most important to try, on Android:
+- the activation screen and its wording;
+- the lock when "My phone is being taken" starts, with recording and location carrying on (check the record and the live page after unlocking);
+- whether a fingerprint can unlock straight after Saakshi's lock (AOSP says no);
+- deleting Saakshi from Settings and from the home screen while it is on;
+- switching it off in Android's settings, then opening Saakshi.
+
+On iPhone: the reminder, then the side button, with recording and location carrying on.
+
+**NEEDS OWNER REVIEW:** the opt-in explanation and the reminder, in English and Hindi (`sos.json` → `lock.*`, including `lock.offInSaakshi` for Android's own screen, and `taken.remind.*`); the receiver's description in Android's list (`modules/saakshi-sos/android/src/main/res/values*/strings.xml`, `saakshi_lock_admin_description`); and the new and changed `secretcode.json` wording (`reset.none`, `reset.noRecoveryOldAndroid`, `reset.explain.recoveryOldAndroid`, `reset.explain.none`, `about.recoveryOldAndroid`, `about.none`, `settings.recoveryMissingOldAndroid`, `settings.noReset`, `reminder.bodyOldAndroid`).
+
+## Fix round 1 (iPhone test round 1, A–C)
+
+The builder for [docs/briefs/2026-11-05-test-round-1-fixes.md](briefs/2026-11-05-test-round-1-fixes.md) works through its groups in order, one branch and pull request per group, each from the latest `main`. Questions are in "Owner questions" below, marked "(Fix round 1)".
+
+| Group | State |
+|---|---|
+| 1. Body-cam: back swipe, and sound in the video (C2, C6) | Merged: https://github.com/AayushTainwala/Saakshi/pull/16. Not yet run on a phone. |
+| 2. Body-cam: other fixes (C1–C3) | Merged: https://github.com/AayushTainwala/Saakshi/pull/17. Not yet run on a phone. |
+| 2a. Body-cam: one continuous file, with checkpoints | Merged: https://github.com/AayushTainwala/Saakshi/pull/18. Not yet run on a phone. |
+| 2b. Bug mode: one continuous file, with checkpoints (owner said yes, 6 Nov) | Merged: https://github.com/AayushTainwala/Saakshi/pull/20. Not yet run on a phone. |
+| 3. Records list and playback (B1, C6) | Merged: https://github.com/AayushTainwala/Saakshi/pull/21. Not yet run on a phone. |
+| 4. Evidence camera: front and back, zoom (B2) | Merged: https://github.com/AayushTainwala/Saakshi/pull/22. Research items reported below, not built. Not yet run on a phone. |
+| 5. Why a recording ended (B8) | Merged: https://github.com/AayushTainwala/Saakshi/pull/23. Not yet run on a phone. |
+| 6. Trusted contacts, three ticks per person (B5) | Merged: https://github.com/AayushTainwala/Saakshi/pull/24. Not yet run on a phone. |
+| 7. Witness message (B5) | Merged: https://github.com/AayushTainwala/Saakshi/pull/25. Not yet run on a phone. |
+| 8. Certificate: one profile (B7) | Merged: https://github.com/AayushTainwala/Saakshi/pull/26. Not yet run on a phone. |
+| 9. Export (B6) | Built: https://github.com/AayushTainwala/Saakshi/pull/27 (branch `claude/fix-round-1-group-9`, on `main`). Not yet run on a phone. |
+
+### Where fix round 1 stands, and what's next (6 Nov 2026)
+
+For the session that takes over. Read the brief, then this section, then CLAUDE.md as usual.
+
+- **Finished:** groups 1 to 8 are merged into `main`: #16, #17 and #18, bug mode (#20), then #21 to #26. Each pull request has plain test steps for the owner, and both native builds passed on every one.
+- **Open:** group 9, export (#27, on `main`). It is the brief's last group. Typecheck, lint and 396 tests pass, and both native builds pass on its native code.
+- **Not yet tested:** nothing from fix round 1 has run on a phone. The owner's next TestFlight round should follow the test steps in each pull request, #16 to #27. Step C of #18, a forced restart while recording, is the genuine cut-off test that round 1 couldn't do.
+- **Next:** the owner's answers to the "(Fix round 1)" questions below, then whatever they decide. Nothing else in the brief is left to build.
+- **What group 3 starts from:**
+  - **Body-cam files now:** one file per clip. iPhone video is fragmented MP4 (`.mp4`), and each file's timeline starts at 0. iPhone sound-only files are ADTS (`.aac`). Android is MPEG-TS (`.ts`), with its existing MP4 copy (`Remuxer.kt`).
+  - **Bug mode (from #20):** one continuous ADTS AAC file (`.aac`) per recording on both phones, with checkpoints; a follow-on file of the same clip only after the microphone was lost (a call) or a file failed.
+  - **Group 3's joined MP4 copy:** it needs a multi-file record, which now happens only when an iPhone user left the app. Its "copy" record can follow `export/playableCopy.ts` and spec section 11.
+  - **Sessions now hold `checkpoints`** beside `items`. Any list of a session's records must count both; `lastLink()` in `capture/pipeline.ts` gives the chain head.
+- **Bundle format:** 0.6 with #20 (bug mode), 0.7 with #21 (joined copies), 0.8 with group 9 (names a person can read). A later change needs 0.9: update `FORMAT_VERSION`, the record-version strings in `seal.test.ts`, `playableCopy.test.ts`, `deviceKey.test.ts`, `joinedCopy.test.ts` and `checkpointBundle.test.ts`, `SUPPORTED_VERSIONS` in `tools/verify-bundle.mjs`, and spec section 12.
+- **Left on purpose for later groups:**
+  - putting the latest checkpoint in the witness message (group 7). Bug mode's automatic texts already carry it (#20); the message the user sends from a record does not yet. Bug mode's automatic texts are also not noted in the session's `witness` list (they never were); group 7 could add that;
+  - telling "phone locked" from "left Saakshi", and showing end reasons in plain words on the record screen (group 5);
+  - in-app playback of sound files (group 3).
+- **Owner's decisions so far (all in SPEC.md, body-cam mode):** one record from Start to Stop; video and sound in the same file; unlock with volume-up twice, after a practice step; video stops only when iOS stops the camera; one continuous file with signed checkpoints; upload parts for E7, whose size is a setting.
+- **Owner's decision on bug mode (6 Nov):** one continuous file with checkpoints, like body-cam (SPEC E8). Open question from it: the 3% auto-save (see "Owner questions", "(Fix round 1)").
+- **How this was built, for the next builder:**
+  - Swift and Kotlin compile only in the "Native build" workflow, which runs on pull requests that touch `modules/**`. Its status can be read without signing in from `https://api.github.com/repos/AayushTainwala/Saakshi/actions/runs?branch=<branch>`.
+  - `ffmpeg` is installed in the cloud container. `modules/saakshi-evidence/verify/checkpoint-parts.sh` and `cutoff-formats.sh` check the containers with it.
+  - There is no Kotlin compiler in the container, but JetBrains' command-line compiler downloads from GitHub releases (`https://github.com/JetBrains/kotlin/releases/download/v2.1.21/kotlin-compiler-2.1.21.zip`) and runs plain Kotlin on the JVM: `modules/saakshi-sos/verify/adts-checkpoints.sh` uses it (`KOTLINC=<path>/kotlinc/bin/kotlinc`). Code that uses Android's classes still compiles only in CI.
+  - Apple's documentation reads well as JSON (`https://developer.apple.com/tutorials/data/documentation/<path>.json`). Android source wasn't reachable from Google's hosts, but the LineageOS copy on raw.githubusercontent.com was.
+  - Twice, an independent review of the new native code, by a separate agent before merging, found real bugs that the compiler couldn't. Worth repeating for native changes.
+
+### Group 1: what was fixed
+
+1. **Nothing leaves body-cam while it records.** I couldn't pin down from the code alone why the left-edge swipe got through `gestureEnabled: false`. The likeliest cause is that the option was set from inside the screen, after the screen had been pushed. The fix covers every route out, whatever the cause:
+   - the root layout turns the back gesture off for the body-cam screen before it opens (`src/app/_layout.tsx`), including iOS 26's full-screen swipe;
+   - while recording, the screen refuses to be removed (`usePreventRemove` from expo-router, which also tells iOS not to let the native back gesture dismiss it), hides its header and back button, and swallows Android's back button. A swipe or back press shows "Stop and save first" (or the lock message, if locked);
+   - leaving is allowed again only after Stop has saved everything;
+   - if the screen were ever removed anyway, the recording is stopped and the session finished as one record, instead of being left open.
+2. **Body-cam video on iPhone now has its sound in the same file.** The iPhone side of body-cam has its own recorder (`modules/saakshi-evidence/ios/BodyCamRecorder.swift`), in place of expo-camera (muted) plus expo-audio:
+   - the camera (no microphone input) and one microphone stream (`AVAudioEngine`, started on screen when you press Start) feed `AVAssetWriter`;
+   - while Saakshi is on screen, each one-minute video piece is a `.mov` with H.264 video and AAC sound, with a movie fragment every 10 seconds, so it is cut-off safe like the evidence camera's;
+   - iOS can't write a video file in the background (Apple's `AVAssetWriter.h`: a writer still writing when the app goes into the background fails; see [this Apple forum reply](https://developer.apple.com/forums/thread/672056)). So the video piece is closed the moment the app goes into the background, inside a background task that gives it time to finish;
+   - from then on the same sound goes into sound-only `.m4a` pieces, written by `AVAudioFile`, which works in the background. The first starts half a second before the video's sound ended, or up to 11 seconds before if the video file didn't close properly (such a file keeps only its complete 10-second fragments). When you come back, video with sound starts again and the sound-only piece ends half a second later. So the sound has no gap, and the picture's gap is in the next video clip's record;
+   - a phone call: a sound-only piece ends; a video piece carries on without sound, and ends when sound comes back, so the next piece has sound again;
+   - every file has its crash-recovery marker and its signed record in the same session, as before.
+
+   An independent review of the recorder (before your test) found and I fixed: the background-writing failure above; starting body-cam during a call left the whole session without sound (the microphone is now retried until it starts); a stale microphone format after a route change (a fresh engine is made each time); extra tiny files when sound came back; and smaller timing errors in the gaps recorded.
+
+   Bundle format **0.3** (`docs/spec/evidence-bundle.md`, section 3, step 8): two new end reasons, `video-resumed` (a sound-only piece ended because video came back) and `sound-resumed` (a video piece recorded without sound, after a phone call for example, ended because sound came back). `tools/verify-bundle.mjs` reads 0.1 to 0.3.
+
+### Group 1: what I found on sharing the microphone (research)
+
+The brief asked whether iOS lets the camera and the background recorder share the microphone, or whether a hand-over is needed. What Apple documents:
+- The camera can't be used in the background: iOS interrupts it with [`videoDeviceNotAvailableInBackground`](https://developer.apple.com/documentation/avfoundation/avcapturesession/interruptionreason/videodevicenotavailableinbackground).
+- A capture session uses the app's shared audio session by default ([`usesApplicationAudioSession`](https://developer.apple.com/documentation/avfoundation/avcapturesession/usesapplicationaudiosession)) and, by default, reconfigures it for its own recording and does not restore it afterwards ([`automaticallyConfiguresApplicationAudioSession`](https://developer.apple.com/documentation/avfoundation/avcapturesession/automaticallyconfiguresapplicationaudiosession)). expo-camera leaves both at their defaults.
+- Starting a recording from the background can be refused: [`AVAudioSession.ErrorCode.cannotStartRecording`](https://developer.apple.com/documentation/coreaudiotypes/avaudiosession/errorcode/cannotstartrecording) "usually occurs when an app starts a mixable recording from the background". Body-cam's sound is mixable, so that other apps' music doesn't stop it.
+
+What Apple does not document is whether a capture session with a microphone input and a separate recorder in the same app can both record at once; developer-forum reports disagree, and I couldn't test it here. A hand-over would have to start the sound recorder at the moment the app leaves the screen, which is already the background, where iOS may refuse it. So I built neither: the camera has no microphone input, and a single microphone stream, started on screen, is written into the video file or the sound-only file. There is no hand-over of the microphone and no second recorder, and the only gap is in the picture while you are away. Whether all of this behaves as designed needs your next phone test.
+
+### Group 1: not verified
+
+- Nothing has run on a phone. The Swift compiles only in the Native build workflow.
+- Sound carrying on in the background: the old build relied on it too (expo-audio), but confirm it with the phone locked for several minutes.
+- After a phone call that ends while Saakshi is in the background, sound may not restart until you return to the app (the mixable rule above). The recorder then tries as a non-mixable recording, which it stays until Stop, so other apps' sound could then interrupt it; untested.
+- Whether the background task gives the video file enough time to finish when the phone locks. If not, the file's record says `error`, and the sound-only file reaches 11 seconds back to cover it.
+- iOS 26's full-screen back swipe is blocked by the same settings; untested.
+- Audio and video timing in the files (lip sync), and the half-second overlaps, need checking by playing the files.
+
+### Group 2: what was fixed, and what was found
+
+1. **Notification Center stopping video.** The new recorder from group 1 never stops video because the app is covered or inactive: under Control Center or Notification Center it keeps recording unless iOS actually stops the camera or sends the app into the background. Each video piece's record now gives iOS's reason (bundle format **0.4**): `app-left` (the app left the screen or the phone locked), `camera-in-use` (another app took the camera), `system-pressure` (Apple's example is heat), or `camera-lost` for anything else. The raw iOS reason is also written to the phone's log. If Notification Center still stops video in your next test, its record will say `app-left`, which means iOS itself treated pulling it down as leaving the app; the app can't prevent that.
+2. **Unlock with one button only.** Apple's button API ([`AVCaptureEventInteraction`](https://developer.apple.com/documentation/avkit/avcaptureeventinteraction)) tells an app only whether a press was "primary" or "secondary"; a [capture event](https://developer.apple.com/documentation/avkit/avcaptureevent) carries nothing else. Apple's WWDC 2025 session 253 ([transcript](https://developer.apple.com/videos/play/wwdc2025/253/)): "Primary actions are triggered by the volume down button, Action button, and the Camera Control, while the secondary action is triggered by the volume up button", and from iOS 26 AirPods stem clicks are primary too. So volume-down can't be told apart from the others. **You decided (5 Nov): unlock with volume-up twice, on both platforms.** Volume-down, Camera Control, the Action button and AirPods now do nothing while the lock shows. On iOS 16.4–17.1, which lack that API, the app watches the volume level instead, so there the unlock doesn't work when the volume is already at its highest.
+3. **Practice step.** The "I know how to unlock it" tick is gone. The start screen says "Press volume-up twice now", and Start becomes available only once you have done it; afterwards a one-line reminder stays above Start, with "Practise again". On iPhone the camera turns on during the practice (nothing is recorded), because iOS passes button presses only to an app that is using the camera; the screen says so. The old tick doesn't count, since it was for volume-down, so everyone practises once.
+4. **The side button.** Locking the phone stops video (an iOS limit) and sound carries on. The hash report in the bundle now says so in words: "video stopped because Saakshi left the screen or the phone was locked (iPhone records video only while the app is on screen); sound carried on in the next file". The app itself can't yet tell locking apart from leaving the app; showing the reason on the record's screen, and telling those two apart if possible, is group 5.
+
+### Group 2: not verified
+
+- Nothing has run on a phone. Most important: that Camera Control, the Action button (set to Camera) and AirPods really do nothing while the lock shows; and that volume-up twice unlocks, during the practice and while recording.
+- Whether Notification Center sends Saakshi into the background (then video stops, and the record says `app-left`) or only covers it (then video carries on).
+
+### Group 2a: what was checked before building (brief item 4)
+
+All three checks came out feasible, so nothing falls back to pieces.
+
+1. **Reading a file while the recorder is still writing it.**
+   - *iPhone: nothing has to be read back.* The asset writer can hand its output to the app segment by segment instead of writing a file. Apple: "The asset writer stops normal file writing when you implement this method" ([`assetWriter(_:didOutputSegmentData:segmentType:segmentReport:)`](https://developer.apple.com/documentation/avfoundation/avassetwriterdelegate/assetwriter(_:didoutputsegmentdata:segmenttype:segmentreport:))). With Apple's HLS profile it sends an initialization segment, then a segment every 10 seconds, video and sound together ([WWDC 2020, session 10011](https://developer.apple.com/videos/play/wwdc2020/10011/): "If you encode both audio and video, one AVAssetWriterInput for each media can be added"). The app writes each segment to the file and fingerprints it on the way. So the iPhone body-cam video is now fragmented MP4 (`.mp4`), not `.mov`. For a `.mov` that the asset writer writes itself, Apple doesn't say whether bytes already written stay untouched when it finishes; this way the question doesn't arise.
+   - *iPhone sound-only files:* the app now encodes and writes them itself too, as ADTS AAC (`.aac`). That is append-only, cut-off safe and works in the background.
+   - *Android:* MediaRecorder writes MPEG-TS through Android's `MPEG2TSWriter`. In the Android 15 source (the LineageOS 22.1 copy of AOSP, [`MPEG2TSWriter.cpp`](https://raw.githubusercontent.com/LineageOS/android_frameworks_av/lineage-22.1/media/libstagefright/MPEG2TSWriter.cpp); Google's own source host isn't reachable from here), every write is an `fwrite` of a 188-byte packet to a stream opened with `fdopen(dup(fd), "wb")`, and there is no seek anywhere in the file. `StagefrightRecorder::setupMPEG2TSRecording` creates it ([`StagefrightRecorder.cpp`](https://raw.githubusercontent.com/LineageOS/android_frameworks_av/lineage-22.1/media/libmediaplayerservice/StagefrightRecorder.cpp), line 1601). So the bytes on disk only grow. The app reads only the new bytes, up to the last whole packet, after flushing the file to storage. Phone makers can change this code; it needs testing on a Samsung and a Xiaomi, Oppo or Vivo.
+   - *Android MP4 fallback (Android 7, or a phone that refuses MPEG-TS):* MediaRecorder rewrites an MP4's header when it stops, so these files get no checkpoints.
+2. **That parts never split a file in a way that breaks it.** `modules/saakshi-evidence/verify/checkpoint-parts.sh` makes 40-second MPEG-TS and fragmented MP4 files with ffmpeg (not phones' recorders) and found:
+   - a running SHA-256 snapshotted at each checkpoint equals the SHA-256 of the prefix re-read from disk;
+   - parts ending on checkpoints, joined in order, are the file byte for byte;
+   - every checkpointed prefix plays: 301, 600 and 901 video frames at the MPEG-TS checkpoints; 300, 600, 900 and 1200 at the fMP4 segment ends.
+3. **Battery.** I couldn't measure this on a phone. Estimate:
+   - Body-cam writes about 0.4 MB a second at 720p (0.8 at 1080p).
+   - SHA-256 runs at about 1,400 MB a second on this cloud machine. Current phones have the same kind of SHA instructions in their processors.
+   - So even at a tenth of that speed, the hashing would use well under 1% of one core.
+   - Each checkpoint adds one signature and one flush to storage every 10 seconds; Android also reads each byte once more, from memory.
+
+   I expect this to be small next to the camera, the encoder and the screen. Your last test used about 2% battery in 10.5 minutes; the next test will show whether that changes.
+
+### Group 2a: what was built
+
+- **One continuous file.** Body-cam records one file from Start to Stop, with its sound, on both platforms. On iPhone a new file starts only when it must: you came back to Saakshi, sound came back after a call, or a file couldn't be written. The sound-only file still covers only the time video couldn't record.
+- **Signed checkpoints, about every 10 seconds.** On iPhone they come at each video segment, and about every 10 seconds of sound for sound-only files; on Android, every 10 seconds at a packet boundary.
+  - Each checkpoint is the length so far and the SHA-256 of those bytes, from the running hash. It is signed into the session's chain as it comes (bundle format **0.5**: a new record type, `saakshi.evidence.checkpoint`).
+  - When the file closes, its usual record carries the same `recording` id. The app also compares the file as hashed with what the recorder wrote, and notes any difference.
+  - The body-cam screen shows how many checkpoints are signed and the time of the last one.
+- **Upload parts, for E7.** Byte ranges of the file, each ending on a checkpoint, about `uploadPartSeconds` long. That is a stored setting, 60 seconds for now, to be decided with E7. E7 gets them through `setBodyCamPartListener` from `@/modules/evidence`. Nothing is uploaded yet.
+- **The checker.** `tools/verify-bundle.mjs` checks every checkpoint against its file in one pass: the file's first bytes must have the SHA-256 the checkpoint signed. Tests build real signed bundles and catch a changed byte, a file shorter than its checkpoints, a missing checkpoint, and checkpoints without their file.
+- **Not done:** the witness message could carry the latest checkpoint (the brief says "can"); group 7 redesigns that message, so I left it there. Bug mode is unchanged, as the brief says.
+- **An independent review** of the new phone code found eleven problems, all fixed in this pull request:
+  - an iPhone video file whose writer failed mid-recording would have dropped everything until Stop; it now ends at once and a new file starts;
+  - on Android, a failed stop (for example, the phone full) would have deleted a recording that had checkpoints; it is now kept and marked as an error;
+  - each iPhone `.mp4` now starts its own timeline at 0, so players show the right length;
+  - a write that fails part-way cuts the file back to the last fingerprinted byte;
+  - a checkpoint can no longer reach the app after its file's close event;
+  - the checker accepts a missing checkpoint number (one that couldn't be signed);
+  - and smaller things: waiting for Android's last packets before the final fingerprint, flushing after measuring, a full flush on iPhone (`F_FULLFSYNC`), and sound-only files from unusual microphones being resampled or mixed down instead of refused.
+
+### Group 2a: not verified
+
+- Nothing has run on a phone. Most important:
+  - that the iPhone segments arrive every 10 seconds and the `.mp4` plays in Photos, Files and QuickTime;
+  - that the `.aac` sound-only file encodes in the background;
+  - that Android's checkpoints keep up with the recorder on several makers' phones;
+  - that a recording cut off by a forced restart verifies up to its last checkpoint.
+- `MessageDigest.clone()` (Android's way of snapshotting the running hash) is supported by Android's standard SHA-256. If a phone refused it, that phone would give no checkpoints; recording would carry on.
+- Apple doesn't document that an asset writer hands over its last segment before `finishWriting` reports done. If it didn't, the last few seconds would be missing and the app would show a recording problem.
+- AAC's start-up delay (about 44 ms) isn't marked in the `.mp4` (Apple's HLS profile writes no edit list), so sound may run that much behind the picture.
+
+### Bug mode: one continuous file, with checkpoints (#20)
+
+**The owner said yes (6 Nov):** bug mode records like body-cam, one continuous file with checkpoints; on iPhone with the cut-off-safe AAC writer; its witness texts, at most every 10 minutes, carry the latest checkpoint. Recorded in SPEC E8.
+
+**Checked before building:**
+- *Android: reading the file while MediaRecorder writes it.* Bug mode already wrote ADTS AAC (`MediaRecorder.OutputFormat.AAC_ADTS`). In the Android 15 source (LineageOS 22.1 copy of AOSP), `StagefrightRecorder::setupAACRecording` makes an `AACWriter` for that format ([`StagefrightRecorder.cpp`](https://raw.githubusercontent.com/LineageOS/android_frameworks_av/lineage-22.1/media/libmediaplayerservice/StagefrightRecorder.cpp), line 1478). [`AACWriter.cpp`](https://raw.githubusercontent.com/LineageOS/android_frameworks_av/lineage-22.1/media/libstagefright/AACWriter.cpp) writes each frame as a 7-byte header, one byte at a time (`writeAdtsHeader`), and then the frame's data (`threadFunc`), each with `write()` on its own descriptor, with no seek or truncate anywhere. So the bytes on disk only grow, and a checkpoint may find the file ending part-way through a header. Phone makers can change this code; the checkpointer stops checkpointing (and says so once) if the bytes aren't ADTS, and recording carries on.
+- *That checkpoints never split a frame.* `modules/saakshi-sos/verify/adts-checkpoints.sh` makes a 40-second ffmpeg AAC file at the recorder's settings (mono, 44.1 kHz, 64 kbit/s), and runs the real `AdtsCheckpointer.kt`, compiled for the JVM, on a copy that grows the way `AACWriter` writes it. Result: 80 checkpoints, every one on a frame boundary, each SHA-256 equal to the prefix re-read; every checkpointed prefix decodes with ffmpeg with no errors; parts ending on checkpoints join into the file byte for byte; bytes that aren't ADTS give one error and no more checkpoints; a file shorter than its checkpoints is refused.
+- *iPhone:* nothing is read back. The app encodes and writes every byte itself (`AdtsWriter` and `CheckpointedFile`, body-cam's sound-only writer from group 2a), so the running hash is over exactly what was written.
+- *Cost.* Sound is about 8 KB a second on Android (64 kbit/s) and 16 KB on iPhone (128 kbit/s). Each checkpoint reads about 80 KB once on Android, and on both phones flushes the file, signs one record and rewrites `session.json`. That last step grows with the recording: the session's bookkeeping lists every checkpoint, so after an hour `session.json` is about 135 KB (24 MB written in all), after 8 hours about 1.1 MB (about 1.5 GB written in all, 1 MB every 10 seconds by then). My estimate is that this is small next to the microphone and the screen-off phone's own drain (perhaps 1–2% of the battery over 8 hours), but it isn't measured. If the owner's test shows it matters, the fix is to keep checkpoints in an append-only file beside `session.json` (body-cam would gain too); I haven't built it.
+
+**What was built:**
+- **Android** (`modules/saakshi-sos`): `BugRecorder` records one `.aac` file from Start to Stop; `AdtsCheckpointer` reads only the new bytes up to the last whole ADTS frame, every 10 seconds, on the recorder's own thread, so a checkpoint always comes before its file's close and never after. A new file starts only if MediaRecorder reports an error (then the old file ends with `"error"`, and a new one starts, retried every 5 seconds until it does). The service now says when Stop has closed the last file (`onBugRecorderStopped`).
+- **iPhone** (`modules/saakshi-evidence/ios/SoundRecorder.swift`): replaces expo-audio's 2-minute `.m4a` pieces. `AVAudioEngine`'s microphone, started on screen, goes into `AdtsWriter`, with a checkpoint about every 10 seconds of sound. A new file starts only when the microphone stops and comes back (a phone call, a route change, a media-services reset; the old file ends with `"audio-interrupted"`) or a file can't be written. The microphone is retried every 10 seconds while it is off, as body-cam's is. Start fails, with the reason on screen, if the microphone can't start at all.
+- **One JavaScript path for both** (`startSoundRecording` in `@/modules/evidence`): each checkpoint is signed into the session's chain as it comes; each file is hashed, moved and sealed when it closes, and compared with the recorder's own fingerprint. Upload parts for E7 come through `setBugModePartListener` from `@/modules/bugmode` (it replaces `setPieceUploader`), with the same part-size setting as body-cam. If nothing was recorded because the microphone couldn't start, no empty session is left in the Record tab.
+- **Witness texts:** after a new signed record, if 10 minutes have passed since the last text, the newest chain head goes to trusted contacts (where the phone can send with no tap): "Saakshi bug mode: recording since 10:40 IST, signed up to 10:50 IST. SHA-256: …". The 20-texts-in-30-minutes cap stays.
+- **Screens:** the bug-mode screen shows how many checkpoints are signed and the time of the last; the iPhone Live Activity shows "Signed up to 10:50 IST", updated at most once a minute. The text explains one file and checkpoints in place of pieces, in English and Hindi.
+- **Location:** each record takes the latest fix, now asked for at most once a minute (it was once per piece).
+- **Bundle format 0.6** (`docs/spec/evidence-bundle.md`): bug mode's files, checkpoints and follow-on files as above; no record member was added or removed. `tools/verify-bundle.mjs` reads 0.1 to 0.6. A test makes a real signed bug-mode bundle (two files after a call, four checkpoints) and the checker passes it.
+- The App Review note on bug mode (`store/apple/review-notes.md`) now says one file, signed every 10 seconds.
+- **An independent review** of the new code (by a separate agent, before the pull request was ready) found no compile errors and no case where a checkpoint could disagree with its file or come after its file's close. It found ten problems in how failures are handled, all fixed in #20:
+  - Android: if MediaRecorder stops writing (AOSP's `AACWriter` stops on a write or microphone error without telling anyone, for example when the phone is full), nothing noticed. Now a file that hasn't grown for 30 seconds ends as `"error"` and a new one starts. A failure while closing a file can no longer crash the app, and the service always says when Stop is done.
+  - Android: a recorder could be left running if its marker couldn't be written. The marker is now written before the recorder starts.
+  - Recorder problems never reached the screen, and an Android start that never recorded looked like success. Now the bug-mode screen shows the latest problem, and on Android Start waits (up to 8 seconds) until the first file is recording, or fails with the reason.
+  - iPhone: a microphone whose first sound took more than 2 seconds could loop without ever recording, silently. Late first sound is now kept; an engine with no sound after 5 seconds is started afresh; 10 seconds without sound is reported on screen.
+  - Android: file end times were taken after the final fingerprint (up to a second late); now right after the recorder stops.
+  - A stop taking more than 5 seconds could let the old file's late events reach the next recording. Each recording now takes only events for files in its own session folder, and a Start while the last recording is still stopping fails with a message.
+  - iPhone: bug mode now leaves the sound session as it is while body-cam runs, sets it only when it differs, and restarts its microphone at most once a second, so the two can't make each other restart in a loop.
+  - iPhone: the stall and retry timers now use the uptime clock, which a clock change doesn't move.
+  - Upload parts could end on a checkpoint that wasn't signed. Parts are now cut only from signed checkpoints, and the last part from the file as sealed. Body-cam had the same pattern (group 2a) and is fixed the same way here.
+  - Android: the service released its wake lock before the last file was closed and fingerprinted; now it waits.
+- **Compiled before CI:** `BugRecorder.kt` and `AdtsCheckpointer.kt` compile with the JetBrains compiler against small Java stand-ins for the Android classes they use (signatures copied from the Android API). The rest of the Kotlin and all Swift compile only in the Native build workflow.
+
+**Not verified:**
+- Nothing has run on a phone, and the Swift and Android Kotlin compile only in the Native build workflow.
+- Most important to test: an iPhone recording with the phone locked for 30 minutes or more (that sound keeps coming, and checkpoints keep being signed); a phone call during bug mode on both phones; a forced restart while recording (the file should play up to the cut and be sealed as interrupted when the app opens, with its checkpoints); Android with the screen off for an hour on a Samsung and a Xiaomi, Oppo or Vivo.
+- As before for iPhone, after a call that ends while Saakshi is in the background, sound may not restart until the user returns to the app (iOS may refuse to start a recording from the background; the recorder then tries it as non-mixable).
+- If body-cam and bug mode ever ran together on iPhone (for example, confiscation mode started from the code pad over body-cam), both would use the microphone at once; neither switches the sound session off or changes it under the other, but this hasn't been tried.
+- Found by the review, not changed (it was so before #20): the crash-recovery check at app start trusts that a session not marked active in the running JavaScript is finished. If the app's JavaScript ever restarted while Android's service kept recording, the file being written could be sealed early as interrupted. Nothing calls `bugRecorderRunning()` yet.
+
+### Group 3: records list and playback (#21)
+
+**What was built:**
+- **The records list** shows each record as what it is: "Body-cam", "Bug mode", "Photo", "2 videos", "Video and 2 photos". It also shows its length ("12 min 5 s"), "Started 06/11/2026 10:40 IST" and a picture.
+  - The picture is the photo itself, or a video's frame at one second, made once by `expo-video-thumbnails`.
+  - Video pictures are kept in the session's `thumbs/` folder. They are not evidence, never go in a bundle, and go when the record is deleted.
+  - Body-cam and bug mode are measured from Start to Stop; the evidence camera adds up its videos' lengths.
+  - Each file's mode and rotation are now kept in the locker's bookkeeping. Older sessions read them from the signed record.
+- **Photos** open full screen.
+- **Sound files** play in the app.
+- **One player per body-cam or bug-mode record** (`expo-video`): it plays the files end to end with their sound, and shows the total length and which file is playing.
+  - Each file starts where the one before stopped, so iPhone's half-second hand-over overlaps aren't heard twice.
+  - Sound-only stretches say so. Gaps where nothing was recorded (a phone call) are said too.
+  - Android `.ts` videos play from their MP4 copy.
+  - **Older body-cam records** (your test round 1) saved muted video pieces with sound in separate overlapping files. The player plays their sound end to end, says why, and each video still plays on its own.
+- **Nothing plays while Saakshi is recording** (bug mode in the background, for example). The microphone would pick the playback up, and on iPhone playing takes the sound session from the recorder. **For you to confirm** (SPEC E5 says "built so").
+- **Joined MP4 copy for sharing**, offered where a body-cam record has more than one video file: on iPhone after you left the app; on Android only after a recorder error. "Share the whole video" makes it once.
+  - Each video file's picture sits at its place in time, with no new picture in between. The sound comes from the video and sound-only files, each stretch once, placed by each file's own clock so picture and sound stay in step.
+  - iPhone (`Joiner.swift`): `AVMutableComposition` exported with the passthrough preset. It re-encodes only if the clips were filmed turned different ways or passthrough fails, and then the record says so.
+  - Android (`Remuxer.join`): `MediaExtractor` into `MediaMuxer`, samples copied unchanged and interleaved by time. Files turned different ways are not joined, and the app says why.
+  - Its own signed record (`saakshi.evidence.joined-copy`, bundle format **0.7**, spec section 11a) lists every source file's record and SHA-256, and where each stretch went, naming only what the phone actually placed.
+  - It is labelled as a copy, and is never in the bundle or the certificate.
+- **New dependencies:** `expo-video` 58.0.13 and `expo-video-thumbnails` 58.0.2, both MIT, SDK-matched, with no new permissions. expo-video's config plugin is **not** in `app.json`: given `false` options, it removes iPhone's background `audio` mode, which bug mode and body-cam need.
+- **An independent review** found and I fixed:
+  - the older records above;
+  - playback that could start during a recording (after making an Android copy);
+  - the plugin problem;
+  - evidence pictures left in expo-image's disk cache after a delete (now never cached);
+  - deletes racing a copy or thumbnail (now refused until it's done);
+  - duplicate copy jobs;
+  - session updates lost while a copy was signed;
+  - sound drifting from picture in the joined copy;
+  - Android trimming inside a file;
+  - rotation of Android MP4-fallback files;
+  - untranslated join errors.
+
+**Not verified:**
+- Nothing has run on a phone. The Swift and Kotlin compiled in the Native build workflow for the first version; the review fixes are building.
+- Whether the iPhone passthrough export accepts a composition with empty stretches and sound from both `.mp4` and `.aac` files. If not, it re-encodes and says so.
+- Whether AVPlayer and ExoPlayer play every file as expected: fragmented `.mp4` with no edit list, ADTS `.aac`, older `.m4a`.
+- Android video frames from MPEG-TS for thumbnails (`MediaMetadataRetriever`).
+
+### Group 4: evidence camera, front and back, and zoom (#22)
+
+**What was built:**
+- **Front and back camera:** a switch button (⇄) beside the shutter, for photos and video. It is off during a video (see the research below).
+  - Android video uses the app's own recorder, which now opens the front camera too, with Camera2's front-camera rotation for the file.
+- **Zoom:** pinch with two fingers anywhere on the picture, plus quick buttons:
+  - **0.5×** where the phone has a wider lens. On iPhone that is the ultra-wide lens, chosen with expo-camera's `selectedLens`. On Android video it is the camera's own zoom below 1×, on phones that offer it (Android 11+); the button then shows its real value, for example "0.6×".
+  - **1×**, and **2×** where the camera reaches it. The current zoom shows on the selected button, for example "1.4×".
+  - Zoom can change while recording, except iPhone's 0.5×, which is a different lens: expo-camera changes lens by changing the camera, and that would end the file.
+  - Android photos (expo-camera, CameraX) can't go below 1×.
+  - `capture/zoom.ts` turns the zoom into what each camera needs, and is tested:
+    - iPhone expo-camera: `zoom` 0..1 rises exponentially to the lens's maximum, which the native module reads from the device's current format;
+    - Android expo-camera: the ratio over the camera's maximum;
+    - Android video: `CONTROL_ZOOM_RATIO`, or a sensor crop before Android 11.
+- **Leaving the camera:** unchanged (group 5 records why).
+- **An independent review** found and I fixed:
+  - on iPhone, one tap on ⇄ left the shutter off until the camera was closed. expo-camera says it is ready only once per view, so the camera view is now made afresh for each camera and each mode;
+  - on Android video, the preview froze after a switch, while recording used the new camera (the preview view is now made afresh too);
+  - a double tap on ⇄ that could leave a camera open (⇄ is off until the camera is ready, and the recorder closes a camera that opens after a newer open or a close);
+  - zoom left wrong after changing between photo and video on iPhone (learnt again);
+  - a lens change racing a recording's start (the shutter waits for the new lens);
+  - iPhone lenses changing back and forth while pinching (they change only when the fingers lift);
+  - a pinch jumping after one finger lifted;
+  - Android zoom updates sent faster than the camera needs (now at most about 30 a second);
+  - the digital-zoom crop before Android 11 being slightly off centre.
+- **Joining front and back videos (Android):** a record with both front- and back-camera videos can't be joined, because their turns differ. The app now says it was filmed with different cameras. On iPhone the joiner re-encodes such a record and says so.
+
+**Research (brief item 3), not built; your decision:**
+1. **Switching camera during a video, keeping one file.**
+   - **iPhone with expo-camera: not possible.** Changing `facing` makes expo-camera swap the camera input inside a configuration change (`CameraSessionManager.swift`, `addDevice`), with no check for a recording.
+     - Apple has an error for this case: "Recording stopped because the configuration of media sources and destinations changed" ([AVError.Code.sessionConfigurationChanged](https://developer.apple.com/documentation/avfoundation/averror-swift.struct/code/sessionconfigurationchanged)).
+     - Apple's AVCamManual sample disables the camera button "until recording finishes" ([listing](https://developer.apple.com/library/archive/samplecode/AVCamManual/Listings/AVCamManual_AVCamManualCameraViewController_m.html)).
+     - An Apple media engineer advises a video data output into `AVAssetWriter` instead ([forum](https://developer.apple.com/forums/thread/101833)).
+   - **iPhone with the app's own recorder:** possible.
+     - It is the body-cam recorder's design (`BodyCamRecorder.swift`) plus a preview and the switch, with both cameras set to the same size: "ensure that sample buffers you append are of the specified format" ([AVAssetWriterInput](https://developer.apple.com/documentation/avfoundation/avassetwriterinput/init(mediatype:outputsettings:sourceformathint:))).
+     - The file's turn can't change once writing starts ("You can't set this value after writing starts", [transform](https://developer.apple.com/documentation/avfoundation/avassetwriterinput/transform)), so the front camera's frames would need turning one by one.
+     - My estimate: 400–700 lines of Swift, medium risk.
+   - **Android, the app's recorder:** not documented either way.
+     - A persistent surface "can be reused by subsequent MediaCodec or MediaRecorder instances" ([MediaCodec](https://developer.android.com/reference/android/media/MediaCodec#createPersistentInputSurface())), but nothing says a second camera may feed it while MediaRecorder runs.
+     - The size and the rotation are fixed before `prepare()` ([setOrientationHint](https://developer.android.com/reference/android/media/MediaRecorder#setOrientationHint(int))), and two cameras' timestamps may not be comparable ([SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN](https://developer.android.com/reference/android/hardware/camera2/CameraMetadata#SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN)).
+     - A safe version needs a GPU step that scales, turns and re-times frames. The file's rotation would also vary within one file, which MPEG-TS can't hold and our records would need (a bundle-format change).
+     - My estimate: 150–250 lines of Kotlin, high risk until tried on phones; 600–1,000 more with the GPU step.
+2. **Dual capture (front and back at once, picture-in-picture).**
+   - **iPhone:** `AVCaptureMultiCamSession`, iOS 13 and later, on "an iPhone with an A12 or later processor" ([Apple's sample](https://developer.apple.com/documentation/avfoundation/avmulticampip-capturing-from-multiple-cameras)), which is iPhone XS, XS Max and XR onwards (WWDC 2019).
+     - The app must check `isMultiCamSupported` on the phone. A configuration whose `hardwareCost` is over 1.0 won't run ([docs](https://developer.apple.com/documentation/avfoundation/avcapturemulticamsession/hardwarecost)).
+     - Under heat, the system pressure state can stop capture ([docs](https://developer.apple.com/documentation/avfoundation/avcapturedevice/systempressurestate-swift.class)). WWDC 2019 session 249 gives "up to 15 minutes" at moderate pressure.
+   - **Android:** concurrent cameras from Android 11 (`CameraManager.getConcurrentCameraIds`). Only on phones that declare `FEATURE_CAMERA_CONCURRENT`: "The device's main front and back cameras can stream concurrently" ([PackageManager](https://developer.android.com/reference/android/content/pm/PackageManager#FEATURE_CAMERA_CONCURRENT)).
+     - The guaranteed sizes are small, 720p plus 1440p at most ([CameraDevice](https://developer.android.com/reference/android/hardware/camera2/CameraDevice)).
+     - Google publishes no list of phones. I couldn't read the Android CDD's wording (source.android.com isn't reachable from here).
+   - **Cost:** both platforms need the two pictures combined on the GPU into one encoder. My estimate: 1,000–1,500 lines of Swift and 1,200–2,000 of Kotlin, high risk, with battery and heat to be measured. CameraX 1.5+ can do picture-in-picture recording, but only to MP4, which isn't cut-off safe.
+
+**Not verified:**
+- Nothing has run on a phone. Most important:
+  - that 0.5× and 2× match the phone's own Camera app;
+  - that zoom during a video doesn't end the file;
+  - that front-camera video on Android plays upright.
+- Whether expo-camera calls `onCameraReady` again after a lens change. The zoom controls are learnt there, and stay as they were if it doesn't.
+
+### Group 5: why a recording ended (#23)
+
+**What was built:**
+- Each file on the record screen, and the recording as a whole (its last file), says why it ended, in plain words, in English and Hindi. There are words for all twelve end reasons the records can hold. The ones the brief named:
+  - "You stopped it."
+  - "Stopped when you left Saakshi or locked the phone."
+  - "Battery low: stopped and saved."
+  - "Cut off: the app closed or the phone switched off…".
+  - A test checks that every end reason has words in both languages.
+- **The evidence camera** now stops a video only when Saakshi goes into the background, and records that as `app-left` (it recorded `stopped`). Only covering the app (Control Center, Notification Center) leaves it recording, as you decided for body-cam in group 2.
+
+**Found:** iPhone doesn't tell an app whether the user locked the phone or left the app; both look the same to the app (it goes into the background). The only public signal is `UIApplication.protectedDataWillBecomeUnavailableNotification`, "posts shortly before protected files are locked down and become inaccessible" ([Apple](https://developer.apple.com/documentation/uikit/uiapplication/protecteddatawillbecomeunavailablenotification)). It comes only on a phone with a passcode, and Apple gives no timing, so a lock a few seconds after leaving can't be told apart. So one sentence covers both, and says why. Android records in the background, so it never needs this.
+
+**For the next test round, a genuine cut-off:** while recording (evidence camera, body-cam or bug mode), force-restart the iPhone: volume up, volume down, then hold the side button until the Apple logo. When Saakshi opens again, the record should say "Cut off: …", and Check files should pass.
+
+**Not verified:** on a phone, that the evidence camera now keeps recording under Control Center and Notification Center (expo-camera's capture session isn't stopped when the app is only covered; untested).
+
+### Group 6: trusted contacts, three ticks per person (#24)
+
+**What was built** (your decision of 5 Nov; SPEC S1):
+- Each trusted contact has three ticks: **SOS alerts**, **Live location**, **Witness messages**.
+  - All are ticked for someone new, and for everyone saved before. The contacts file is now version 2; older files read as all ticked.
+  - The ticks show under each person on the contacts screen, with a warning if none is ticked.
+- Every message fills in the people ticked for it, so nobody types a recipient at the moment of sending:
+  - SOS alert, including confiscation mode's: SOS.
+  - Live-location link, including "send again" and confiscation mode's late link: live location.
+  - The witness message from a record: witness. It now fills its recipients in; before, you chose them in Messages.
+  - Bug mode's witness texts: witness.
+- **Confiscation mode:** when its SOS alert carries the live link, the link also goes on its own to anyone ticked for live location but not for SOS alerts, who would otherwise not get it.
+- **For other modules:** `getTrustedContacts(use?)` and `textTrustedContacts(message, { use })` from `@/modules/sos`.
+
+**Not verified:** on a phone, that iPhone's Messages composer opens with the witness recipients filled in.
+
+### Group 7: the witness message (#25)
+
+**What was built:** the witness message from a record is now **format v1**, specified in `docs/spec/evidence-bundle.md`, section 9. Its own version is independent of the bundle's.
+- **Line 1** is always `Saakshi witness v1`.
+- **Then, in a fixed order:**
+  - the record's name ("2026-11-06 10-40 IST Body-cam");
+  - Started and Ended, with seconds, in IST, and the length ("0:12:18");
+  - the place where it started, with its accuracy and a map link;
+  - the number of files, and each file's SHA-256 when there are three or fewer ("video 1 SHA-256: …");
+  - the whole record's SHA-256 (the chain head);
+  - the app version and the record's id.
+- **Language:** labels follow the app's language, as before; values never change. Software reads the lines by their order.
+- **Length:** at most 6 SMS parts. Over that, it leaves out, in turn, the per-file lines, the map link and the id. English uses only GSM characters ("within 13 m", not "±13 m"), so it stays in the cheaper encoding. Hindi is Unicode and loses the per-file lines first.
+- **Times:**
+  - The 03:42 / 03:43 mismatch you saw: the bundle's file name used the time the session was opened, and the message used the time the last file ended. Now the bundle's name uses the time recording started, the same "Started" the app and the message show.
+  - The bundle's `hash-report.txt` and the certificate's enclosed hash report label each file's times "Started" and "Ended". Neither is the Schedule's form wording, which is unchanged.
+- **Names** (`naming.ts`): "2026-11-06 10-40 IST Body-cam" for a record, and "video 1", "sound 2" for its files. They follow the brief's group 9 examples, so that the bundle can use the same names.
+- **Bug mode's automatic texts** keep their own short form ("Saakshi bug mode: recording since 10:40 IST, signed up to 10:50 IST. SHA-256: …"), which the spec now describes. They are still not noted in the session's `witness` list.
+
+**Not verified:** on a phone, how Messages shows a six-part message, and whether it splits it.
+
+### Group 8: certificate, one profile (#26)
+
+**What was built** (your decision of 5 Nov; SPEC E4):
+- **Settings → Certificates → "Your details for certificates"**: the phone's one profile.
+  - The fields: name; son, daughter or spouse of, and that person's name; residing or employed at, and the address; IMEI(s) with the `*#06#` help; colour; serial number; the ownership boxes.
+  - It is saved on the phone as it is typed, in the same file the form used, so details typed before carry over.
+  - It says it is of the person who owns, maintains, manages or operates the phone, and that anyone else changes it first.
+- **Making a certificate shows no form.**
+  - If the profile is incomplete: "Your details for certificates aren't complete yet. Part A needs them", and a button to fill them in.
+  - If it is complete: "Part A will be made for Asha Rao, who owns and operates this phone (IMEI 356938035643809)", and **Make certificate**, plus "Change your details".
+- **Unchanged:** existing certificates, and the form's wording (`certificate/html.ts`).
+
+**NEEDS OWNER REVIEW:** the new strings (`profile` in `record.json`, `certificates` in `settings.json`, English and Hindi). The Settings line refers to "section 63(4)(c) of the Bharatiya Sakshya Adhiniyam, 2023", as the existing certificate screen does (law.md 1A).
+
+### Group 9: export (#27)
+
+**What was built** (brief section 9; SPEC E5, "Export"):
+- **Two clear actions on every record**, in one card under the player:
+  - **"Share video"** (or "Share photo") sends a playable file through the share sheet, to WhatsApp, Instagram, YouTube, Mail and so on. On iPhone it is the original. On Android it is the MP4 copy, with no question first: the original goes in the bundle. A body-cam record with several video files shares its joined copy (group 3).
+  - **"Export evidence bundle"** saves the full ZIP. The card says where it saves, or that the first time asks for a folder, and offers "Change folder" and "Share the bundle instead".
+  - Each file's card also has its own "Share video", "Share photo" or "Share sound".
+- **The default export folder.** The user picks it once.
+  - iPhone: Apple's document picker for folders, kept as a security-scoped bookmark (`ExportFolder.swift`). Each export resolves the bookmark, opens the folder, copies the ZIP in under file coordination, and closes it. A name that is taken becomes "… (2).zip". A stale bookmark is made again. This follows Apple's "Providing access to directories".
+  - Android: expo-file-system's folder picker, which takes a persistable Storage Access Framework permission. The ZIP is written straight into the folder, and a half-written one is deleted if the export fails.
+  - If the folder has gone, the app says so and offers to choose another or to share instead. The choice is kept on the phone (`evidence/export-folder.json`).
+- **Names a person can read: bundle format 0.8** (spec section 7). For example:
+  - the bundle: `Saakshi 2026-11-06 10-40 IST Body-cam.zip`;
+  - the originals: `Original files/2026-11-06 10-40-12 IST video 1.mp4`;
+  - the records: `Signed records/0074 video 1.json`, and checkpoints like `Signed records/0000 video 1 checkpoint 0.json`. The number is the record's place in the chain, so the folder lists them in order;
+  - also `Hash report.txt` and `Certificate Part A.pdf`.
+  
+  The machine identifiers (session id, record ids, the app's own file names) stay in `manifest.json`. The manifest now says which original goes with which record. The hash report gives both names for every file. `tools/verify-bundle.mjs` reads 0.8 and every older layout. The tests check it with `openssl`, `sha256sum`-style hashing, and Python's `zipfile` reading the names.
+- **README.txt in English and then Hindi**, for someone with no technical background (`export/readme.ts`). It covers:
+  - what each file and folder is, and why it is there;
+  - how the fingerprints and the chain prove nothing changed;
+  - how a lawyer or expert checks the bundle: the one-line tool, or by hand, with commands that name this bundle's own files.
+  
+  It has a byte-order mark and Windows line ends, so Notepad on an older PC shows the Hindi and the lines.
+- **A certificate made from now on** names the files as the bundle does. One made before keeps the old names (`media/0003-clip0-seg0.mp4`), which the hash report gives as each file's "Name in record".
+- **Guards:** a bundle can't be made while its record is still recording or being sealed, and a record can't be deleted while its bundle is being written or copied.
+- **An independent review** found these, and I fixed them:
+  - **the checking tool could say "OK" about a tampered 0.8 bundle.** It found each original through the manifest, which isn't signed, so a doctored file could sit at the readable name with the genuine one elsewhere. Now each record's file must be directly in `Original files/`, no file may be claimed twice, every file there must be claimed, and paths outside the bundle are refused. The tool lists each file it checked. Four new tests make such bundles, and each fails as it should (they passed the old tool);
+  - **the README claimed too much:** that a record "cannot be removed" without it showing. Records taken off the end show only against a chain head held elsewhere, such as a witness message. The README (both languages), the spec and the tool now say so;
+  - **every export failure blamed the folder,** even a missing file in the record. Folder problems and bundle problems now have their own messages;
+  - **the iPhone's folder errors were in English only.** They now have codes, which the app says in English or Hindi;
+  - **on iPhone, a failed copy could leave half a bundle behind,** and the record could be deleted during the copy. Both are fixed. The folder's name is now the one the Files app shows ("iCloud Drive", not "com~apple~CloudDocs").
+- **A second review of those fixes** found three more ways to get "OK" about a misleading bundle, and a small race. All are fixed:
+  - **the readable names weren't checked.** A video renamed to another start time, with the manifest changed to match, passed. Now the tool works every name out from the signed records (spec section 7 gives the rule exactly) and fails on any difference, so the time in a file's name is as trustworthy as its record. The app names files by the same rule;
+  - **a copy in a look-alike folder passed.** Examples are "ORIGINAL FILES/", a Cyrillic "О" and a trailing space, and on a Mac or Windows PC such a copy can land on the real file when unzipped. Now nothing may sit outside the bundle's one layout (except `key.pem`, which the README's steps make), and names a computer would treat as one fail;
+  - **a ZIP holding a name twice passed,** because unzip tools differ on which copy they keep. That now fails, as does a ZIP entry whose local header gives another name;
+  - **every export shared one cache folder,** so sharing one record during another's long copy could remove the file being copied. Each record now has its own.
+  - Seven new tests make such bundles; each passed the earlier tool and fails now.
+- **A third review** found that a crafted ZIP, though not a folder, could still unpack a doctored copy at the readable name: through `.` in a name, a local header naming another file on an entry the tool never read, or the Unicode Path extra field, which Python's `zipfile` takes as the name. The app writes plain ZIPs, so the tool now refuses anything else: every name a plain path, every local header the same as the central directory, no extra fields but ZIP64's and timestamps, no gaps between entries, no symbolic links. It skips only the exact files a computer adds (`.DS_Store`, `._`, `__MACOSX/`, `Thumbs.db`, `desktop.ini`), and a `key.pem` left in the bundle must be its key. Three more tests; the reviewer's own attack bundles all fail now.
+- **A fourth, last review** of the ZIP reader found one more: nothing after the central directory was checked, so a second archive could follow it, which Info-ZIP, Python and Java would unpack instead. The tool now requires exactly the ending the app writes (the end record in the last 22 bytes, no comment, the directory right before it or before the ZIP64 records, which must agree). The reviewer found nothing else, and confirmed the app's own ZIPs, ordinary and ZIP64, pass and unpack the same in those tools. One more test.
+- **Left as they are:**
+  - on Android, if the app is killed while it writes, a cut-short ZIP can stay in the folder under the bundle's name. expo-file-system can't rename a file in such a folder, so it can't be written under a temporary name first. No ZIP tool or the checking tool will accept it;
+  - on iPhone, the bundle is made in the cache, then copied in, so it needs about twice its size free for a moment.
+- Typecheck, lint and 396 tests pass.
+
+**Built so, for you to confirm** (also in "Owner questions"):
+- A sound-only record (bug mode) has **"Share sound"**.
+- An evidence-camera record with several photos or videos has no record-level share. Each is shared from its own card, because the share sheet takes one file.
+- File and folder names in the bundle are in English, whatever the app's language, so that they read the same for every lawyer and court and every ZIP tool handles them.
+
+**NEEDS OWNER REVIEW:**
+- The README as a whole, since a court reader may rely on what it says the bundle proves: in particular "How the proof works".
+- Its Hindi.
+- Its closing lines on section 63(4)(c). They say what the old README said: Part A by the person in charge of the device, Part B by an expert (law.md 1A, s.63(4)(c); 1B, the Schedule).
+- The new strings (`share` and `export` in `record.json`, English and Hindi).
+
+**Not checked:** the brief asks the README to agree with the bundle walkthrough the review session is giving you. That walkthrough isn't in the repository, so I couldn't compare them. Please check them against each other, or point me to it.
+
+**Not verified (needs a phone):**
+- iPhone: the folder picker and bookmark with "On My iPhone", iCloud Drive and a third-party provider, including after the app restarts.
+- Android: a folder on the phone and one in Google Drive's provider. Writing into Drive's provider is the least certain.
+- How long a large bundle takes to save.
 
 ## Owner questions
 
@@ -36,6 +919,29 @@ Streams add questions here as `- [ ] (Stream X) question`.
 - [x] (Stream B) **Supabase region for live location (S3).** *Answered 20 Oct:* Mumbai (`ap-south-1`). Project `saakshi-live` created there.
 - [x] (Stream B) **Supabase plan for live location.** `saakshi-live` is in the "AT's Desk" organisation. Supabase pauses inactive projects on its free plan, which would break live links without warning. *Answered (owner's review of R2):* free while testing; the plan must be reviewed before R2 goes public. On the release checklist below.
 - [x] (Stream B, for Stream D) **Apple Team ID.** The widget extension needs `ios.appleTeamId` in `app.json`. *Answered (owner's review of R2):* `5NYAUT5C56` (not secret); set in `app.json`.
+- [x] (Fix round 1) **Camera picture on the iPhone body-cam screen.** *Withdrawn 5 Nov:* the old iPhone body-cam drew the camera's live picture under its controls, but behind an 85%-black layer, so it couldn't really be seen (the owner never noticed it). The new recorder draws no picture, as Android never did. Nothing changes for the user.
+- [x] (Fix round 1) **Bug mode, continuous too?** *Answered 6 Nov:* yes, like body-cam (iPhone: the cut-off-safe AAC writer; witness texts, at most every 10 minutes, carry the latest checkpoint). Built in #20; SPEC E8.
+- [x] (Fix round 1) **Camera research (group 4).** Switching between front and back during one video needs the app's own iPhone recorder (about 400–700 lines of Swift, medium risk) and, on Android, either an undocumented hand-over (high risk) or a GPU step (600–1,000 more lines). Dual capture is a larger separate feature (1,000–2,000 lines per platform, high risk, newer phones only). Build either, and when? Details in "Group 4" above. *Answered 6 Nov:* no camera switching during a video and no front-and-back capture, for now (SPEC E1).
+- [x] (Fix round 1) **No playback while recording.** Group 3 lets nothing play while Saakshi is recording (for example, bug mode in the background), so the recording doesn't pick the playback up, and iPhone doesn't take the microphone from the recorder. The player says so. Is that right, or should playback be allowed (on Android, where the microphone isn't taken)? *Answered 6 Nov:* kept as built (SPEC E5).
+- [x] (Fix round 1) **Bug mode and the 3% auto-save.** You decided on 22 Oct that bug mode has no 3% auto-save, because its pieces were short and a dying battery lost at most the piece being recorded. With one file, a dying battery now leaves that one file cut off: it still plays up to the cut, its checkpoints prove all but about the last 10 seconds, and it is sealed as interrupted when the app next opens. Keep it so, or add the 3% stop-and-save that body-cam has (which would end bug mode cleanly at 3%, before the phone dies)? I've kept your 22 Oct decision until you answer. *Answered 6 Nov:* superseded. There is no 3% stop for any mode; at 5% body-cam and Pocket recording close the file and a new one continues, and the evidence camera never stops by itself (SPEC E1, Low battery; bundle spec 0.9).
+- [ ] (Fix round 1) **Export (group 9): three things built so.** (1) A bug-mode or other sound-only record's button is "Share sound". (2) An evidence-camera record with several photos or videos shares each from its own card, since the share sheet takes one file. (3) The bundle's file and folder names are in English in both languages of the app. Right, or change any?
+- [ ] (Fix round 1) **README and the review session's walkthrough (group 9).** The walkthrough isn't in the repository, so the bundle's README (English and Hindi) couldn't be checked against it. Please compare them, or point me to the walkthrough.
+- [x] (Round 2) **Wording review.** *Answered 6 Nov:* all wording (English and Hindi, legal and ordinary) is reviewed together in one later test round, in one or more passes. Strings marked NEEDS OWNER REVIEW are collected, not reviewed one by one.
+- [ ] (Round 2, review session) **Built so, please confirm.** (1) The secret code can be reset with the phone's passcode only while nothing is running (otherwise whoever holds the phone and its passcode could reset it and switch off "My phone is being taken"). (2) "Cannot be stopped" is worded as "can only be stopped in Saakshi with the code", because force-quit, switch-off and airplane mode remain. (3) The silence alarm's heartbeat is separate from location updates; it says the phone has stopped reporting, not that anything has happened; and a "reporting again" message follows. (4) SMS contacts get no text from the silence alarm (our server sends no SMS; a gateway costs money and needs DLT registration): only those who open the link see it. (5) Body-cam uploads use the same lengthening schedule as Pocket recording. (6) The recordings link is public to whoever holds it, set only for shares the user starts. (7) Notifications go directly through Apple and Google from our own server, not through Expo's push service. (8) Positions to Saakshi contacts are end-to-end encrypted; the live link for SMS contacts stays readable by our server, as today.
+- [x] (Round 2) **Secret code reset: a face or fingerprint also works.** The phone's own prompt accepts Face ID or Touch ID (iPhone) and a fingerprint or face (Android) when they are set up, as well as the passcode (group 1.2, "What each platform's prompt accepts"). iPhone has no passcode-only option; Android 11 and later does, but only with code of our own. I recommend leaving it as built: the reset is offered only while nothing is running, so it can't switch off anything running, and the walkthrough (Part 4) tells people to turn face and fingerprint unlock off. Or should Android ask for the screen lock only? *Answered 9 Nov:* the phone's passcode only, never a face or fingerprint, on both platforms (group 1.6).
+- [x] (Round 2) **A Stop when no code is set** (built so): the code screen asks the user to set a code first, and setting it lets the Stop go through. Right? (The alternative, refusing the Stop, would leave a recording that can't be stopped in the app.) *Answered 9 Nov:* yes, as built.
+- [x] (Round 2) **The waits follow the phone's clock.** Setting the clock forward ends a wait early; setting it back restarts it. Accept? I recommend yes: it needs the phone unlocked, and without the internet an app can't know the true time. *Answered 9 Nov:* accepted, as built.
+- [x] (Round 2) **A phone with no screen lock** can't reset a forgotten code; the screen says to set a passcode first. Right? *Answered 9 Nov:* such a phone gets a recovery code when the secret code is set (group 1.6, SPEC 5.3).
+- [x] (Round 2) **"My phone is being taken" after setting a code** (built so): if no code is set, the swipe asks for one, and once it is set the mode starts at once, since the swipe already said what the user wants. Right, or should it ask for a second swipe? *Answered 9 Nov:* yes, as built.
+- [x] (Round 2) **Stopping "My phone is being taken" stops everything it runs**, including a Pocket recording or a location share that was already running before it started (built so). Right? *Answered 9 Nov:* yes, as built.
+- [x] (Round 2) **Battery level with each position, not as a new argument to `live_push`** (group 1.4). The brief says "an optional argument to `live_push`". A new argument would mean replacing the function in a way that, for a while, stops the app already on phones from sending positions, so the level travels inside each position instead. It does the same job, and stays with the right position when positions wait for signal. Right? *Answered 9 Nov:* inside the position is right; and the level is sent and shown only at 20% or less (group 1.6).
+- [x] (Round 2) **Saving mode sends location every 5 minutes, but the phone still finds it every 30 seconds** (group 1.5). The brief says "location every 5 minutes". At 5% Saakshi is usually in the background, where it may not restart location updates at a slower rate (Android refuses to start a foreground service from the background; iPhone doesn't let an app start location updates there), and a failed restart would stop live location altogether. So positions are found as before and sent in one burst every 5 minutes, which saves the mobile radio but not the GPS. The saving isn't measured. I recommend keeping it as built and measuring on a phone first. Or should the app also try the slower rate when it happens to be on screen at 5%? *Answered 9 Nov:* keep as built and measure on a phone; slow the GPS only if that can't stop live location (group 1.6).
+- [x] (Round 2) **Plugging in at 5% doesn't start a new file** (group 1.5, built so). Saving mode ends and the next file is at the normal quality, but body-cam is one continuous file, so the 480p file carries on until the user stops, or until a later handover. I recommend leaving it: a plug-in can be brief, and each new file is another short gap on Android. Or should plugging in start a normal-quality file at once? *Answered 9 Nov:* yes, as built.
+- [x] (Round 2) **The "battery at 5%" text to contacts goes only from the Android APK** (group 1.5, built so). On iPhone and the Play Store build, a text needs a tap on Send, and at 5% the phone is usually locked; the live page says it instead. Right? *Answered 9 Nov:* as built for texts (iPhone lets no app send a text without the user's tap; the Play build waits for Google's SMS permission). Contacts who have Saakshi get it as a notification (owner, 9 Nov; group 3.1), and the Play build texts it once Google grants the SMS permission.
+- [x] (Round 2) **Android 7 to 10: no way to reset a forgotten code** (group 1.6). Those versions can't ask for the screen lock alone: their only system screen for it also takes a fingerprint (and on Android 10 a face), and an app can't turn that off. Built so: such a phone with a screen lock has no reset, and Saakshi says so before a code is chosen and on "Forgot the code?". Someone who forgets the code there can't stop anything running, and can't change or remove the code. I recommend giving these phones the recovery code, as for a phone with no screen lock: it weakens nothing, sends nothing, and is a one-line change (`resetMethodFor` in `src/modules/secretcode/reset.ts`). Yes? *Answered 9 Nov:* yes, those phones get the recovery code (group 1.7, item 8).
+- [x] (Round 2) **iPhone saving mode's location: about 100 m** (group 1.6, built so). In saving mode the running updates go to about 100 m accuracy and a new position after about 100 m moved, back to 10 m and 20 m when it ends. iOS has no time interval to slow, only the accuracy and distance, and the accuracy is what lets it leave the GPS off. Contacts then see a coarser position at 5% battery. Right, or keep the GPS's accuracy and send every 5 minutes only? *Answered 9 Nov:* keep full accuracy and send every 5 minutes; revisit after a phone test (group 1.7, item 8).
+- [ ] (Round 2) **Say that Saakshi's lock needs the PIN, not a fingerprint?** On Android, after Saakshi locks the screen through device admin, the next unlock needs the phone's PIN, pattern or password; a fingerprint or face doesn't work until it is entered (AOSP, group 1.7). That helps someone whose phone is taken. I recommend that the opt-in explanation says so only after your Android phone test confirms it, since makers' versions of Android may differ. Add it then?
+- [ ] (Round 2) **How the Play listing describes the phone lock.** Play's Malware policy names device admin "so that it can't be removed by a typical user" and "Apps that abuse features to prevent them from being uninstalled or stopped" (group 1.7). SPEC 5.4 says the lock is "so that force-quitting or deleting Saakshi needs the phone's passcode". I recommend that the listing and the review notes describe it only as locking the screen when the user starts "My phone is being taken", opt-in and switched off in Saakshi in one tap, never as a way to stop Saakshi being deleted. Right?
 - [ ] (Stream C) **Helpline list updates.** The Help tab fetches `helplines/helplines.json` from raw.githubusercontent.com each time it opens (a plain GET; nothing of the user's is sent, but GitHub sees the phone's IP address). Keep it automatic, or only on a "Check for updates" tap? And should the list be signed, so that a compromised `main` branch can't change numbers on every phone? Today it is only schema-checked.
 - [ ] (Stream C) **Lawyers and medics list.** The schema (`src/modules/helplines/schema.ts`, `helplines/README.md`) shows name, phone, city, state and languages, and records the registration number, consent date and an expiry (`listedUntil`) in the public file. Is publishing the registration number right, or should it be checked and kept off GitHub? Who collects the written consent, and where is it kept?
 - [ ] (Stream C) **"What police may ask of a phone"** (SPEC G5) is left out of the guide: `docs/research/law.md` has nothing on demands to unlock a phone or give a passcode. It needs its own research from statutes and judgments first. Shall I do that next?
@@ -60,6 +966,14 @@ Things that must be done or decided before a release goes public. Streams add it
 - [ ] (Stream D, beta) **Dependency audit:** `npm ci` reports 61 known vulnerabilities in build tools. Triage which, if any, reach the app; don't run `npm audit fix --force`.
 - [ ] (Stream D, beta) **TestFlight public link** (Apple's beta review) and **Play closed test** (12 or more testers for 14 days).
 - [ ] (Review, beta) **Rights and safety guides (G1, G2):** the owner decides whether they join the beta.
+- [ ] (Round 2, release) **Device admin on Android (group 1.7):** say in the Play listing and the review notes why Saakshi asks for it (force-lock only, opt-in, switched off in Settings), and in the privacy policy that it reads nothing. If Play's review objects, the Play build can ship without it. Play's rules that touch it (Malware: Ransomware and Elevated Privilege Abuse; Deceptive Device Settings Changes) are quoted in "Group 1.7"; describe it as locking the screen, never as stopping Saakshi being deleted (question in "Owner questions").
+- [ ] (Round 2, release) **Power-off lock requests.** Draft and file the requests to Apple (Feedback Assistant), Google and phone makers asking for a power-off lock; the release notes say a power-off lock is an essential safety feature, which phones offer it, that we have asked, and how readers can ask too (SPEC G5). **At release, not now.**
+- [ ] (Round 2, release, start early) **Google Play's SMS permission:** apply under "Apps that send SMS alerts in emergency situations" so the Play version sends by itself.
+- [ ] (Round 2, release, start early) **Google's review of email sending** (after round 2, for email contacts).
+- [ ] (Round 2, release, start early) **Apple Critical Alerts entitlement** (to sound through Do Not Disturb); time-sensitive notifications are used until then.
+- [ ] (Round 2, release) **Privacy policy, Apple privacy label and Play Data safety:** add every channel and what passes through our server (Saakshi-to-Saakshi, the silence alarm's check-ins, Google Drive), from `docs/spec/alerts.md` section "privacy-policy facts".
+- [ ] (Round 2, beta) **Supabase plan.** The server now carries a safety feature (the silence alarm); the free plan's pausing of quiet projects is unacceptable for the beta. Move `saakshi-live` to Pro before the beta, not only before the public release.
+- [ ] (Round 2, release) **Google Cloud OAuth:** publish the consent screen out of "Testing" so Drive tokens last past a week.
 
 ---
 
@@ -174,12 +1088,12 @@ None of it has run on a phone yet.
   - Data still in memory when the phone goes off (typically under a second) is lost; a dead battery normally shuts the phone down cleanly, and step 4's auto-save at 3% avoids that case.
 - **Interrupted files** (both platforms): a marker in the session's `pending/` folder is written when recording starts and removed once the file is in the locker. When the app opens (Record tab), any marker left behind is sealed: hashed as it is, chained after the session's last file, with `interrupted: true` and `endReason: "interrupted"` in the record (spec 0.2, section 3). On iPhone the marker can't name the file in advance (expo-camera reports the path only when it stops), so recovery takes the first `.mov` in expo-camera's cache folder created after the recording started. iOS may empty that cache folder when storage is very low, which would lose the file.
 
-**Body-cam mode (B1–B4): how it works and every platform limit found (21 Oct).** Record tab → "Body-cam mode". The first time, the user must acknowledge how to unlock before Start is enabled. Pieces are 60 seconds (`BODYCAM_PIECE_SECONDS`), 720p by default with 1080p as an option, and are sealed through `createEvidenceSession()`. Nothing is uploaded in R1.
+**Body-cam mode (B1–B4): how it works and every platform limit found (21 Oct).** Record tab → "Body-cam mode". The first time, the user must acknowledge how to unlock before Start is enabled. Since fix round 1, group 2a, one continuous file from Start to Stop with signed checkpoints every 10 seconds (it was 60-second pieces); 720p by default with 1080p as an option, sealed through `createEvidenceSession()`. Nothing is uploaded in R1.
 
 - **Reading the volume buttons:**
-  - *Android, screen on:* key events reach the app's window while it is on screen. `VolumeKeys.kt` wraps the window's callback while the lock is showing, takes volume-down presses, and swallows both volume keys so the volume doesn't change.
+  - *Android, screen on:* key events reach the app's window while it is on screen. `VolumeKeys.kt` wraps the window's callback while the lock is showing, takes volume-up presses (volume-down before fix round 1, group 2), and swallows both volume keys so the volume doesn't change.
   - *Android, screen off:* apps get no key events. Volume keys go to the system, or to an active media session that takes remote volume handling ([`MediaSession.setPlaybackToRemote`](https://developer.android.com/reference/android/media/session/MediaSession): "This must be called to receive volume button events"). That would mean presenting a fake playing media session, so it isn't used. Unlocking needs the dark screen (which is on, at minimum brightness). If the user turns the screen off, recording carries on and they unlock the phone as usual.
-  - *iPhone, iOS 17.2+:* [`AVCaptureEventInteraction`](https://developer.apple.com/documentation/avkit/avcaptureeventinteraction): "The system sends capture events only to apps that actively use the camera. Backgrounded capture apps … don't receive events." Volume down is a "primary" event (WWDC 2025 session 253), and so are the **Action button and Camera Control**: pressing either twice also unlocks.
+  - *iPhone, iOS 17.2+:* [`AVCaptureEventInteraction`](https://developer.apple.com/documentation/avkit/avcaptureeventinteraction): "The system sends capture events only to apps that actively use the camera. Backgrounded capture apps … don't receive events." Volume down is a "primary" event (WWDC 2025 session 253), and so are the **Action button and Camera Control** (and AirPods clicks from iOS 26). Since fix round 1, group 2, only volume-up (the "secondary" event) unlocks, and the primary buttons do nothing while the lock shows.
   - *iPhone, iOS 16.4–17.1:* no public API reads the buttons. The fallback watches the system output volume and counts each decrease as a press, so it **does not work when the volume is already at zero**, and the presses do change the volume.
 - **Dark screen:** Android dims only Saakshi's window (no `WRITE_SETTINGS` permission; I removed expo-brightness, whose plugin would add it). iPhone sets the system brightness and restores the previous level on unlock; iOS also restores it when the phone locks. The screen stays on (keep-awake) so that it can be unlocked, which costs battery.
 - **Android foreground service** (`BodyCamService.kt`, types camera and microphone, partial wake lock):
@@ -188,18 +1102,16 @@ None of it has run on a phone yet.
   - Some makers' battery managers (Xiaomi, Oppo, Vivo and others) may stop background services. Test.
   - During a phone call Android may give the microphone to the call and silence other apps' recording; video continues. Not yet tested.
   - Google Play requires a declaration for camera and microphone foreground services (Stream D).
-- **iPhone:**
+- **iPhone** (rebuilt in fix round 1, group 1: see "Fix round 1" above; the old expo-camera and expo-audio design is gone from body-cam):
   - Apple allows video only while the app is on screen, as the spec says. Video pieces stop with `endReason: "app-left"` when the app leaves the screen, and a new clip starts on return; `gapBeforeMs` in the first piece's record gives the gap.
   - The screen warns about this before Start, and again whenever it is unlocked. iOS gives no notice before the user leaves an app, so a warning at the moment of leaving isn't possible.
-  - Sound is recorded separately (expo-audio, background recording, `.m4a` pieces). Each piece starts before the last stops, so there is no silence, and records show a small negative `gapBeforeMs` for the overlap.
-  - A phone call interrupts sound recording. That piece ends `audio-interrupted`, and a new piece starts at the next minute if iOS allows it, which needs testing.
-  - Video and sound are separate files in the same session, matched by their times.
+  - While the app is on screen, each video piece has its sound in the same file. Sound-only `.m4a` pieces are written only while video can't record.
   - There is no way to open the Low Power Mode setting directly, so the app explains where it is. On Android the button opens Battery Saver settings.
 - **Gaps between pieces:**
   - Android: about the time to stop one `MediaRecorder` and start the next.
-  - iPhone video: the time between one `recordAsync` ending and the next starting.
+  - iPhone: none between pieces (one writer ends on the frame where the next begins); the gap in the picture while the app is away is in the next video clip's `gapBeforeMs`.
   - Both are recorded in `gapBeforeMs` and are untested on phones.
-- **For Stream C:** the chest-mount guide (G4) should teach the unlock (volume down, twice). The lock message deliberately doesn't name the buttons.
+- **For Stream C:** the chest-mount guide (G4) should teach the unlock (volume up, twice, since fix round 1, group 2). The lock message deliberately doesn't name the buttons.
 - **Permissions:** `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, `SYSTEM_ALERT_WINDOW` and `VIBRATE` come from Expo's template and no feature uses them. All four are now blocked in every Android build through `ALWAYS_BLOCKED` in `app.config.ts`; Stream D had already blocked the first three, and I added `VIBRATE`, which nothing in the app uses and no library declares. `POST_NOTIFICATIONS` stays, for body-cam's notice.
 
 **Android videos: the original and its MP4 copy (owner decision of 22 Oct).** The `.ts` from the camera stays the original: the chain, the export bundle and the certificate use only it.
@@ -224,7 +1136,7 @@ None of it has run on a phone yet.
 - the same on iPhone, with a recording longer than 10 seconds;
 - body-cam with the screen off on Android, through a phone call;
 - body-cam on iPhone leaving and returning to the app;
-- volume-down unlock on each platform, including iOS 16 and 17.0–17.1;
+- volume-up unlock on each platform, including iOS 16 and 17.0–17.1;
 - the 10%, 5% and 3% battery points.
 
 Kotlin and Swift compile only on GitHub's runners (Native build workflow).
@@ -287,7 +1199,7 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
   - Settings at SOS → Quick trigger: set the code, and choose what it does (SOS alert, or confiscation mode).
   - **Android:** a home-screen widget and an optional ongoing notification ("Open code pad"), both opening `saakshi://codepad`. The notification comes back after a restart and in the current language when the app opens.
   - **iPhone:** a widget extension (`targets/widget`, built by `@bacons/apple-targets`, MIT) with a Control Center, Lock Screen and Action Button control and a Lock Screen widget. An App Intent, "Open Saakshi code pad", is built into the app too, so it also appears in Shortcuts for Back Tap. It hands the request to the app through `modules/saakshi-sos` (`onOpenCodePad`, `consumeCodePadRequest`).
-- **E8, bug mode.** New module `@/modules/bugmode`; SOS → Bug mode.
+- **E8, bug mode.** New module `@/modules/bugmode`; SOS → Bug mode. *Since fix round 1 (#20) bug mode records one continuous file with checkpoints, on iPhone with its own recorder in place of `AudioPieces`, and its E7 hook is `setBugModePartListener()`; see "Bug mode: one continuous file, with checkpoints" under fix round 1. The pieces described here are how R2 built it.*
   - Pieces are 2 minutes long, recorded until stopped or the battery runs out, with the screen locked. Each is sealed through Stream A's pipeline with `capture.mode: "bug"` (spec 0.2).
   - **Android:** the app's own recorder in a microphone foreground service (`BugModeService`). It writes cut-off-safe AAC (`.aac`, ADTS), so a piece cut off by a dead battery plays up to the cut. It uses Stream A's crash-recovery markers, so a piece the app didn't seal (killed, phone off) is sealed when the app next opens.
   - **iPhone:** Stream A's `AudioPieces` (expo-audio background recording, two overlapping recorders, no silence between pieces), now taking a capture mode. There is also a Live Activity (Lock Screen and Dynamic Island) with a timer and the number of pieces saved.
@@ -306,7 +1218,7 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
 - `src/modules/evidence` changes in this pull request:
   - `AudioPieces` takes a `mode` (default `body-cam`).
   - The public API gains `startAudioPieces()`, `piecePaths()`, and the `CaptureMode` and `EndReason` types.
-- **E7:** call `setPieceUploader()` from `@/modules/bugmode` with the Drive upload. Bug mode then uploads each piece the moment it is sealed.
+- **E7:** call `setBugModePartListener()` from `@/modules/bugmode` with the Drive upload (it replaced `setPieceUploader()` in fix round 1). Bug mode then uploads each part, a byte range of its one file ending on a signed checkpoint, as soon as it exists.
 
 **For Stream D:**
 - **SMS flag:** `app.config.ts` and `modules/saakshi-sos/app.plugin.js` agree. Both use `SAAKSHI_SMS_AUTOSEND=1` and remove SEND_SMS otherwise. The app decides at run time from the built manifest, which comes to the same thing as `extra.smsAutoSend`.
@@ -314,6 +1226,7 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
 - **App Review notes:** I added an optional "R2 features" block to `store/apple/review-notes.md`, covering live location's server, background audio and location, the controls, and why the Location Always string exists though it is never requested. All blocks stay under 4000 bytes (checked by the store tests).
 - **Privacy label, Play Data safety and privacy policy for an R2 build.** The policy says it will be updated before live location ships. The facts:
   - Positions (precise location) go to our Supabase server (Mumbai) only while the user shares, for App Functionality, and are deleted when sharing stops or after at most 24 hours.
+    - **Round 2 changes these facts** (groups 1.3 and 1.4): a "My phone is being taken" share has no fixed end. It is kept while the phone reports and deleted a week after its last position, or when it is stopped with the code. And each position now carries the battery level when the phone sent it, shown to whoever has the link. Both need to be in the privacy texts. The optional R2 block in `store/apple/review-notes.md` still says "after 24 hours at most"; it needs the same change before it is used.
   - There is no account and nothing that identifies the user: the share is a random id and token.
   - Supabase's request logs probably record the phone's IP address for their own retention period. I have not checked that period.
   - Nothing else goes to us.
@@ -353,7 +1266,7 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
   - Controls need iOS 18; the extension targets iOS 18.0, so phones on iOS 16 or 17 get no widget, control or Live Activity, though everything in the app works.
   - The orange microphone dot and the Live Activity are visible to anyone holding the phone (spec E8 accepts this).
   - iOS ends a Live Activity after 8 hours; recording carries on.
-- **iPhone, background:** if the app is force-quit, iOS stops both bug mode and live location. A phone call takes the microphone; `AudioPieces` keeps the current piece and retries a piece later.
+- **iPhone, background:** if the app is force-quit, iOS stops both bug mode and live location. A phone call takes the microphone; since fix round 1 the file ends there (`"audio-interrupted"`) and a new one starts when the microphone comes back.
 - **Android, foreground services:**
   - Bug mode and live location must start while Saakshi is on screen (Android 14 forbids starting microphone and location services from the background). The code pad and confiscation mode are on screen, so they can; the widget alone can't start recording.
   - Without notification permission (Android 13+), the recording and sharing notifications show only in the Task Manager.
@@ -377,7 +1290,7 @@ Kotlin and Swift compile only on GitHub's runners (Native build workflow).
 
 **Next:**
 - Phone testing of R1 and R2; fix what it finds.
-- After E7 lands, check the Drive upload through `setPieceUploader()`.
+- After E7 lands, check the Drive upload through `setBugModePartListener()`.
 - v1.1: WhatsApp, Signal and Telegram for alerts and live links.
 
 **Start prompt** (model Opus, effort high):

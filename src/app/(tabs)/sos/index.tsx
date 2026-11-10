@@ -1,11 +1,15 @@
-import { SosHome, useTrustedContacts } from '@/modules/sos';
-import { ConfiscationCard } from '@/modules/trigger';
+import { SosHome } from '@/modules/sos';
+import { PhoneTakenStatus, PhoneTakenSwipe, usePhoneTaken } from '@/modules/trigger';
 
 export default function SOSScreen() {
-  const contacts = useTrustedContacts();
+  // "Now lock your phone" puts the running card first (round 2, group 1.7).
+  const { lockReminder } = usePhoneTaken();
   return (
-    <SosHome>
-      <ConfiscationCard hasContacts={contacts.length > 0} />
-    </SosHome>
+    <SosHome
+      first={<PhoneTakenStatus at="first" />}
+      firstShown={lockReminder}
+      phoneTaken={<PhoneTakenSwipe />}
+      running={<PhoneTakenStatus at="normal" />}
+    />
   );
 }

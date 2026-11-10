@@ -1,19 +1,11 @@
 {
   "title": "SOS",
-  "intro": "Alert your trusted contacts with your location. Saakshi is not an emergency service.",
   "call112": "Call 112",
   "call112Hint": "Calls India's emergency number",
   "setup": {
-    "heading": "Choose who to alert",
-    "body": "Add the people you trust. When you send an alert, each of them gets a text message with where you are and the time.",
     "add": "Add trusted contacts"
   },
   "alert": {
-    "button": "Alert my trusted contacts",
-    "hintDirect_one": "Texts {{count}} contact 3 seconds after you tap. You can cancel.",
-    "hintDirect_other": "Texts {{count}} contacts 3 seconds after you tap. You can cancel.",
-    "hintComposer_one": "Opens your SMS app with the message to {{count}} contact. Tap Send there.",
-    "hintComposer_other": "Opens your SMS app with the message to {{count}} contacts. Tap Send there.",
     "countdown_one": "Texting your contacts in {{count}} second…",
     "countdown_other": "Texting your contacts in {{count}} seconds…",
     "sendNow": "Send now",
@@ -40,7 +32,13 @@
     "noLocation": "My location: not available",
     "sent": "Sent",
     "live": "Live location",
-    "liveInvite": "Saakshi: follow my live location until {{time}}: {{link}}"
+    "accuracy": "within {{meters}} m",
+    "battery": "Battery: {{percent}}%",
+    "shareUntil": "I'm sharing my location with you until {{time}}.",
+    "shareOpen": "I'm sharing my location with you until I stop.",
+    "shareBattery": "Battery {{percent}}%.",
+    "shareFollow": "Follow it here: {{link}}",
+    "saving": "Saakshi: my battery is at 5%. To save power, my location now updates every 5 minutes."
   },
   "contacts": {
     "title": "Trusted contacts",
@@ -61,7 +59,20 @@
     "invalid": "That doesn't look like a phone number.",
     "duplicate": "That number is already on the list.",
     "full": "The list is full. Remove someone to add another.",
-    "pickFailed": "Your contacts couldn't be opened: {{detail}}"
+    "pickFailed": "Your contacts couldn't be opened: {{detail}}",
+    "usesIntro": "Tick what each person gets. Everything is ticked for someone new.",
+    "usesLabel": "What {{name}} gets",
+    "usesNone": "Nothing is ticked: this person gets no messages from Saakshi.",
+    "uses": {
+      "sos": "SOS alerts",
+      "live": "Live location",
+      "witness": "Witness messages"
+    },
+    "methodHeading": "How they're reached",
+    "methodLabel": "How {{name}} is reached",
+    "methods": {
+      "sms": "Text message (SMS)"
+    }
   },
   "direct": {
     "heading": "Send with no tap",
@@ -82,7 +93,6 @@
   "live": {
     "heading": "Live location",
     "body": "Your trusted contacts get a link that shows where you are in any browser, until you stop. Your location goes to Saakshi's server only while sharing is on, and is deleted when it stops.",
-    "duration": "Share for",
     "hours_one": "{{count}} hour",
     "hours_other": "{{count}} hours",
     "start": "Share my live location",
@@ -100,85 +110,120 @@
     "noticeBody": "Your trusted contacts can see where you are until you stop."
   },
   "bug": {
-    "title": "Bug mode",
-    "intro": "Bug mode records sound, for your own records, until you stop it or the battery runs out. It carries on with the screen locked. The sound is saved in pieces of 2 minutes, and each piece is fingerprinted and signed as it is saved.",
+    "title": "Pocket recording",
+    "intro": "Pocket recording records sound only, like a body-cam for sound, with the phone in your pocket or bag. It is for your own records, and carries on until you stop it or the battery runs out, with the screen locked too. The sound is saved as one file. About every 10 seconds, what has been recorded so far is fingerprinted and signed, so if the recording is cut off suddenly, it is still proven up to then.",
     "iosNote": "While it records, iPhone shows a dot at the top of the screen and a Live Activity on the Lock Screen.",
     "androidNote": "While it records, Android shows a notification.",
-    "witnessOn": "After a piece is saved, its fingerprint is texted to your trusted contacts, at most once every 10 minutes. Each fingerprint also vouches for every piece before it.",
+    "witnessOn": "The latest fingerprint is texted to your trusted contacts, at most once every 10 minutes. Each fingerprint also vouches for everything recorded before it.",
     "witnessOff": "On this phone the fingerprints are not texted by themselves. You can send a witness message from the Record tab.",
-    "localNote": "The pieces stay on this phone, in the Record tab.",
-    "start": "Start bug mode",
-    "stop": "Stop bug mode",
+    "localNote": "The recording stays on this phone, in the Record tab.",
+    "start": "Start Pocket recording",
+    "stop": "Stop Pocket recording",
     "recording": "Recording since {{time}}.",
-    "pieces_one": "{{count}} piece saved and signed.",
-    "pieces_other": "{{count}} pieces saved and signed.",
-    "failed_one": "{{count}} piece could not be signed; it is kept as it is.",
-    "failed_other": "{{count}} pieces could not be signed; they are kept as they are.",
+    "checkpoints_one": "{{count}} checkpoint signed, the last at {{time}}.",
+    "checkpoints_other": "{{count}} checkpoints signed, the last at {{time}}.",
+    "noCheckpointYet": "The first checkpoint is signed about 10 seconds after Start.",
+    "failed_one": "{{count}} file could not be signed; it is kept as it is.",
+    "failed_other": "{{count}} files could not be signed; they are kept as they are.",
+    "problem": "Problem at {{time}}: {{detail}}",
     "witnessed": "Last fingerprint texted at {{time}}.",
-    "micDenied": "Saakshi needs microphone permission for bug mode.",
-    "error": "Bug mode could not start: {{detail}}",
+    "micDenied": "Saakshi needs microphone permission for Pocket recording.",
+    "error": "Pocket recording could not start: {{detail}}",
     "noticeTitle": "Saakshi is recording sound",
-    "noticeText": "Bug mode is on. Open Saakshi to stop it.",
+    "noticeText": "Pocket recording is on. Open Saakshi to stop it.",
     "activityTitle": "Recording sound",
-    "activityStarting": "Bug mode is on",
-    "activityPieces_one": "{{count}} piece saved",
-    "activityPieces_other": "{{count}} pieces saved",
-    "witness": "Saakshi bug mode: piece {{n}}, {{from}} to {{to}}, saved and signed. SHA-256: {{hash}}"
-  },
-  "pad": {
-    "title": "Code",
-    "prompt": "Enter your code",
-    "entered": "{{count}} of 3 entered",
-    "delete": "Delete",
-    "close": "Close",
-    "noCode": "No code has been set yet. Set one first, so this pad can send your alert.",
-    "setCode": "Set a code"
+    "activityStarting": "Pocket recording is on",
+    "activitySigned": "Signed up to {{time}}",
+    "witness": "Saakshi pocket recording: recording since {{from}}, signed up to {{to}}. SHA-256: {{hash}}"
   },
   "trigger": {
     "title": "Quick trigger",
-    "intro": "Open a code pad in one step from outside the app, and send your alert by typing a 3-digit code. The alert goes out on the third correct digit. A wrong code does nothing.",
-    "codeHeading": "Your code",
-    "codeSet": "A code is set.",
-    "codeLabel": "New 3-digit code",
-    "codeHint": "Not an emergency number such as 100, 108 or 112",
-    "save": "Save code",
-    "remove": "Remove code",
-    "format": "The code must be exactly 3 digits.",
-    "emergency": "That is an emergency or helpline number. Choose a different code.",
-    "saved": "Code saved.",
-    "actionHeading": "When the code is typed",
-    "actionAlert": "Send the SOS alert",
-    "actionConfiscation": "Start confiscation mode (alert, live location and bug mode)",
-    "openHeading": "How to open the code pad",
+    "intro": "Open Saakshi's SOS screen in one step from outside the app: from the Lock Screen, a button or a widget. No code is typed. On the SOS screen, you swipe the action you want.",
+    "openHeading": "How to open the SOS screen",
     "iosControl": "Control Center or Lock Screen: edit it, add a control, and choose Saakshi quick alert.",
     "iosAction": "Action Button (iPhone 15 Pro and later): Settings, Action Button, Controls, Saakshi quick alert.",
     "iosWidget": "Lock Screen widget: edit the Lock Screen and add Saakshi quick alert.",
-    "iosBackTap": "Back Tap: in the Shortcuts app make a shortcut with Open Saakshi code pad, then choose it in Settings, Accessibility, Touch, Back Tap.",
-    "iosFaceId": "From a locked iPhone, iOS may ask for Face ID or your passcode before the pad opens.",
+    "iosBackTap": "Back Tap: in the Shortcuts app make a shortcut with Open Saakshi SOS, then choose it in Settings, Accessibility, Touch, Back Tap.",
+    "iosLocked": "From a locked iPhone, iOS may ask for Face ID or your passcode before the SOS screen opens.",
     "androidWidget": "Home-screen widget: touch and hold the home screen, choose Widgets, and add Saakshi quick alert.",
-    "androidNotification": "Keep a quick-alert notification",
-    "androidNotificationOn": "The notification is on. Its button opens the code pad.",
+    "androidNotification": "Keep a quick notification",
+    "androidNotificationOn": "The notification is on. Tapping it opens the SOS screen.",
     "androidNotificationOff": "Show it",
     "androidNotificationHide": "Hide it",
-    "androidLocked": "From a locked phone, Android asks you to unlock before the pad opens.",
+    "androidLocked": "From a locked phone, Android asks you to unlock before the SOS screen opens.",
     "notificationTitle": "Saakshi quick alert",
-    "notificationText": "Tap to open the code pad.",
-    "notificationAction": "Open code pad",
-    "try": "Open the code pad"
+    "notificationText": "Tap to open the SOS screen.",
+    "notificationAction": "Open SOS",
+    "try": "Open the SOS screen"
   },
-  "confiscation": {
-    "title": "Confiscation mode",
-    "intro": "Before you hand your phone over, start everything at once: your SOS alert with a live location link goes to your trusted contacts, and bug mode records sound. Each part can also be started on its own above.",
-    "biometrics": "Saakshi can't lock your phone. Turn off Face ID or fingerprint unlock first; see the preparedness guide.",
-    "start": "Start confiscation mode",
-    "confirmTitle": "Start confiscation mode?",
-    "confirmBody": "This sends your SOS alert, shares your live location and starts recording sound.",
-    "confirm": "Start",
-    "running": "Running:",
-    "partAlert": "SOS alert sent",
-    "partLive": "Live location on",
-    "partBug": "Bug mode recording",
-    "partFailed": "{{part}}: did not start",
-    "stopAll": "Stop live location and bug mode"
+  "home": {
+    "call112Confirm": {
+      "title": "Call 112?",
+      "body": "Your phone will call 112, India's emergency number."
+    },
+    "help": "I need help",
+    "helpDetail": "Alerts your trusted contacts",
+    "helpConfirm": {
+      "title": "Alert your trusted contacts?",
+      "body": "The people you ticked for SOS alerts get a text with the time and your location. Saakshi is not an emergency service: for the police, an ambulance or the fire service, call 112.",
+      "action": "Send the alert"
+    },
+    "share": "Share my location",
+    "noLive": "Nobody is ticked for live location. Choose who gets it in Settings, Trusted contacts.",
+    "noContacts": "You have no trusted contacts for SOS alerts yet.",
+    "quickTrigger": "Quick trigger setup"
+  },
+  "taken": {
+    "label": "My phone is being taken",
+    "detail": "Records sound, shares your location, alerts your contacts",
+    "confirm": {
+      "title": "Start \"My phone is being taken\"?",
+      "body": "Saakshi records sound, shares your location until you stop it, and sends your SOS alert to your trusted contacts. It can only be stopped in Saakshi with your secret code.",
+      "action": "Start"
+    },
+    "needsCode": {
+      "heading": "A secret code is needed first",
+      "body": "\"My phone is being taken\" can only be stopped in Saakshi with your secret code, so it can't start until you have one. Set it now; then this starts.",
+      "set": "Set a secret code"
+    },
+    "on": "\"My phone is being taken\" is on",
+    "since": "Since {{time}}.",
+    "pocketOn": "Sound is being recorded (Pocket recording).",
+    "pocketStarting": "Sound recording is starting…",
+    "pocketFailed": "Sound recording couldn't start: {{detail}}",
+    "retryPocket": "Try recording again",
+    "liveOn": "Your location is being shared until you stop it.",
+    "liveStarting": "Location sharing is starting…",
+    "liveFailed": "Location sharing couldn't start: {{detail}}",
+    "retryLive": "Try sharing again",
+    "alertSending": "Your SOS alert is being sent…",
+    "alertSent": "Your SOS alert went to your trusted contacts.",
+    "alertFailed": "Your SOS alert couldn't be sent: {{detail}}",
+    "stopNote": "It can only be stopped in Saakshi with your secret code.",
+    "stop": "Stop",
+    "pocketOff": "Sound recording has stopped.",
+    "liveOff": "Location sharing has stopped.",
+    "remind": {
+      "title": "Now lock your phone",
+      "ios": "Press the side button.",
+      "android": "Press the power button.",
+      "carriesOn": "Sound recording and location sharing carry on with the screen locked."
+    }
+  },
+  "lock": {
+    "title": "Lock the phone",
+    "heading": "Lock the phone when \"My phone is being taken\" starts",
+    "what": "When you swipe \"My phone is being taken\", Saakshi first starts recording sound, sharing your location and sending your alert. Then it locks the screen, as the power button does. You unlock it as usual.",
+    "nothingElse": "This permission lets Saakshi lock the screen and nothing else: it can't erase your phone or change your screen lock.",
+    "deleting": "While it is on, Android asks for it to be switched off before Saakshi can be deleted.",
+    "offHere": "You can switch it off here at any time, in one tap. It can also be switched off in your phone's settings.",
+    "offInSaakshi": "You can switch it off in Saakshi's Settings at any time, in one tap, or in your phone's settings.",
+    "androidScreen": "Next, Android shows its own screen to confirm. To switch this on, choose to activate it there.",
+    "on": "On. Saakshi locks the screen when \"My phone is being taken\" starts.",
+    "off": "Off. When \"My phone is being taken\" starts, Saakshi asks you to lock the phone yourself.",
+    "switchOn": "Switch on",
+    "switchOff": "Switch off",
+    "failed": "That didn't work. Please try again.",
+    "open": "Open"
   }
 }

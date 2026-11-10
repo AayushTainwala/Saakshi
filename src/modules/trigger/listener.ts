@@ -5,7 +5,10 @@ import { AppState, Platform } from 'react-native';
 
 import i18n from '@/i18n';
 
-/** The Android quick-alert notification's words, in the app's language. */
+/** Where every quick trigger lands: the SOS screen with its three swipes (SPEC 5.1). */
+export const SOS_ROUTE = '/sos';
+
+/** The Android quick notification's words, in the app's language. */
 export function quickNotificationText(): { title: string; text: string; action: string } {
   return {
     title: i18n.t('sos:trigger.notificationTitle'),
@@ -15,10 +18,11 @@ export function quickNotificationText(): { title: string; text: string; action: 
 }
 
 /**
- * Opens the code pad when a trigger outside the app's screens asks for it. Android's widget and
- * notification open saakshi://codepad, which the router handles by itself; iPhone's controls,
- * Action Button and Shortcut run an App Intent, which the native module passes on here.
- * Also puts the Android notification back (in the current language) if the user had it on.
+ * Opens the SOS screen when a trigger outside the app's screens asks for it (round 2: no code is
+ * typed to trigger). Android's widget and notification open saakshi://sos, which the router handles
+ * by itself; iPhone's controls, Action Button and Shortcut run an App Intent, which the native
+ * module passes on here. Also puts the Android notification back (in the current language) if the
+ * user had it on.
  */
 export function useQuickTriggers(): void {
   useEffect(() => {
@@ -33,11 +37,11 @@ export function useQuickTriggers(): void {
       return;
     }
 
-    const open = () => router.push('/codepad');
-    if (native.consumeCodePadRequest()) open();
-    const event = native.addListener('onOpenCodePad', open);
+    const open = () => router.navigate(SOS_ROUTE);
+    if (native.consumeSosRequest()) open();
+    const event = native.addListener('onOpenSos', open);
     const appState = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && native.consumeCodePadRequest()) open();
+      if (state === 'active' && native.consumeSosRequest()) open();
     });
     return () => {
       event.remove();

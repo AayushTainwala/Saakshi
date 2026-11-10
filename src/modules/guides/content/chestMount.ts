@@ -45,12 +45,12 @@ export const chestMount: Guide = {
               hi: 'जब ऐप कहे, तो बैटरी सेवर (Android) या लो पावर मोड (iPhone) चालू करें।',
             },
             {
-              en: 'To unlock the screen, press volume-down twice. The locked screen does not say which buttons to press, so that someone who picks up your phone is not shown how. Remember it, and practise it once at home.',
-              hi: 'स्क्रीन खोलने के लिए वॉल्यूम कम करने वाला बटन दो बार दबाएँ। लॉक स्क्रीन पर यह नहीं लिखा होता कि कौन-से बटन दबाने हैं, ताकि आपका फ़ोन उठाने वाले को पता न चले। इसे याद रखें, और घर पर एक बार आज़मा लें।',
+              en: 'To unlock the screen, press volume-up twice. The locked screen does not say which buttons to press, so that someone who picks up your phone is not shown how. Saakshi asks you to practise it before you first start, and you can practise again at any time.',
+              hi: 'स्क्रीन खोलने के लिए वॉल्यूम बढ़ाने वाला बटन दो बार दबाएँ। लॉक स्क्रीन पर यह नहीं लिखा होता कि कौन-से बटन दबाने हैं, ताकि आपका फ़ोन उठाने वाले को पता न चले। पहली बार शुरू करने से पहले साक्षी आपसे इसका अभ्यास करवाता है, और आप कभी भी फिर से अभ्यास कर सकते हैं।',
             },
             {
-              en: 'Video is saved in short pieces as it records, and each piece is fingerprinted and signed as it is saved. In this version, the pieces stay on your phone. You find them in the Record tab.',
-              hi: 'रिकॉर्ड होते-होते वीडियो छोटे-छोटे हिस्सों में सेव होता है, और हर हिस्से का फ़िंगरप्रिंट और हस्ताक्षर सेव होते ही बन जाता है। इस वर्ज़न में ये हिस्से आपके फ़ोन पर ही रहते हैं। ये आपको रिकॉर्ड टैब में मिलेंगे।',
+              en: 'Video is saved as one file from Start to Stop, and what has been recorded is fingerprinted and signed every 10 seconds while it records. In this version, the recording stays on your phone. You find it in the Record tab.',
+              hi: 'वीडियो \'शुरू करें\' से \'रोकें\' तक एक ही फ़ाइल में सेव होता है, और रिकॉर्ड होते समय हर 10 सेकंड पर, जितना रिकॉर्ड हो चुका है उसका फ़िंगरप्रिंट और हस्ताक्षर बनता है। इस वर्ज़न में रिकॉर्डिंग आपके फ़ोन पर ही रहती है। यह आपको रिकॉर्ड टैब में मिलेगी।',
             },
           ],
         },
@@ -62,8 +62,8 @@ export const chestMount: Guide = {
               hi: 'Android: स्क्रीन बंद होने पर भी, और कॉल लेते समय या दूसरे ऐप चलाते समय भी, रिकॉर्डिंग चलती रहती है।',
             },
             {
-              en: 'iPhone: video records only while Saakshi is on the screen. If you leave the app, or a call comes in, sound keeps recording and video starts again when you come back. Every gap is noted in the record.',
-              hi: 'iPhone: वीडियो तभी रिकॉर्ड होता है जब साक्षी स्क्रीन पर खुला हो। अगर आप ऐप से बाहर जाएँ या कॉल आए, तो आवाज़ रिकॉर्ड होती रहती है, और लौटने पर वीडियो फिर शुरू हो जाता है। हर रुकावट रिकॉर्ड में दर्ज होती है।',
+              en: 'iPhone: video records only while Saakshi is on the screen, with its sound in the same file. If you leave the app or lock the phone, sound keeps recording on its own, and video starts again, with sound, when you come back. A phone call pauses the sound. Every gap is noted in the record.',
+              hi: 'iPhone: वीडियो तभी रिकॉर्ड होता है जब साक्षी स्क्रीन पर खुला हो, और उसकी आवाज़ उसी फ़ाइल में रहती है। अगर आप ऐप से बाहर जाएँ या फ़ोन लॉक करें, तो आवाज़ अलग से रिकॉर्ड होती रहती है, और लौटने पर वीडियो आवाज़ के साथ फिर शुरू हो जाता है। फ़ोन कॉल के दौरान आवाज़ की रिकॉर्डिंग रुक जाती है। हर रुकावट रिकॉर्ड में दर्ज होती है।',
             },
             {
               en: 'Recording for a long time uses a lot of battery and storage. Carry a power bank and a short cable, free up space before you go, and keep the phone out of strong sun where you can, because a hot phone may stop recording.',

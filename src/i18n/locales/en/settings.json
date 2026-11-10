@@ -1,5 +1,18 @@
 {
   "title": "Settings",
+  "contacts": {
+    "heading": "Trusted contacts",
+    "none": "No one yet. Add the people who should get your alerts and your location."
+  },
+  "live": {
+    "heading": "Live-location length",
+    "body": "How long your location is shared each time you start sharing it, unless you stop sooner."
+  },
+  "trigger": {
+    "heading": "Quick trigger",
+    "body": "Open Saakshi's SOS screen straight from the Lock Screen, the Action Button, Back Tap, a widget or a notification.",
+    "open": "Set up the quick trigger"
+  },
   "language": {
     "heading": "Language",
     "system": "Phone's language",
@@ -11,6 +24,11 @@
     "system": "Same as phone",
     "light": "Light",
     "dark": "Dark"
+  },
+  "certificates": {
+    "heading": "Certificates",
+    "body": "Your name, address and the phone’s IMEI for Part A of the certificate under section 63(4)(c) of the Bharatiya Sakshya Adhiniyam, 2023. Kept only on this phone.",
+    "open": "Your details for certificates"
   },
   "about": {
     "heading": "About",

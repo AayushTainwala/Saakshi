@@ -1,7 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { router } from 'expo-router';
 import { Linking } from 'react-native';
 
 import { initI18n } from '@/i18n';
+import { liveShare } from '@/modules/location';
 import { PreferencesProvider } from '@/preferences/PreferencesProvider';
 
 import { contactsStore } from '../contacts/fileStore';
@@ -43,20 +45,79 @@ describe('SOS screens', () => {
     for (const contact of contactsStore.list()) contactsStore.remove(contact.id);
   });
 
-  it('always offers 112, and asks for contacts before the first alert', async () => {
-    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+  /** Lays out a swipe control (343 points wide) and swipes it all the way. */
+  async function swipe(testID: string) {
+    await fireEvent(screen.getByTestId(testID), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 343, height: 76 } } });
+    const handle = screen.getByTestId(`${testID}-handle`);
+    const call = (name: string, x: number, previous: number, time: number) =>
+      (handle.props[name] as (e: unknown) => unknown)({
+        nativeEvent: { touches: [{ pageX: x, pageY: 0 }], changedTouches: [] },
+        touchHistory: {
+          numberActiveTouches: 1,
+          indexOfSingleActiveTouch: 0,
+          mostRecentTimeStamp: time,
+          touchBank: [
+            {
+              touchActive: true,
+              startPageX: 0,
+              startPageY: 0,
+              startTimeStamp: 0,
+              currentPageX: x,
+              currentPageY: 0,
+              currentTimeStamp: time,
+              previousPageX: previous,
+              previousPageY: 0,
+              previousTimeStamp: time - 1,
+            },
+          ],
+        },
+      });
+    await act(async () => {
+      call('onStartShouldSetResponderCapture', 0, 0, 1);
+      call('onStartShouldSetResponder', 0, 0, 1);
+      call('onResponderGrant', 0, 0, 1);
+      call('onResponderMove', 150, 0, 2);
+      call('onResponderMove', 300, 150, 3);
+      call('onResponderRelease', 300, 300, 4);
+    });
+  }
+
+  it('has only the swipes, Share my location and the quick-trigger link at rest (round 2)', async () => {
     await render(wrap(<SosHome />));
-    await fireEvent.press(screen.getByRole('button', { name: 'Call 112' }));
-    expect(openURL).toHaveBeenCalledWith('tel:112');
-    expect(screen.getByRole('button', { name: 'Add trusted contacts' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: "Call 112. Calls India's emergency number" })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'I need help. Alerts your trusted contacts' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Share my location' })).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Quick trigger setup' }));
+    expect(router.push).toHaveBeenCalledWith('/settings/trigger');
+    // The old alert button and code pad are gone.
     expect(screen.queryByRole('button', { name: 'Alert my trusted contacts' })).toBeNull();
   });
 
-  it('shows the alert button once someone is added', async () => {
-    contactsStore.add({ name: 'Asha', phone: '9876543210' });
+  it('calls 112 on a full swipe', async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     await render(wrap(<SosHome />));
-    expect(screen.getByRole('button', { name: 'Alert my trusted contacts' })).toBeTruthy();
-    expect(screen.getByText('1 trusted contact: Asha')).toBeTruthy();
+    await swipe('swipe-112');
+    expect(openURL).toHaveBeenCalledWith('tel:112');
+  });
+
+  it('asks for trusted contacts when "I need help" is swiped with nobody to alert', async () => {
+    await render(wrap(<SosHome />));
+    const start = jest.spyOn(liveShare, 'start');
+    await swipe('swipe-help');
+    expect(await screen.findByText('You have no trusted contacts for SOS alerts yet.')).toBeTruthy();
+    // No location is shared with nobody told.
+    expect(start).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByRole('button', { name: 'Add trusted contacts' }));
+    expect(router.push).toHaveBeenCalledWith('/settings/contacts');
+    await fireEvent.press(screen.getByRole('button', { name: 'Done' }));
+  });
+
+  it('says who to tick when Share my location has nobody ticked for it', async () => {
+    const added = contactsStore.add({ name: 'Asha', phone: '9876543210' });
+    if (added.ok) contactsStore.setUse(added.contact.id, 'live', false);
+    await render(wrap(<SosHome />));
+    await fireEvent.press(screen.getByRole('button', { name: 'Share my location' }));
+    expect(screen.getByText('Nobody is ticked for live location. Choose who gets it in Settings, Trusted contacts.')).toBeTruthy();
   });
 
   it('adds a typed number, refuses a bad one, and removes', async () => {

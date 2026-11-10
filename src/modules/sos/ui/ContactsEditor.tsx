@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, StyleSheet, View } from 'react-native';
 
-import { AppText, Button, Card, Screen, TextField } from '@/components';
+import { AppText, Button, Card, CheckboxGroup, KeyboardGroup, OptionGroup, Screen, TextField } from '@/components';
 import {
   getLocationPermission,
   type LocationPermission,
@@ -14,7 +14,7 @@ import { spacing } from '@/theme';
 import { phoneChannels, pickPhoneNumber, requestDirectSms } from '../alert/channels';
 import { contactsStore, useTrustedContacts } from '../contacts/fileStore';
 import { formatPhone } from '../contacts/phone';
-import { type AddError, MAX_CONTACTS } from '../contacts/store';
+import { type AddError, CONTACT_METHODS, CONTACT_USES, type ContactMethod, type ContactUse, MAX_CONTACTS } from '../contacts/store';
 
 /** Adding and removing trusted contacts, and the permissions an alert works best with. */
 export function ContactsEditor() {
@@ -48,26 +48,54 @@ export function ContactsEditor() {
   };
 
   const full = contacts.length >= MAX_CONTACTS;
+  const useOptions = CONTACT_USES.map((use) => ({ value: use, label: t(`contacts.uses.${use}`) }));
+  // Only SMS for now; the Saakshi app joins in round 2, group 3.3 (SPEC 5.5).
+  const methodOptions = CONTACT_METHODS.map((method) => ({ value: method, label: t(`contacts.methods.${method}`) }));
 
   return (
     <Screen>
       <AppText>{t('contacts.intro')}</AppText>
       <AppText color="textMuted">{t('contacts.count', { count: contacts.length, max: MAX_CONTACTS })}</AppText>
 
-      {contacts.map((contact) => (
-        <Card key={contact.id} style={styles.row}>
-          <View style={styles.grow}>
-            <AppText variant="label">{contact.name ?? t('contacts.noName')}</AppText>
-            <AppText variant="mono">{formatPhone(contact.phone)}</AppText>
-          </View>
-          <Button
-            variant="secondary"
-            label={t('contacts.remove')}
-            accessibilityLabel={t('contacts.removeLabel', { name: contact.name ?? formatPhone(contact.phone) })}
-            onPress={() => contactsStore.remove(contact.id)}
-          />
-        </Card>
-      ))}
+      {contacts.length > 0 ? <AppText color="textMuted">{t('contacts.usesIntro')}</AppText> : null}
+      {contacts.map((contact) => {
+        const shown = contact.name ?? formatPhone(contact.phone);
+        const ticked = CONTACT_USES.filter((use) => contact.uses[use]);
+        return (
+          <Card key={contact.id}>
+            <View style={styles.row}>
+              <View style={styles.grow}>
+                <AppText variant="label">{contact.name ?? t('contacts.noName')}</AppText>
+                <AppText variant="mono">{formatPhone(contact.phone)}</AppText>
+              </View>
+              <Button
+                variant="secondary"
+                label={t('contacts.remove')}
+                accessibilityLabel={t('contacts.removeLabel', { name: shown })}
+                onPress={() => contactsStore.remove(contact.id)}
+              />
+            </View>
+            <CheckboxGroup<ContactUse>
+              label={t('contacts.usesLabel', { name: shown })}
+              options={useOptions}
+              values={ticked}
+              onChange={(values) => {
+                for (const use of CONTACT_USES) {
+                  if (values.includes(use) !== contact.uses[use]) contactsStore.setUse(contact.id, use, values.includes(use));
+                }
+              }}
+            />
+            {ticked.length === 0 ? <AppText color="warning">{t('contacts.usesNone')}</AppText> : null}
+            <AppText variant="label">{t('contacts.methodHeading')}</AppText>
+            <OptionGroup<ContactMethod>
+              label={t('contacts.methodLabel', { name: shown })}
+              options={methodOptions}
+              value={contact.method}
+              onChange={(method) => contactsStore.setMethod(contact.id, method)}
+            />
+          </Card>
+        );
+      })}
 
       {message ? (
         <AppText color="danger" accessibilityLiveRegion="polite">
@@ -77,27 +105,30 @@ export function ContactsEditor() {
 
       <Button label={t('contacts.pick')} disabled={full} onPress={() => void pick()} />
 
-      <AppText variant="heading">{t('contacts.typeHeading')}</AppText>
-      <TextField
-        label={t('contacts.name')}
-        value={name}
-        onChangeText={setName}
-        autoComplete="name"
-        textContentType="name"
-        maxLength={80}
-      />
-      <TextField
-        label={t('contacts.phone')}
-        hint={t('contacts.phoneHint')}
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-        autoComplete="tel"
-        textContentType="telephoneNumber"
-        maxLength={24}
-        onSubmitEditing={add}
-      />
-      <Button variant="secondary" label={t('contacts.add')} disabled={full || phone.trim() === ''} onPress={add} />
+      {/* Kept above the keyboard together, on any phone and in either language (round 2, group 1.1). */}
+      <KeyboardGroup>
+        <AppText variant="heading">{t('contacts.typeHeading')}</AppText>
+        <TextField
+          label={t('contacts.name')}
+          value={name}
+          onChangeText={setName}
+          autoComplete="name"
+          textContentType="name"
+          maxLength={80}
+        />
+        <TextField
+          label={t('contacts.phone')}
+          hint={t('contacts.phoneHint')}
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+          autoComplete="tel"
+          textContentType="telephoneNumber"
+          maxLength={24}
+          onSubmitEditing={add}
+        />
+        <Button variant="secondary" label={t('contacts.add')} disabled={full || phone.trim() === ''} onPress={add} />
+      </KeyboardGroup>
 
       <DirectSmsCard />
       <LocationCard />

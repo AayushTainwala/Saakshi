@@ -1,3 +1,4 @@
+import AVFoundation
 import ExpoModulesCore
 
 public class SaakshiEvidenceModule: Module {
@@ -8,10 +9,19 @@ public class SaakshiEvidenceModule: Module {
     // already writes movie fragments every 10 seconds, so its files survive a cut-off.
     Function("recorderSupported") { false }
 
-    Events("onVolumeDown")
+    Events(
+      "onVolumeUp", "onRecordingClosed", "onRecorderError", "onCheckpoint", "onSoundCheckpoint", "onSoundClosed",
+      "onSoundError"
+    )
 
     OnCreate {
-      VolumeButtons.shared.onVolumeDown = { [weak self] in self?.sendEvent("onVolumeDown", [:]) }
+      VolumeButtons.shared.onVolumeUp = { [weak self] in self?.sendEvent("onVolumeUp", [:]) }
+      BodyCamRecorder.shared.emit = { [weak self] name, body in
+        self?.sendEvent(name, body.mapValues { $0 as Any? })
+      }
+      SoundRecorder.shared.emit = { [weak self] name, body in
+        self?.sendEvent(name, body.mapValues { $0 as Any? })
+      }
     }
 
     AsyncFunction("volumeKeysStart") {
@@ -22,13 +32,133 @@ public class SaakshiEvidenceModule: Module {
       VolumeButtons.shared.stop()
     }.runOnQueue(.main)
 
+    // The unlock practice on the body-cam start screen: runs the camera, without recording, so that
+    // iOS sends the button presses (see UnlockPractice in VolumeButtons.swift).
+    AsyncFunction("unlockPracticeStart") { (promise: Promise) in
+      UnlockPractice.start { promise.resolve() }
+    }
+
+    AsyncFunction("unlockPracticeStop") { (promise: Promise) in
+      UnlockPractice.stop { promise.resolve() }
+    }
+
     AsyncFunction("setScreenDimmed") { (dimmed: Bool) in
       ScreenDimmer.set(dimmed: dimmed)
     }.runOnQueue(.main)
 
-    // Body-cam mode on iPhone records with expo-camera (video) and expo-audio (sound); there is
-    // no foreground service, because Apple allows video only while the app is on screen.
-    Function("bodyCamRunning") { false }
+    // Body-cam mode on iPhone: the app's own recorder (BodyCamRecorder.swift). Video and sound go
+    // into the same file while Saakshi is on screen; sound carries on alone while it can't be.
+    Function("bodyCamRunning") { BodyCamRecorder.shared.isRunning }
+
+    AsyncFunction("bodyCamStart") { (options: BodyCamStartOptions, promise: Promise) in
+      guard let outputDir = URL(string: options.outputDir), outputDir.isFileURL,
+        let pendingDir = URL(string: options.pendingDir), pendingDir.isFileURL
+      else {
+        promise.reject("ERR_BODYCAM_OPTIONS", "outputDir and pendingDir must be file:// URIs")
+        return
+      }
+      let config = BodyCamRecorder.Config(
+        outputDir: outputDir,
+        pendingDir: pendingDir,
+        pieceSeconds: options.pieceSeconds > 0 ? max(options.pieceSeconds, 10) : 0,
+        checkpointSeconds: max(options.checkpointSeconds, 2),
+        quality: options.quality,
+        firstClip: options.clip,
+        mode: options.mode
+      )
+      BodyCamRecorder.shared.start(config) { error in
+        if let error {
+          promise.reject("ERR_BODYCAM_START", error.localizedDescription)
+        } else {
+          promise.resolve()
+        }
+      }
+    }
+
+    // Resolves once every file is closed, with the onRecordingClosed events of those closed by
+    // the stop (they are also sent as events).
+    AsyncFunction("bodyCamStop") { (promise: Promise) in
+      BodyCamRecorder.shared.stop { events in promise.resolve(events as Any) }
+    }
+
+    // Bug mode on iPhone (spec E8): one continuous, checkpointed sound file (SoundRecorder.swift).
+    // On Android bug mode records in the SaakshiSos module.
+    Function("soundRunning") { SoundRecorder.shared.isRunning }
+
+    // The low-battery handover at 5% (round 2, group 1.5): the file being written closes as
+    // "low-battery" and a new one continues; with `saving`, body-cam's new video is 480p at 15
+    // frames a second.
+    AsyncFunction("bodyCamHandOver") { (reason: String, saving: Bool) in
+      BodyCamRecorder.shared.handOver(reason: reason, saving: saving)
+    }
+
+    // Saving mode off (the phone is charging): the next body-cam file is at the normal quality.
+    AsyncFunction("bodyCamSetSaving") { (saving: Bool) in
+      BodyCamRecorder.shared.setSaving(saving)
+    }
+
+    AsyncFunction("soundHandOver") { (reason: String) in
+      SoundRecorder.shared.handOver(reason: reason)
+    }
+
+    AsyncFunction("soundStart") { (options: SoundStartOptions, promise: Promise) in
+      guard let outputDir = URL(string: options.outputDir), outputDir.isFileURL,
+        let pendingDir = URL(string: options.pendingDir), pendingDir.isFileURL
+      else {
+        promise.reject("ERR_SOUND_OPTIONS", "outputDir and pendingDir must be file:// URIs")
+        return
+      }
+      let config = SoundRecorder.Config(
+        outputDir: outputDir,
+        pendingDir: pendingDir,
+        checkpointSeconds: max(options.checkpointSeconds, 2),
+        clip: options.clip,
+        mode: options.mode
+      )
+      SoundRecorder.shared.start(config) { error in
+        if let error {
+          promise.reject("ERR_SOUND_START", error.localizedDescription)
+        } else {
+          promise.resolve()
+        }
+      }
+    }
+
+    // Resolves once the file is closed, with the onSoundClosed events of the files the stop closed
+    // (they are also sent as events).
+    AsyncFunction("soundStop") { (promise: Promise) in
+      SoundRecorder.shared.stop { events in promise.resolve(events as Any) }
+    }
+
+    // The evidence camera's zoom (fix round 1, group 4): the most the lens expo-camera is using can
+    // zoom, in its current format. expo-camera's `zoom` prop runs from 1x at 0 to this at 1, rising
+    // exponentially (CameraSessionManager.updateZoom). AVCaptureDevice objects are shared, so after the
+    // camera is ready this reads the format expo-camera chose.
+    AsyncFunction("cameraMaxZoom") { (position: String, deviceType: String?) -> Double in
+      let side: AVCaptureDevice.Position = position == "front" ? .front : .back
+      let type = deviceType.map { AVCaptureDevice.DeviceType(rawValue: $0) } ?? .builtInWideAngleCamera
+      guard let device = AVCaptureDevice.default(type, for: .video, position: side) else { return 1 }
+      return Double(device.activeFormat.videoMaxZoomFactor)
+    }
+
+    // A record's files joined into one MP4 copy for sharing (Joiner.swift; fix round 1, group 3).
+    AsyncFunction("joinToMp4") { (request: JoinRequestRecord) async throws -> [String: Any] in
+      try await Joiner.join(request)
+    }
+
+    // The default export folder (ExportFolder.swift; fix round 1, group 9): the user picks a
+    // folder once, and bundles are copied into it with one tap.
+    AsyncFunction("pickExportFolder") { (promise: Promise) in
+      guard let controller = self.appContext?.utilities?.currentViewController() else {
+        promise.reject("ERR_NO_SCREEN", "There is no screen to show the folder picker on.")
+        return
+      }
+      ExportFolder.shared.pick(from: controller, promise: promise)
+    }.runOnQueue(.main)
+
+    AsyncFunction("saveToExportFolder") { (bookmark: String, source: URL, name: String) throws -> [String: Any] in
+      try ExportFolder.save(bookmark: bookmark, source: source, name: name)
+    }
 
     // iPhone recordings are already QuickTime files that play everywhere; no copy is made.
     AsyncFunction("remuxToMp4") { (_: String, _: String, _: Int?) -> String in
@@ -72,4 +202,26 @@ public class SaakshiEvidenceModule: Module {
       try DeviceKey.sign(Data(message.utf8)).base64EncodedString()
     }
   }
+}
+
+/// What JavaScript passes to `bodyCamStart` (BodyCamOptions in SaakshiEvidence.types.ts). The
+/// notification texts are Android's and are ignored here.
+struct BodyCamStartOptions: Record {
+  @Field var outputDir: String = ""
+  @Field var pendingDir: String = ""
+  /// 0: one continuous file per stretch (body-cam's default since fix round 1, group 2a).
+  @Field var pieceSeconds: Double = 0
+  @Field var checkpointSeconds: Double = 10
+  @Field var quality: Int = 720
+  @Field var clip: Int = 0
+  @Field var mode: String = "body-cam"
+}
+
+/// What JavaScript passes to `soundStart` (SoundStartOptions in SaakshiEvidence.types.ts).
+struct SoundStartOptions: Record {
+  @Field var outputDir: String = ""
+  @Field var pendingDir: String = ""
+  @Field var checkpointSeconds: Double = 10
+  @Field var clip: Int = 0
+  @Field var mode: String = "bug"
 }

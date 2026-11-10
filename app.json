@@ -47,7 +47,7 @@
         "expo-camera",
         {
           "cameraPermission": "Saakshi uses the camera to record photos and videos for your own records. They are fingerprinted and signed on your phone.",
-          "microphonePermission": "Saakshi records sound with your videos and in bug mode, for your own records.",
+          "microphonePermission": "Saakshi records sound with your videos and in Pocket recording, for your own records.",
           "recordAudioAndroid": true,
           "barcodeScannerEnabled": false
         }
@@ -63,9 +63,16 @@
       ],
       "expo-sharing",
       [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false,
+          "configureAndroidBackup": false
+        }
+      ],
+      [
         "expo-audio",
         {
-          "microphonePermission": "Saakshi records sound with your videos and in bug mode, for your own records.",
+          "microphonePermission": "Saakshi records sound with your videos and in Pocket recording, for your own records.",
           "recordAudioAndroid": true,
           "enableBackgroundRecording": true,
           "enableBackgroundPlayback": false

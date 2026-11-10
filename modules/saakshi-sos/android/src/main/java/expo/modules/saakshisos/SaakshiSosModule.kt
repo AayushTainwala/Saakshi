@@ -26,7 +26,7 @@ class SaakshiSosModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("SaakshiSos")
 
-    Events("onBugPieceClosed", "onBugRecorderError")
+    Events("onBugPieceClosed", "onBugCheckpoint", "onBugRecorderError", "onBugRecorderStarted", "onBugRecorderStopped")
 
     OnCreate {
       BugRecorder.listener = { name, body -> sendEvent(name, body) }
@@ -38,9 +38,39 @@ class SaakshiSosModule : Module() {
 
     lateinit var phonePicker: AppContextActivityResultLauncher<PickPhoneInput, Uri?>
 
+    lateinit var lockAdminActivation: AppContextActivityResultLauncher<AddLockAdminInput, Boolean>
+
     RegisterActivityContracts {
       phonePicker = registerForActivityResult(PickPhoneContract())
+      lockAdminActivation = registerForActivityResult(AddLockAdminContract())
     }
+
+    // "Lock the phone when 'My phone is being taken' starts" (SPEC 5.4; round 2, group 1.7): device
+    // admin with the force-lock policy only (LockAdmin.kt).
+    Function("lockAdminSupported") { LockAdmin.supported(context) }
+
+    Function("lockAdminActive") { LockAdmin.isActive(context) }
+
+    // Android's own "Activate device admin app?" screen, with Saakshi's explanation on it. Resolves
+    // whether the admin is on afterwards.
+    AsyncFunction("lockAdminRequest") Coroutine { explanation: String ->
+      if (!LockAdmin.isActive(context)) {
+        try {
+          lockAdminActivation.launch(AddLockAdminInput(explanation))
+        } catch (error: ActivityNotFoundException) {
+          throw CodedException("ERR_NO_DEVICE_ADMIN", "This phone has no device admin screen", error)
+        }
+      }
+      LockAdmin.isActive(context)
+    }
+
+    // Switches it off from Saakshi's Settings. Resolves whether it is still on (false once off).
+    AsyncFunction("lockAdminRemove") Coroutine { ->
+      LockAdmin.removeAndWait(context)
+    }
+
+    // Locks the screen now. Resolves false if the admin isn't on.
+    AsyncFunction("lockNow") { LockAdmin.lockNow(context) }
 
     // Opens the contacts app's picker for phone numbers. The picker grants this app read access to
     // the one number picked, so READ_CONTACTS is never requested.
@@ -82,13 +112,17 @@ class SaakshiSosModule : Module() {
       QuickTrigger.notificationEnabled(context)
     }
 
-    // Bug mode (spec E8): sound in pieces from a microphone foreground service.
+    // Bug mode (spec E8): one continuous sound file, with checkpoints, from a microphone foreground
+    // service.
     AsyncFunction("bugRecorderStart") { options: Map<String, Any?> ->
       val intent = Intent(context, BugModeService::class.java).apply {
         action = BugModeService.ACTION_START
         putExtra(BugModeService.EXTRA_OUTPUT_DIR, pathOf(options["outputDir"] as String))
         putExtra(BugModeService.EXTRA_PENDING_DIR, pathOf(options["pendingDir"] as String))
-        putExtra(BugModeService.EXTRA_PIECE_MILLIS, ((options["pieceSeconds"] as Number).toDouble() * 1000).toLong())
+        putExtra(
+          BugModeService.EXTRA_CHECKPOINT_MILLIS,
+          ((options["checkpointSeconds"] as? Number)?.toDouble()?.coerceAtLeast(2.0) ?: 10.0).times(1000).toLong()
+        )
         putExtra(BugModeService.EXTRA_CLIP, (options["clip"] as Number).toInt())
         putExtra(BugModeService.EXTRA_TITLE, options["notificationTitle"] as? String)
         putExtra(BugModeService.EXTRA_TEXT, options["notificationText"] as? String)
@@ -104,11 +138,17 @@ class SaakshiSosModule : Module() {
 
     Function("bugRecorderRunning") { BugModeService.running }
 
+    // The low-battery handover at 5% (round 2, group 1.5): the file being written closes as
+    // "low-battery" and a new one continues at once.
+    AsyncFunction("bugRecorderHandOver") { reason: String ->
+      BugRecorder.handOver(reason)
+    }
+
     // iPhone only. Android's backup is off for the whole app (android:allowBackup="false").
     AsyncFunction("setExcludedFromBackup") { _: String, _: Boolean -> 0 }
 
-    // iPhone only: the widget and the notification here open saakshi://codepad directly.
-    Function("consumeCodePadRequest") { false }
+    // iPhone only: the widget and the notification here open saakshi://sos directly.
+    Function("consumeSosRequest") { false }
 
     // iPhone only (bug mode's Live Activity); Android shows the recording notification instead.
     AsyncFunction("liveActivityStart") { _: String, _: String -> false }

@@ -2,12 +2,14 @@ import enCommon from './locales/en/common.json';
 import enGuides from './locales/en/guides.json';
 import enHelp from './locales/en/help.json';
 import enRecord from './locales/en/record.json';
+import enSecretcode from './locales/en/secretcode.json';
 import enSettings from './locales/en/settings.json';
 import enSos from './locales/en/sos.json';
 import hiCommon from './locales/hi/common.json';
 import hiGuides from './locales/hi/guides.json';
 import hiHelp from './locales/hi/help.json';
 import hiRecord from './locales/hi/record.json';
+import hiSecretcode from './locales/hi/secretcode.json';
 import hiSettings from './locales/hi/settings.json';
 import hiSos from './locales/hi/sos.json';
 
@@ -24,6 +26,7 @@ export const resources = {
     sos: enSos,
     guides: enGuides,
     help: enHelp,
+    secretcode: enSecretcode,
   },
   hi: {
     common: hiCommon,
@@ -32,6 +35,7 @@ export const resources = {
     sos: hiSos,
     guides: hiGuides,
     help: hiHelp,
+    secretcode: hiSecretcode,
   },
 } as const;
 

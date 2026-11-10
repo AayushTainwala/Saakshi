@@ -1,13 +1,24 @@
 import Constants from 'expo-constants';
+import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { AppText, Card, OptionGroup, Screen } from '@/components';
+import { AppText, Button, Card, OptionGroup, Screen } from '@/components';
+import { LIVE_HOURS_CHOICES, type LiveHours, liveLength, useLiveLength } from '@/modules/location';
+import { SecretCodeSettings } from '@/modules/secretcode';
+import { useTrustedContacts } from '@/modules/sos';
+import { LockSettingsCard } from '@/modules/trigger';
 import { usePreferences } from '@/preferences/PreferencesProvider';
 import type { LanguagePreference, ThemePreference } from '@/preferences/store';
 
+/**
+ * Settings (SPEC 5.8; round 2, group 1.2): trusted contacts (moved from the SOS tab), the
+ * live-location length, the secret code and the quick trigger, above the items that were here.
+ */
 export default function SettingsScreen() {
-  const { t } = useTranslation('settings');
+  const { t } = useTranslation(['settings', 'sos']);
   const { preferences, setLanguage, setTheme } = usePreferences();
+  const contacts = useTrustedContacts();
+  const hours = useLiveLength();
 
   const languages: { value: LanguagePreference; label: string }[] = [
     { value: 'system', label: t('language.system') },
@@ -22,6 +33,36 @@ export default function SettingsScreen() {
 
   return (
     <Screen>
+      <Card>
+        <AppText variant="heading">{t('contacts.heading')}</AppText>
+        <AppText>
+          {contacts.length > 0
+            ? t('contacts.summary', { ns: 'sos', count: contacts.length, names: contacts.map((c) => c.name ?? c.phone).join(', ') })
+            : t('contacts.none')}
+        </AppText>
+        <Button variant="secondary" label={t('contacts.manage', { ns: 'sos' })} onPress={() => router.push('/settings/contacts')} />
+      </Card>
+
+      <AppText variant="heading">{t('live.heading')}</AppText>
+      <AppText color="textMuted">{t('live.body')}</AppText>
+      <OptionGroup<`${LiveHours}`>
+        label={t('live.heading')}
+        options={LIVE_HOURS_CHOICES.map((h) => ({ value: `${h}`, label: t('live.hours', { ns: 'sos', count: h }) }))}
+        value={`${hours}`}
+        onChange={(value) => liveLength.set(Number(value) as LiveHours)}
+      />
+
+      <SecretCodeSettings />
+
+      {/* Android only (round 2, group 1.7). */}
+      <LockSettingsCard />
+
+      <Card>
+        <AppText variant="heading">{t('trigger.heading')}</AppText>
+        <AppText>{t('trigger.body')}</AppText>
+        <Button variant="secondary" label={t('trigger.open')} onPress={() => router.push('/settings/trigger')} />
+      </Card>
+
       <AppText variant="heading">{t('language.heading')}</AppText>
       <OptionGroup
         label={t('language.heading')}
@@ -37,6 +78,10 @@ export default function SettingsScreen() {
         value={preferences.theme}
         onChange={setTheme}
       />
+
+      <AppText variant="heading">{t('certificates.heading')}</AppText>
+      <AppText color="textMuted">{t('certificates.body')}</AppText>
+      <Button variant="secondary" label={t('certificates.open')} onPress={() => router.push('/settings/certificate-profile')} />
 
       <AppText variant="heading">{t('about.heading')}</AppText>
       <Card>

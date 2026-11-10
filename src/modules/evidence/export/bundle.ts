@@ -3,16 +3,10 @@ import * as Sharing from 'expo-sharing';
 
 import { attestIfNeeded } from '../integrity/deviceKey';
 import { appInfo } from '../integrity/environment';
-import { loadSealed } from '../locker/records';
+import { isActive, whileBusy } from '../locker/active';
 import { fileLocker } from '../locker/store';
-import {
-  type BundledRecord,
-  buildManifest,
-  bundleFileName,
-  CERTIFICATE_FILE,
-  hashReport,
-  README,
-} from './contents';
+import { CERTIFICATE_FILE } from './contents';
+import { planBundle } from './plan';
 import { bytesEntry, type ZipEntry, writeZip } from './zip';
 
 const CHUNK = 1 << 20;
@@ -38,65 +32,80 @@ function fileEntry(name: string, file: File, size: number, crc32: number, modifi
   };
 }
 
+/** Where a bundle is written: bytes in order, then closed. */
+export type BundleOutput = { write: (bytes: Uint8Array) => Promise<void>; close: () => void };
+
 /**
- * Writes a session's bundle (docs/spec/evidence-bundle.md, section 7) to the cache and returns its
- * URI. Media files are copied through in chunks with the CRC-32 computed when they were captured.
+ * Writes a session's bundle (docs/spec/evidence-bundle.md, section 7) to the output `open` gives
+ * for its file name, and returns that name. Media files are copied through in chunks with the
+ * CRC-32 computed when they were captured.
  */
-export async function writeBundle(id: string): Promise<string> {
+export async function writeBundleTo(id: string, open: (fileName: string) => BundleOutput | Promise<BundleOutput>): Promise<string> {
+  // A record still being recorded or sealed would give a bundle without its last file.
+  if (isActive(id)) throw new BundleBusyError('This record is still being recorded or sealed.');
+  // It can't be deleted while its files are read.
+  return whileBusy(id, () => write(id, open));
+}
+
+/** The record is still being recorded or sealed. */
+export class BundleBusyError extends Error {}
+
+async function write(id: string, open: (fileName: string) => BundleOutput | Promise<BundleOutput>): Promise<string> {
   const session = fileLocker.readSession(id);
   if (!session) throw new Error('No such session');
   const key = await attestIfNeeded(fileLocker);
   const now = new Date();
-  const encode = (text: string) => new TextEncoder().encode(text);
-
-  const sealed = loadSealed(fileLocker, id);
-  const records: BundledRecord[] = sealed.map((entry) => entry.bundled);
-  const entries: ZipEntry[] = [];
-
-  for (const { item, body, bundled } of sealed) {
-    const { record, recordFile } = bundled;
-    const media = new File(fileLocker.mediaUri(id, item.media));
-    if (!media.exists || media.size !== record.file.size) {
-      throw new Error(`${item.media} is missing or has changed size; run Check files.`);
-    }
-    entries.push(
-      fileEntry(`media/${item.media}`, media, record.file.size, item.digests!.crc32, new Date(record.capture.endedAt)),
-      bytesEntry(`records/${recordFile}`, encode(body), now),
-      bytesEntry(`records/${recordFile}.sig`, fileLocker.readRecordBytes(id, `${recordFile}.sig`), now),
-    );
-  }
-
   const certificate = new File(fileLocker.sessionFileUri(id, CERTIFICATE_FILE));
-  const hasCertificate = !!session.certificate && certificate.exists;
-  const manifest = buildManifest(session, records, now, appInfo(), hasCertificate);
-  const report = hashReport(session, records, key, now, session.items.length - sealed.length);
+  const plan = planBundle({
+    store: fileLocker,
+    id,
+    key,
+    now,
+    app: appInfo(),
+    certificate: session.certificate && certificate.exists ? certificate.bytesSync() : null,
+  });
 
-  const head: ZipEntry[] = [
-    bytesEntry('manifest.json', encode(JSON.stringify(manifest, null, 2)), now),
-    bytesEntry('device-key.json', encode(JSON.stringify(key, null, 2)), now),
-  ];
-  const tail: ZipEntry[] = [
-    bytesEntry('hash-report.txt', encode(report), now),
-    bytesEntry('README.txt', encode(README), now),
-  ];
-  if (hasCertificate) tail.push(bytesEntry(CERTIFICATE_FILE, certificate.bytesSync(), now));
+  const entries: ZipEntry[] = plan.entries.map((entry) => {
+    if ('bytes' in entry) return bytesEntry(entry.name, entry.bytes, now);
+    const media = new File(fileLocker.mediaUri(id, entry.media.file));
+    if (!media.exists || media.size !== entry.media.size) {
+      throw new Error(`${entry.media.file} is missing or has changed size; run Check files.`);
+    }
+    return fileEntry(entry.name, media, entry.media.size, entry.media.crc32, entry.media.modified);
+  });
 
-  const exports = new Directory(Paths.cache, 'exports');
+  const output = await open(plan.fileName);
+  try {
+    await writeZip(output, entries);
+  } finally {
+    output.close();
+  }
+  return plan.fileName;
+}
+
+/** Where a session's bundle is made in the cache: its own folder, so one export never removes another's. */
+export function exportCacheFor(id: string): Directory {
+  return new Directory(Paths.cache, 'exports', id);
+}
+
+/** Writes a session's bundle to the cache; returns its URI and its file name. */
+export async function writeBundle(id: string): Promise<{ uri: string; fileName: string }> {
+  const exports = exportCacheFor(id);
   if (exports.exists) exports.delete();
   exports.create({ intermediates: true });
-  const output = new File(exports, bundleFileName(session));
-  output.create();
-  const handle = output.open(FileMode.ReadWrite);
-  try {
-    await writeZip({ write: (bytes) => handle.writeBytes(bytes) }, [...head, ...entries, ...tail]);
-  } finally {
-    handle.close();
-  }
-  return output.uri;
+  let uri = '';
+  const fileName = await writeBundleTo(id, (name) => {
+    const file = new File(exports, name);
+    file.create();
+    uri = file.uri;
+    const handle = file.open(FileMode.ReadWrite);
+    return { write: (bytes) => handle.writeBytes(bytes), close: () => handle.close() };
+  });
+  return { uri, fileName };
 }
 
 /** Builds the bundle and opens the share sheet with it. */
 export async function shareBundle(id: string, dialogTitle: string): Promise<void> {
-  const uri = await writeBundle(id);
+  const { uri } = await writeBundle(id);
   await Sharing.shareAsync(uri, { mimeType: 'application/zip', UTI: 'public.zip-archive', dialogTitle });
 }

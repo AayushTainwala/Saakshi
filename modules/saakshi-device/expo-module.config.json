@@ -1,0 +1,9 @@
+{
+  "platforms": ["android", "apple"],
+  "apple": {
+    "modules": ["SaakshiDeviceModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.saakshidevice.SaakshiDeviceModule"]
+  }
+}

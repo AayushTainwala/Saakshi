@@ -5,35 +5,35 @@ import ExpoModulesCore
 
 public class SaakshiSosModule: Module {
   private var picker: PhonePicker?
-  private var codePadObserver: NSObjectProtocol?
+  private var sosObserver: NSObjectProtocol?
 
   public func definition() -> ModuleDefinition {
     Name("SaakshiSos")
 
     // Sent when the Action Button, a Control Center or Lock Screen control, or a Shortcut asks for
-    // the code pad (targets/widget/_shared/OpenCodePadIntent.swift).
-    Events("onOpenCodePad")
+    // the SOS screen (targets/widget/_shared/OpenCodePadIntent.swift).
+    Events("onOpenSos")
 
     OnStartObserving {
-      self.codePadObserver = NotificationCenter.default.addObserver(
-        forName: CodePadRequest.notification, object: nil, queue: .main
+      self.sosObserver = NotificationCenter.default.addObserver(
+        forName: SosRequest.notification, object: nil, queue: .main
       ) { [weak self] _ in
-        if CodePadRequest.consume() { self?.sendEvent("onOpenCodePad") }
+        if SosRequest.consume() { self?.sendEvent("onOpenSos") }
       }
     }
 
     OnStopObserving {
-      if let observer = self.codePadObserver { NotificationCenter.default.removeObserver(observer) }
-      self.codePadObserver = nil
+      if let observer = self.sosObserver { NotificationCenter.default.removeObserver(observer) }
+      self.sosObserver = nil
     }
 
-    // True once if a trigger asked for the code pad in the last minute (for a cold start, before
+    // True once if a trigger asked for the SOS screen in the last minute (for a cold start, before
     // anything was listening).
-    Function("consumeCodePadRequest") { () -> Bool in
-      CodePadRequest.consume()
+    Function("consumeSosRequest") { () -> Bool in
+      SosRequest.consume()
     }
 
-    // Bug mode's Live Activity on the Lock Screen and in the Dynamic Island (spec E8).
+    // Pocket recording's Live Activity on the Lock Screen and in the Dynamic Island (spec E8).
     AsyncFunction("liveActivityStart") { (title: String, detail: String) throws -> Bool in
       try BugModeActivity.start(title: title, detail: detail)
     }
@@ -45,6 +45,14 @@ public class SaakshiSosModule: Module {
     AsyncFunction("liveActivityEnd") { () async in
       await BugModeActivity.end()
     }
+
+    // Android only: device admin's force-lock (round 2, group 1.7). No iPhone app can lock the
+    // screen, so Saakshi shows "Now lock your phone" instead.
+    Function("lockAdminSupported") { () -> Bool in false }
+    Function("lockAdminActive") { () -> Bool in false }
+    AsyncFunction("lockAdminRequest") { (_: String) -> Bool in false }
+    AsyncFunction("lockAdminRemove") { () -> Bool in false }
+    AsyncFunction("lockNow") { () -> Bool in false }
 
     // Android only: the quick-alert notification. iPhone uses the controls above.
     Function("quickNotificationShow") { (_: String, _: String, _: String) in }
@@ -61,6 +69,9 @@ public class SaakshiSosModule: Module {
 
     // Android only: bug mode's recorder. iPhone records through expo-audio (Stream A's AudioPieces).
     Function("bugRecorderRunning") { () -> Bool in false }
+
+    // Android only: Pocket recording's handover on iPhone is in the evidence module (soundHandOver).
+    AsyncFunction("bugRecorderHandOver") { (_: String) in }
 
     // Apple's contact picker runs outside the app and hands back only what the user picks, so no
     // contacts permission is asked for.

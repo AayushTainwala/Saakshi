@@ -53,6 +53,7 @@
   <section id="where" class="card" hidden>
     <div class="big" id="ago"></div>
     <div id="detail"></div>
+    <div id="battery" hidden></div>
     <div class="links">
       <a id="gmaps" target="_blank" rel="noopener noreferrer">Google Maps</a>
       <a id="osm" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>
@@ -72,12 +73,13 @@
   </section>
 </main>
 <script>
-  // Public by design: the publishable key only lets a browser call the four live_* functions.
+  // Public by design: the publishable key only lets a browser call the public live_* functions.
   var SUPABASE_URL = 'https://ppmaxuksrdjhnlnfcfgt.supabase.co';
   var SUPABASE_KEY = 'sb_publishable_HTTTU0RIQO5b6Cn9G6kHqA_H7kyg4cG';
   var REFRESH_MS = 15000;
 
-  var token = decodeURIComponent((location.hash || '').replace(/^#/, ''));
+  // A full stop or bracket a messaging app took into the link is not part of the token.
+  var token = decodeURIComponent((location.hash || '').replace(/^#/, '')).replace(/[.,;:!?)\]]+$/, '');
   var $ = function (id) { return document.getElementById(id); };
   var timer = null;
   var lastMap = '';
@@ -130,6 +132,21 @@
     $('ago').textContent = 'Last seen ' + a.en + ' · ' + a.hi;
     var acc = p.acc != null ? ' · ±' + Math.round(p.acc) + ' m' : '';
     $('detail').textContent = time(p.at) + acc + ' · ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5);
+    // The battery level, with how long ago it was sent (round 2). Shown only when the newest
+    // position carries one: the phone sends it only at 20% or less (group 1.6), so a level on an
+    // older position may no longer be true.
+    var withBattery = p.bat != null ? p : null;
+    if (withBattery) {
+      var b = ago(withBattery.at);
+      $('battery').textContent = 'Battery ' + withBattery.bat + '% (' + b.en + ') · ' + 'बैटरी ' + withBattery.bat + '% (' + b.hi + ')' +
+        // At 5% the phone saves power and sends its positions every 5 minutes (round 2, group 1.5).
+        (withBattery.bat <= 5
+          ? '. The battery is low: positions may come only every 5 minutes. · बैटरी कम है: लोकेशन शायद हर 5 मिनट में ही आए।'
+          : '');
+      $('battery').hidden = false;
+    } else {
+      $('battery').hidden = true;
+    }
     var lat = p.lat.toFixed(5), lng = p.lng.toFixed(5);
     $('gmaps').href = 'https://maps.google.com/?q=' + lat + ',' + lng;
     $('osm').href = 'https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lng + '#map=17/' + lat + '/' + lng;
@@ -137,8 +154,11 @@
     var map = 'https://www.openstreetmap.org/export/embed.html?bbox=' + (p.lng - d) + '%2C' + (p.lat - d) + '%2C' +
       (p.lng + d) + '%2C' + (p.lat + d) + '&layer=mapnik&marker=' + lat + '%2C' + lng;
     if (map !== lastMap) { $('map').src = map; lastMap = map; }
-    $('ends').textContent = 'Sharing ends ' + time(data.expiresAt) + ' unless they stop it sooner. · ' +
-      'शेयरिंग ' + time(data.expiresAt) + ' पर ख़त्म होगी, अगर वे पहले बंद न करें।';
+    // "My phone is being taken" (round 2): no fixed end; the share lasts while the phone reports.
+    $('ends').textContent = data.persistent
+      ? 'Shared until they stop sharing. · ' + 'जब तक वे शेयर करना बंद न करें, तब तक शेयर होगी।'
+      : 'Sharing ends ' + time(data.expiresAt) + ' unless they stop it sooner. · ' +
+        'शेयरिंग ' + time(data.expiresAt) + ' पर ख़त्म होगी, अगर वे पहले बंद न करें।';
 
     var list = $('trailList');
     list.innerHTML = '';
