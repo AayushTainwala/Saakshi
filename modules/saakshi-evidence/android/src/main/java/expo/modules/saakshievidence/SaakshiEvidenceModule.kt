@@ -65,6 +65,12 @@ class SaakshiEvidenceModule : Module() {
       CameraRecorder.handOver(reason, saving)
     }
 
+    // Free storage, stage one (repair round A, group 2): at the room the user keeps free, the video
+    // file closes with `reason` and body-cam carries on as sound only, in the same service.
+    AsyncFunction("bodyCamSoundOnly") { reason: String ->
+      CameraRecorder.soundOnly(reason)
+    }
+
     // Saving mode off (the phone is charging): the next file is at the normal quality.
     AsyncFunction("bodyCamSetSaving") { saving: Boolean ->
       CameraRecorder.setSaving(saving)

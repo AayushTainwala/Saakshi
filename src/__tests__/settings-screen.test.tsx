@@ -74,12 +74,15 @@ describe('Settings screen', () => {
     );
     const headings = screen.getAllByRole('header').map((h) => h.props.children);
     // iPhone: no lock setting.
-    expect(headings.slice(0, 5)).toEqual(['Trusted contacts', 'Live-location length', 'Secret code', 'Quick trigger', 'Language']);
+    // Storage follows them (repair round A, group 2).
+    expect(headings.slice(0, 6)).toEqual(['Trusted contacts', 'Live-location length', 'Secret code', 'Quick trigger', 'Storage', 'Language']);
 
     await fireEvent.press(screen.getByRole('button', { name: 'Manage trusted contacts' }));
     expect(mockPush).toHaveBeenLastCalledWith('/settings/contacts');
     await fireEvent.press(screen.getByRole('button', { name: 'Set up the quick trigger' }));
     expect(mockPush).toHaveBeenLastCalledWith('/settings/trigger');
+    await fireEvent.press(screen.getByRole('button', { name: 'Open Storage' }));
+    expect(mockPush).toHaveBeenLastCalledWith('/settings/storage');
 
     // Four hours unless changed; the choice is kept.
     expect(screen.getByRole('radio', { name: '4 hours' }).props.accessibilityState.checked).toBe(true);

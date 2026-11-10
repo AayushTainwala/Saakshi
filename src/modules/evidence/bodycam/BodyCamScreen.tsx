@@ -12,6 +12,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppText, Button, Card, OptionGroup, Screen } from '@/components';
 import { requireSecretCode } from '@/modules/secretcode';
 import { type BatteryAction, setSavingMode, useLowBattery } from '@/platform/battery';
+import {
+  canStart,
+  noRoomLabel,
+  readFreeBytes,
+  RoomLine,
+  SAFETY_FLOOR_BYTES,
+  StorageExplainer,
+  type StorageWatch,
+  useStorageSettings,
+  videoBytesPerSecond,
+  watchStorage,
+} from '@/platform/storage';
 import { palettes, spacing } from '@/theme';
 
 import { createEvidenceSession } from '../capture/deps';
@@ -25,6 +37,7 @@ import { handoverNoteKey } from './handover';
 import { startUnlockPractice, type UnlockPractice } from './practice';
 import { setBodyCamRunning } from './running';
 import { type BodyCamSettings, loadBodyCamSettings, saveBodyCamSettings } from './settings';
+import { bodyCamStoragePlan } from './storage';
 
 const KEEP_AWAKE_TAG = 'saakshi-bodycam';
 /** Body-cam needs the app's own recorder: Android's CameraRecorder, or iPhone's BodyCamRecorder. */
@@ -53,6 +66,8 @@ function formatElapsed(ms: number): string {
 /** Body-cam mode (spec B1–B4). */
 export function BodyCamScreen() {
   const { t } = useTranslation('record');
+  const { t: ts } = useTranslation('storage');
+  const storage = useStorageSettings();
   const navigation = useNavigation();
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
@@ -202,8 +217,19 @@ export function BodyCamScreen() {
     setNotificationsOff(true);
   }, [settings.notificationsAsked, updateSettings]);
 
+  // Free storage, stage one (repair round A, group 2): body-cam doesn't start below the room the
+  // user keeps free. A reading that fails is "unknown", and never stops a start.
+  const [noRoom, setNoRoom] = useState<string | null>(null);
+  const keepFree = Math.max(storage.keepFreeBytes, SAFETY_FLOOR_BYTES);
+
   const start = useCallback(async () => {
     setStartFailed(false);
+    const free = readFreeBytes();
+    if (free !== null && !canStart(free, keepFree)) {
+      setNoRoom(noRoomLabel(ts, free, keepFree));
+      return;
+    }
+    setNoRoom(null);
     setPhase('starting');
     // The practice's camera must be off before the recorder takes it.
     stopPractice();
@@ -233,7 +259,7 @@ export function BodyCamScreen() {
     setNow(at);
     setPhase('running');
     lock();
-  }, [checkNotifications, location, lock, session, settings.quality, settings.uploadPartSeconds, stopPractice, t]);
+  }, [checkNotifications, keepFree, location, lock, session, settings.quality, settings.uploadPartSeconds, stopPractice, t, ts]);
 
   const stop = useCallback(
     async (reason: EndReason = 'stopped') => {
@@ -286,6 +312,39 @@ export function BodyCamScreen() {
     return () => setSavingMode(false);
   }, [phase]);
 
+  // Free storage, stage one (SPEC section 4, "Storage"; repair round A, group 2). Warnings at about
+  // 30 and 10 minutes of room left. At the room the user keeps free, video stops and the recording
+  // carries on as sound only (unless that is switched off); at the safety floor it is stopped and
+  // saved, with the end reason "storage-full". A reading that fails stops nothing.
+  const [storageNote, setStorageNote] = useState<string | null>(null);
+  const stopForStorage = useRef(stop);
+  useEffect(() => {
+    stopForStorage.current = stop;
+  }, [stop]);
+  useEffect(() => {
+    if (phase !== 'running') return;
+    const plan = bodyCamStoragePlan({ keepFreeBytes: storage.keepFreeBytes, soundOnly: storage.bodyCamSoundOnly, quality: settings.quality });
+    let watch: StorageWatch | null = null;
+    watch = watchStorage(
+      () => plan.target(),
+      (action) => {
+        const step = plan.step(action);
+        if (!step) return;
+        if (step.do === 'warn') setStorageNote(ts(step.of === 'video' ? 'warn.video' : 'warn.sound', { minutes: step.minutes }));
+        else if (step.do === 'sound-only') {
+          // The warnings start again, for the sound that follows.
+          watch?.reset();
+          setStorageNote(ts('warn.soundOnly'));
+          void engine.current?.soundOnly().catch(() => setProblem(true));
+        } else if (step.do === 'stop') void stopForStorage.current('storage-full');
+        else setStorageNote(step.do === 'unknown' ? ts('warn.unknown') : null);
+      },
+    );
+    return () => watch?.stop();
+    // The plan is made once for a recording: a setting changed meanwhile applies to the next one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
   // If the screen goes away anyway, the recording still ends as one complete record.
   useEffect(
     () => () => {
@@ -322,6 +381,9 @@ export function BodyCamScreen() {
     return (
       <Screen>
         <AppText>{t('bodycam.intro')}</AppText>
+
+        {/* What Saakshi does about the phone's room, the first time body-cam opens (group 2). */}
+        <StorageExplainer firstTime quality={settings.quality} />
 
         <Card>
           <AppText variant="label">{t('bodycam.unlockTitle')}</AppText>
@@ -394,6 +456,13 @@ export function BodyCamScreen() {
         {startFailed ? <AppText color="danger">{t('bodycam.startFailed')}</AppText> : null}
         {!RECORDER_AVAILABLE ? <AppText color="danger">{t('bodycam.unavailable')}</AppText> : null}
         {settings.practised ? <AppText color="textMuted">{t('bodycam.unlockReminder')}</AppText> : null}
+        {/* Always shown: how long the free room allows before body-cam reaches the room kept free. */}
+        <RoomLine kind="video" bytesPerSecond={videoBytesPerSecond(settings.quality)} limitBytes={keepFree} />
+        {noRoom ? (
+          <AppText color="danger" accessibilityLiveRegion="polite">
+            {noRoom}
+          </AppText>
+        ) : null}
         <Button
           variant="danger"
           label={t('bodycam.start')}
@@ -428,6 +497,13 @@ export function BodyCamScreen() {
               {batteryNote}
             </AppText>
           ) : null}
+          {/* Shown on the dark screen too, as the battery note is. Whether the wearer is also told
+              by sound or vibration is repair round B's decision. */}
+          {storageNote ? (
+            <AppText variant="label" style={[styles.lockText, { color: dark.warning }]} accessibilityLiveRegion="polite">
+              {storageNote}
+            </AppText>
+          ) : null}
         </Pressable>
       ) : (
         <SafeAreaView style={styles.controls}>
@@ -446,6 +522,7 @@ export function BodyCamScreen() {
           {stopFirst ? <AppText style={{ color: dark.warning }}>{t('bodycam.stopFirst')}</AppText> : null}
           {problem ? <AppText style={{ color: dark.warning }}>{t('bodycam.recorderProblem')}</AppText> : null}
           {batteryNote ? <AppText style={{ color: dark.warning }}>{batteryNote}</AppText> : null}
+          {storageNote ? <AppText style={{ color: dark.warning }}>{storageNote}</AppText> : null}
           {notificationsOff ? <AppText style={{ color: dark.textMuted }}>{t('bodycam.notificationsOff')}</AppText> : null}
           {Platform.OS === 'ios' ? <AppText style={{ color: dark.warning }}>{t('bodycam.iosWarning')}</AppText> : null}
           <Button label={t('bodycam.lock')} disabled={phase !== 'running'} onPress={lock} />

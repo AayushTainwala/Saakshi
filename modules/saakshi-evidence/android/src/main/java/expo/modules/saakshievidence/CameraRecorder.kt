@@ -114,6 +114,13 @@ object CameraRecorder {
   /** Whether the file being written was started in saving mode: its frame rate stays until it ends. */
   private var fileSaving = false
   private var fpsRanges: Array<android.util.Range<Int>>? = null
+  /**
+   * Sound only (repair round A, group 2): body-cam has reached the free room the user keeps, video
+   * has stopped and the camera is closed, and each new file is sound alone. Until the recording ends.
+   */
+  private var soundOnlyMode = false
+  /** What the file being written holds: "video" (with its sound), or "audio" once sound only. */
+  private var currentKind = "video"
 
   val isRecording: Boolean get() = recorder != null
   val isOpen: Boolean get() = device != null
@@ -247,6 +254,7 @@ object CameraRecorder {
       openToken++
       finishCurrent("stopped")
       lowPower = false
+      soundOnlyMode = false
       checkpointThread?.quitSafely()
       checkpointThread = null
       checkpointHandler = null
@@ -460,6 +468,46 @@ object CameraRecorder {
     post { lowPower = on }
   }
 
+  /**
+   * Body-cam carries on as sound only (repair round A, group 2; bundle format 0.10): the video file
+   * being written closes cleanly with `reason` ("storage-sound-only"), the camera is let go, and
+   * the next file of the same clip is sound alone (startSoundFile), in the same foreground service.
+   * It stays so until the recording ends. Like the low-battery handover, this must never stop the
+   * recording: whatever fails, a sound file is started if one can be.
+   */
+  fun soundOnly(reason: String) {
+    post {
+      if (soundOnlyMode) return@post
+      soundOnlyMode = true
+      // Not recording yet (the service's start is still on its way): the first file is sound.
+      if (recorder == null) return@post
+      try {
+        session?.stopRepeating()
+        finishCurrent(reason)
+      } catch (e: Exception) {
+        emit("onRecorderError", mapOf("message" to "The video file didn't close cleanly before sound only: ${e.message ?: e}"))
+      }
+      pieceIndex++
+      // The camera is not needed any more; closing it also puts out the camera indicator.
+      try {
+        openToken++
+        session?.close()
+        session = null
+        device?.close()
+        device = null
+      } catch (e: Exception) {
+        emit("onRecorderError", mapOf("message" to "The camera didn't close for sound only: ${e.message ?: e}"))
+      }
+      if (recorder == null && config != null) {
+        try {
+          startFile()
+        } catch (e: Exception) {
+          emit("onRecorderError", mapOf("message" to "Sound-only recording could not start: ${e.message ?: e}"))
+        }
+      }
+    }
+  }
+
   // ---- Recording ------------------------------------------------------------------------------
 
   fun startRecording(config: Config) {
@@ -484,6 +532,7 @@ object CameraRecorder {
       finishCurrent("stopped")
       // The next recording starts at the normal quality: saving mode doesn't carry into it.
       lowPower = false
+      soundOnlyMode = false
       applyRepeatingRequest()
       config = null
     }
@@ -540,8 +589,64 @@ object CameraRecorder {
   private fun rotationHint(): Int =
     if (front) (sensorOrientation - deviceDegrees + 360) % 360 else (sensorOrientation + deviceDegrees) % 360
 
+  /**
+   * Body-cam carrying on as sound only (repair round A, group 2): one ADTS AAC file, which needs
+   * nothing written at the end, so a cut-off file plays up to the cut. Mono, 44.1 kHz, 64 kbit/s,
+   * as Pocket recording's on Android. Checkpointed at the end of whole frames.
+   */
+  private fun startSoundFile(cfg: Config) {
+    val context = appContext ?: throw IllegalStateException("No context")
+    val file = File(cfg.outputDir, "rec-${System.currentTimeMillis()}-${cfg.clip}-$pieceIndex.aac")
+    val r = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(context) else @Suppress("DEPRECATION") MediaRecorder()
+    val startedAt = try {
+      r.setAudioSource(MediaRecorder.AudioSource.MIC)
+      r.setOutputFormat(MediaRecorder.OutputFormat.AAC_ADTS)
+      r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+      r.setAudioChannels(1)
+      r.setAudioSamplingRate(44_100)
+      r.setAudioEncodingBitRate(64_000)
+      r.setOutputFile(file.absolutePath)
+      r.prepare()
+      val at = System.currentTimeMillis()
+      r.start()
+      at
+    } catch (e: Exception) {
+      r.release()
+      file.delete()
+      throw e
+    }
+    recorder = r
+    currentKind = "audio"
+    cutoffSafe = true
+    currentRotation = null
+    fileSaving = false
+    currentFile = file
+    currentStartedAt = startedAt
+    val recording = UUID.randomUUID().toString()
+    currentRecording = recording
+    val gap = lastEndedAt?.let { startedAt - it }
+    currentGap = gap
+    writeMarker(cfg, file, startedAt, null, null, gap)
+    emit("onRecordingStarted", mapOf(
+      "uri" to "file://${file.absolutePath}",
+      "kind" to "audio",
+      "startedAt" to iso(startedAt),
+      "clip" to cfg.clip,
+      "index" to pieceIndex,
+      "cutoffSafe" to true,
+      "rotationDegrees" to null,
+      "recording" to recording,
+    ))
+    val every = cfg.checkpointMillis
+    if (every != null) startCheckpoints(Checkpointer(file, adts = true), every, file, recording, startedAt, cfg.clip, pieceIndex, "audio")
+  }
+
   private fun startFile() {
     val cfg = config ?: return
+    if (soundOnlyMode) {
+      startSoundFile(cfg)
+      return
+    }
     val surface = persistentSurface ?: throw IllegalStateException("Camera is not open")
     val stamp = System.currentTimeMillis()
     var useTs = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
@@ -563,6 +668,7 @@ object CameraRecorder {
     val startedAt = System.currentTimeMillis()
     r.start()
     recorder = r
+    currentKind = "video"
     fileSaving = lowPower
     currentFile = file
     currentStartedAt = startedAt
@@ -581,14 +687,14 @@ object CameraRecorder {
       "recording" to recording,
     ))
     val every = cfg.checkpointMillis
-    if (every != null && useTs) startCheckpoints(Checkpointer(file), every, file, recording, startedAt, cfg.clip, pieceIndex)
+    if (every != null && useTs) startCheckpoints(Checkpointer(file), every, file, recording, startedAt, cfg.clip, pieceIndex, "video")
   }
 
   // ---- Checkpoints (fix round 1, group 2a) ---------------------------------------------------
 
   /** Reads the growing file on its own thread, so the camera thread never waits for storage. */
   private fun startCheckpoints(
-    tracker: Checkpointer, every: Long, file: File, recording: String, startedAt: Long, clip: Int, index: Int,
+    tracker: Checkpointer, every: Long, file: File, recording: String, startedAt: Long, clip: Int, index: Int, kind: String,
   ) {
     checkpointer = tracker
     val h = checkpointHandler ?: HandlerThread("SaakshiCheckpoints").let { t ->
@@ -608,7 +714,7 @@ object CameraRecorder {
               emit("onCheckpoint", mapOf(
                 "recording" to recording,
                 "uri" to "file://${file.absolutePath}",
-                "kind" to "video",
+                "kind" to kind,
                 "clip" to clip,
                 "index" to index,
                 "checkpoint" to count,
@@ -660,6 +766,7 @@ object CameraRecorder {
     val file = currentFile
     val startedAt = currentStartedAt
     val recording = currentRecording
+    val kind = currentKind
     val hadCheckpoints = checkpointer?.let { it.checkpointsTaken > 0 } ?: false
     recorder = null
     var ok = true
@@ -688,6 +795,7 @@ object CameraRecorder {
       writeMarker(cfg, file, startedAt, endedAt, endReason, null)
       emit("onRecordingClosed", mapOf(
         "uri" to "file://${file.absolutePath}",
+        "kind" to kind,
         "startedAt" to iso(startedAt),
         "endedAt" to iso(endedAt),
         "clip" to cfg.clip,
@@ -709,7 +817,7 @@ object CameraRecorder {
     val existing = if (marker.exists()) runCatching { JSONObject(marker.readText()) }.getOrNull() else null
     val json = existing ?: JSONObject().apply {
       put("file", "file://${file.absolutePath}")
-      put("kind", "video")
+      put("kind", currentKind)
       put("segment", if (cfg.segmented) JSONObject().put("clip", cfg.clip).put("index", pieceIndex) else JSONObject.NULL)
       put("recording", currentRecording ?: JSONObject.NULL)
       put("startedAt", iso(startedAt))

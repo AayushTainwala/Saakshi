@@ -112,6 +112,9 @@ const END_REASONS: Record<EndReason, string> = {
   'audio-interrupted': 'the phone stopped sound recording (for example, for a phone call)',
   'sound-resumed': 'its sound stopped part-way (an interruption, such as a phone call); the next file has sound again (iPhone)',
   'video-resumed': 'sound-only file ended because video with sound started again (iPhone)',
+  'storage-sound-only':
+    'video stopped by the app because the phone was down to the free room the user keeps; recording carried on as sound only in the next file',
+  'storage-full': 'stopped and saved by the app because the phone was running out of free room',
   interrupted: 'cut off (crash or power-off); sealed when the app next opened',
   error: 'camera error',
 };

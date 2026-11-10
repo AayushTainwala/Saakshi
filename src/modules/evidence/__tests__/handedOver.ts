@@ -27,6 +27,8 @@ export type Options = {
   /** What the phone says the battery is; 'throws' for a reading that fails. */
   battery?: number | null | 'throws';
   interruptedLast?: boolean;
+  /** Why the first and the second file ended, instead of "low-battery" and "stopped". */
+  reasons?: [NonNullable<ClosedFile['endReason']>, NonNullable<ClosedFile['endReason']>];
 };
 
 /**
@@ -97,9 +99,9 @@ export async function handedOver(options: Options = {}) {
   });
 
   await session.addCheckpoint(checkpoint('rec-1', 0, first));
-  await session.add(closed('file:///s/incoming/bug-0-0.aac', 'rec-1', 0, 'low-battery'));
+  await session.add(closed('file:///s/incoming/bug-0-0.aac', 'rec-1', 0, options.reasons?.[0] ?? 'low-battery'));
   await session.addCheckpoint(checkpoint('rec-2', 1, second));
-  await session.add(closed('file:///s/incoming/bug-0-1.aac', 'rec-2', 1, options.interruptedLast ? 'interrupted' : 'stopped', options.interruptedLast));
+  await session.add(closed('file:///s/incoming/bug-0-1.aac', 'rec-2', 1, options.interruptedLast ? 'interrupted' : (options.reasons?.[1] ?? 'stopped'), options.interruptedLast));
   const id = session.id!;
   const deviceKey = mergeDeviceKey(
     { keyId: key.keyId, publicKeySpki: Buffer.from(key.spki).toString('base64'), platform: 'ios', storage: 'secure-enclave', attestation: null, attestationError: 'test' },

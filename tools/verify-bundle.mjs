@@ -17,7 +17,13 @@ import { closeSync, createReadStream, existsSync, openSync, readdirSync, readFil
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 
-const SUPPORTED_VERSIONS = ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'];
+const SUPPORTED_VERSIONS = ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '0.10'];
+/**
+ * From 0.10 (free storage, stage one) a file may end with `capture.endReason` "storage-full" (the
+ * app stopped it cleanly for lack of room) or "storage-sound-only" (a body-cam video file closed at
+ * the keep-free amount, with sound carrying on in the next file). An older record must not.
+ */
+const STORAGE_END_REASONS = ['storage-full', 'storage-sound-only'];
 /**
  * From 0.9 a record may carry `capture.batteryPercent` (a whole number, 0 to 100) and, for a
  * sound-only record (`capture.mode` "bug", Pocket recording), `capture.startedFrom` ("pocket" or
@@ -31,6 +37,15 @@ function newMemberProblems(record) {
     if (before09) problems.push(`capture.batteryPercent is not part of format ${record.version}`);
     const value = capture.batteryPercent;
     if (!Number.isInteger(value) || value < 0 || value > 100) problems.push(`capture.batteryPercent must be a whole number from 0 to 100, not ${JSON.stringify(value)}`);
+  }
+  if (STORAGE_END_REASONS.includes(capture.endReason)) {
+    if (SUPPORTED_VERSIONS.indexOf(record.version) < SUPPORTED_VERSIONS.indexOf('0.10')) {
+      problems.push(`capture.endReason "${capture.endReason}" is not part of format ${record.version}`);
+    }
+    if (capture.endReason === 'storage-sound-only' && capture.mode !== 'body-cam') {
+      problems.push('capture.endReason "storage-sound-only" is only for a body-cam file');
+    }
+    if (record.interrupted) problems.push(`a file cut off can't have ended with "${capture.endReason}"`);
   }
   if ('startedFrom' in capture) {
     if (before09) problems.push(`capture.startedFrom is not part of format ${record.version}`);

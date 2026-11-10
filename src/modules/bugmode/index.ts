@@ -9,6 +9,7 @@
  * inside it.
  */
 export type { BugState, StartedFrom, StartOptions as PocketStartOptions } from './controller';
+export { NoRoomError } from './controller';
 export { MicrophoneDeniedError } from './engines';
 export { bugMode, setBugModePartListener, useBugMode } from './instance';
 export { BugModeScreen } from './ui/BugModeScreen';

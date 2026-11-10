@@ -1,5 +1,6 @@
 import type { CaptureSession, EndReason } from '@/modules/evidence';
 import type { BatteryAction } from '@/platform/battery';
+import type { StorageAction, StorageTarget } from '@/platform/storage';
 
 import { WitnessThrottle } from './witness';
 
@@ -32,6 +33,18 @@ export type BugDeps = {
   watchBattery?: (onAction: (action: BatteryAction) => void) => () => void;
   /** Saving mode on or off: live location sends every 5 minutes while it is on. */
   savingMode?: (on: boolean) => void;
+  /**
+   * The phone's free storage (SPEC section 4, "Storage", stage one; repair round A, group 2):
+   * reading it, watching it while recording, the amount the user keeps free, the safety floor, and
+   * how fast sound fills the phone.
+   */
+  storage?: {
+    free: () => number | null;
+    watch: (target: () => StorageTarget, onAction: (action: StorageAction) => void) => { stop: () => void };
+    keepFreeBytes: () => number;
+    floorBytes: number;
+    bytesPerSecond: number;
+  };
   /** Texts the message to trusted contacts with no tap; resolves to how many texts went, or 0. */
   witness: (message: string) => Promise<number>;
   /** How many texts a witness message costs now (one per contact), or 0 if it can't go. */
@@ -46,6 +59,19 @@ export type BugDeps = {
   };
   now: () => Date;
 };
+
+/**
+ * There is too little room on the phone to start: free space is at or below the amount the
+ * recording would stop at. `keepFreeBytes` is null when that amount is the safety floor.
+ */
+export class NoRoomError extends Error {
+  constructor(
+    readonly freeBytes: number,
+    readonly keepFreeBytes: number | null,
+  ) {
+    super('There is too little room on the phone to record');
+  }
+}
 
 /** How a recording was started (bundle format 0.9, `capture.startedFrom`; written by group 1.5). */
 export type StartedFrom = 'pocket' | 'phone-taken';
@@ -68,6 +94,15 @@ export type BugState = {
   saving: boolean;
   /** The last battery warning, as a percentage, or null. */
   batteryWarning: number | null;
+  /** The last storage warning: about this many minutes of room are left, or null. */
+  storageMinutes: number | null;
+  /** The phone isn't saying how much room is free. Nothing is stopped for this. */
+  storageUnknown: boolean;
+  /**
+   * Why the last recording was stopped for lack of room: at the amount the user keeps free, or at
+   * the safety floor. Null if it wasn't. Kept after the stop, for the screen to say.
+   */
+  stoppedForStorage: 'keep-free' | 'floor' | null;
   startedAt: string | null;
   sessionId: string | null;
   /** Checkpoints signed while the file was being written. */
@@ -91,6 +126,9 @@ const IDLE: BugState = {
   liveActivity: false,
   saving: false,
   batteryWarning: null,
+  storageMinutes: null,
+  storageUnknown: false,
+  stoppedForStorage: null,
   startedAt: null,
   sessionId: null,
   checkpoints: 0,
@@ -124,6 +162,9 @@ export class BugModeController {
   private lastActivityUpdate: number | null = null;
   private starting: Promise<void> | null = null;
   private unwatchBattery: (() => void) | null = null;
+  private unwatchStorage: (() => void) | null = null;
+  /** "My phone is being taken" records past the amount kept free, down to the safety floor. */
+  private toFloor = false;
   private work: Promise<void> = Promise.resolve();
 
   constructor(private readonly deps: BugDeps) {}
@@ -143,6 +184,8 @@ export class BugModeController {
   async start(options: StartOptions = {}): Promise<void> {
     if (this.starting) await this.starting.catch(() => undefined);
     if (this.current.running) {
+      // Started over a Pocket recording: from now it records down to the floor.
+      if (options.startedFrom === 'phone-taken') this.toFloor = true;
       if (options.liveActivity === false && this.current.liveActivity) {
         this.set({ ...this.current, liveActivity: false });
         await this.deps.liveActivity.end().catch(() => undefined);
@@ -162,6 +205,8 @@ export class BugModeController {
     this.engine = null;
     this.unwatchBattery?.();
     this.unwatchBattery = null;
+    this.unwatchStorage?.();
+    this.unwatchStorage = null;
     if (this.current.saving) this.deps.savingMode?.(false);
     try {
       await engine.stop(reason);
@@ -184,6 +229,16 @@ export class BugModeController {
     this.seen = new Set();
     this.newest = null;
     this.lastActivityUpdate = null;
+    this.toFloor = options.startedFrom === 'phone-taken';
+    // It doesn't start with less room than it would stop at. A reading that fails is "unknown",
+    // and never stops a start.
+    const free = this.deps.storage?.free() ?? null;
+    const limit = this.storageTarget()?.limitBytes;
+    if (free !== null && limit !== undefined && free <= limit) {
+      const error = new NoRoomError(free, this.toFloor ? null : limit);
+      this.set({ ...IDLE, error: error.message });
+      throw error;
+    }
     try {
       const engine = await this.deps.startEngine(
         (message) => {
@@ -202,6 +257,11 @@ export class BugModeController {
       });
       this.unsubscribe = engine.session.subscribe(() => this.scan(engine.session));
       this.unwatchBattery = this.deps.watchBattery?.((action) => this.onBattery(action)) ?? null;
+      this.unwatchStorage =
+        this.deps.storage?.watch(
+          () => this.storageTarget()!,
+          (action) => this.onStorage(action),
+        ).stop ?? null;
       if (options.liveActivity) await this.deps.liveActivity.start().catch(() => undefined);
     } catch (error) {
       this.set({ ...IDLE, error: error instanceof Error ? error.message : String(error) });
@@ -226,6 +286,42 @@ export class BugModeController {
     }
     this.set({ ...this.current, saving: false });
     this.deps.savingMode?.(false);
+  }
+
+  /** What to watch for: the amount the user keeps free, or the floor for "My phone is being taken". */
+  private storageTarget(): StorageTarget | null {
+    const storage = this.deps.storage;
+    if (!storage) return null;
+    const floorBytes = storage.floorBytes;
+    return { limitBytes: this.toFloor ? floorBytes : Math.max(storage.keepFreeBytes(), floorBytes), floorBytes, bytesPerSecond: storage.bytesPerSecond };
+  }
+
+  /**
+   * Free storage, stage one (SPEC section 4, "Storage"; repair round A, group 2): warnings at about
+   * 30 and 10 minutes of room left. Pocket recording stops cleanly, with the end reason
+   * "storage-full", at the amount the user keeps free; "My phone is being taken" records past it
+   * and stops at the safety floor. A reading that fails stops nothing.
+   */
+  private onStorage(action: StorageAction): void {
+    if (!this.engine || !this.current.running) return;
+    switch (action.type) {
+      case 'warn':
+        return this.set({ ...this.current, storageMinutes: action.minutes });
+      case 'unknown':
+        return this.set({ ...this.current, storageUnknown: true });
+      case 'known':
+        return this.set({ ...this.current, storageUnknown: false });
+      case 'limit':
+        // The limit was the keep-free amount when it was read; "My phone is being taken" may have
+        // started since.
+        if (this.toFloor) return;
+        this.set({ ...this.current, stoppedForStorage: 'keep-free' });
+        void this.stop('storage-full').catch(() => undefined);
+        return;
+      case 'floor':
+        this.set({ ...this.current, stoppedForStorage: 'floor' });
+        void this.stop('storage-full').catch(() => undefined);
+    }
   }
 
   /** Picks out checkpoints and files that have just been signed, and files that failed. */

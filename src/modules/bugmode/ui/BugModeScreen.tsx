@@ -6,6 +6,9 @@ import { Platform } from 'react-native';
 import { AppText, Button, Card, Screen } from '@/components';
 import { requireSecretCode } from '@/modules/secretcode';
 import { canTextWithoutTap } from '@/modules/sos';
+import { noRoomLabel, RoomLine, SAFETY_FLOOR_BYTES, soundBytesPerSecond, StorageExplainer, useStorageSettings } from '@/platform/storage';
+
+import { NoRoomError } from '../controller';
 
 import { MicrophoneDeniedError } from '../engines';
 import { bugMode, useBugMode } from '../instance';
@@ -19,6 +22,8 @@ function timeIST(iso: string, seconds = false): string {
 /** Bug mode (E8): what it does, start and stop, and how far it has got. */
 export function BugModeScreen() {
   const { t } = useTranslation(['sos', 'record']);
+  const { t: ts } = useTranslation('storage');
+  const storage = useStorageSettings();
   const state = useBugMode();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,9 +46,11 @@ export function BugModeScreen() {
       await bugMode.start();
     } catch (e) {
       setError(
-        e instanceof MicrophoneDeniedError
-          ? t('bug.micDenied')
-          : t('bug.error', { detail: e instanceof Error ? e.message : String(e) }),
+        e instanceof NoRoomError
+          ? noRoomLabel(ts, e.freeBytes, e.keepFreeBytes)
+          : e instanceof MicrophoneDeniedError
+            ? t('bug.micDenied')
+            : t('bug.error', { detail: e instanceof Error ? e.message : String(e) }),
       );
     } finally {
       setBusy(false);
@@ -63,6 +70,8 @@ export function BugModeScreen() {
       <AppText color="textMuted">{Platform.OS === 'ios' ? t('bug.iosNote') : t('bug.androidNote')}</AppText>
       <AppText color="textMuted">{witnessing ? t('bug.witnessOn') : t('bug.witnessOff')}</AppText>
       <AppText color="textMuted">{t('bug.localNote')}</AppText>
+      {/* What Saakshi does about the phone's room, the first time Pocket recording opens (repair round A, group 2). */}
+      <StorageExplainer firstTime />
 
       {state.running ? (
         <Card accessibilityLiveRegion="polite">
@@ -83,10 +92,25 @@ export function BugModeScreen() {
           ) : state.batteryWarning ? (
             <AppText color="warning">{t('battery.handoverSoon', { ns: 'record', percent: state.batteryWarning })}</AppText>
           ) : null}
+          {/* Free storage, stage one: a warning as the room runs low; a failed reading stops nothing. */}
+          {state.storageUnknown ? (
+            <AppText color="warning">{ts('warn.unknown')}</AppText>
+          ) : state.storageMinutes ? (
+            <AppText color="warning">{ts('warn.sound', { minutes: state.storageMinutes })}</AppText>
+          ) : null}
           <Button variant="danger" label={t('bug.stop')} busy={busy} onPress={() => void stop()} />
         </Card>
       ) : (
-        <Button label={t('bug.start')} busy={busy} onPress={() => void start()} />
+        <>
+          {state.stoppedForStorage ? (
+            <AppText color="warning" accessibilityLiveRegion="polite">
+              {ts(state.stoppedForStorage === 'floor' ? 'warn.stoppedFloor' : 'warn.stoppedKeepFree')}
+            </AppText>
+          ) : null}
+          {/* Always shown: how long the free room allows before the room kept free is reached. */}
+          <RoomLine kind="sound" bytesPerSecond={soundBytesPerSecond()} limitBytes={Math.max(storage.keepFreeBytes, SAFETY_FLOOR_BYTES)} />
+          <Button label={t('bug.start')} busy={busy} onPress={() => void start()} />
+        </>
       )}
 
       {error ? (

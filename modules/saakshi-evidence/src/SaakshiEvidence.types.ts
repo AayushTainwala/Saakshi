@@ -70,13 +70,18 @@ export type RecorderEndReason =
   | 'system-pressure'
   | 'audio-interrupted'
   | 'sound-resumed'
-  | 'video-resumed';
+  | 'video-resumed'
+  /** Body-cam (format 0.10): the video file closed so that the recording carries on as sound only. */
+  | 'storage-sound-only';
 
 export type RecordingClosedEvent = RecordingStartedEvent & {
   endedAt: string;
   endReason: RecorderEndReason;
   gapBeforeMs: number | null;
-  /** iPhone body-cam: `audio` for a sound-only file, made while video couldn't record. Android: absent (video). */
+  /**
+   * `audio` for a body-cam sound-only file: on iPhone, made while video couldn't record; on both
+   * phones, after body-cam has dropped to sound only (format 0.10). Absent or `video` otherwise.
+   */
   kind?: 'video' | 'audio';
   /** iPhone body-cam: iOS's reason for stopping the camera, when it gave one. For diagnosis only. */
   interruption?: string | null;
