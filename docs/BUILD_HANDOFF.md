@@ -4,7 +4,7 @@ The pickup file for build sessions: where things stand, what is next, and the qu
 
 ## Where things stand (10 Nov 2026)
 
-- **On `main`:** R1 and R2 (#1 to #9), fix round 1 (#16 to #27) and round 2, Part 1 with groups 1.6 and 1.7 (#31 to #36, #41, #43). Typecheck, lint, 598 tests and both native builds pass.
+- **On `main`:** R1 and R2 (#1 to #9), fix round 1 (#16 to #27) and round 2, Part 1 with groups 1.6 and 1.7 (#31 to #36, #41, #43), and repair round A, group 1 (#45). Typecheck, lint, 628 tests and both native builds pass.
 - **What has run on a phone:** the evidence camera and body-cam as they were on 5 Nov, on the owner's iPhone. Nothing built since then has run on a phone, and the Android app has never run on a phone or an emulator. Treat every "Not verified" note in the archived reports as still open.
 - **New feature code is paused** (owner, 10 Nov) until repairs 1 to 4 below are done. Group 3.1 (documents only) may go ahead. Parts 2, 3 and 4 of round 2 wait.
 - **Pace:** no deadline. The next goal is a beta for about 50 testers on iPhone and Android ([BUILD_PLAN.md](BUILD_PLAN.md), "Road to the beta").
@@ -23,7 +23,7 @@ The repairs come from the review of `main` on 10 Nov. Each round gets a brief in
 | # | Work | What it covers | State |
 |---|---|---|---|
 | 1 | **Run on phones** | The Android emulator on the owner's Mac, then his Android phone (from 12 Nov); the iPhone tests owed for Part 1, 1.6 and 1.7; then test sections D to J. One fix round follows what they find. | The owner's sittings. Test builds: [release/try-a-build.md](release/try-a-build.md). |
-| 2 | **Repair round A: evidence that survives** | The bookkeeping file (`session.json`) written safely and rebuilt from the signed records if unreadable; free storage watched, stage one; one file per signing key, never overwritten. | **Built; all three groups are in pull requests.** Groups 1 and 2 each wait for the native builds and a native review. Group 3 has no native code of its own, but is built on groups 1 and 2 and merges after them. Reports below. Brief: [briefs/2026-11-10-repair-round-a.md](briefs/2026-11-10-repair-round-a.md). |
+| 2 | **Repair round A: evidence that survives** | The bookkeeping file (`session.json`) written safely and rebuilt from the signed records if unreadable; free storage watched, stage one; one file per signing key, never overwritten. | **Built.** Group 1 is merged (#45). Group 2 is in a pull request (#46), with both native builds passed, waiting for a native review. Group 3 is in a pull request (#47); it has no native code of its own, is built on groups 1 and 2, and merges last. Reports below. Brief: [briefs/2026-11-10-repair-round-a.md](briefs/2026-11-10-repair-round-a.md). |
 | 3 | **Repair round B: safety that keeps running** | Android video that notices a failed recorder and restarts; body-cam's start check; "My phone is being taken" restarting by itself after the app is killed; time limits on server calls; a phone with no SIM set for texts; the alert sent at once with the link following; the lock at once. | Brief to be written; two points are open with the owner (below). May run beside round A. |
 | 4 | **Our own web address** | A `.org` and a `.in` name in front of the server and the live page, with a short list of addresses for the app to try. | The owner is choosing the names. |
 | 5 | **Tidy-ups** | The small batch (dependencies listed, `.gitignore`, the server's migration record, pinned build tools), and native builds on every pull request so the merge rule can require them. | Brief to be written. |
@@ -85,7 +85,7 @@ Brief: [briefs/2026-11-10-repair-round-a.md](briefs/2026-11-10-repair-round-a.md
 
 ### Group 1: the bookkeeping file can't be lost (branch `repair-a/1-session-file`)
 
-**State:** in a pull request. Typecheck, lint and 628 tests pass. It changes native code (Kotlin, Java, Swift), so it waits for both native builds and for **a review by a session that did not write it**. No change to what a signed record or a bundle holds: the bundle format stays 0.9.
+**State:** merged on 10 Nov (#45). Typecheck, lint and 628 tests passed, and both native builds. It changes native code (Kotlin, Java, Swift). No change to what a signed record or a bundle holds: the bundle format stays 0.9.
 
 **The reading of the file library, confirmed.** In the installed `expo-file-system` 58.0.10:
 - iPhone writes text with `content.write(to: url, atomically: false, …)` (`ios/FileSystemFile.swift`, line 117), and bytes with `data.write(to: url)`, which is not all-or-nothing either.
@@ -138,7 +138,7 @@ Everything a signed record holds comes back exactly: the file's name, kind, size
 
 ### Group 2: free storage, stage one (branch `repair-a/2-free-storage`)
 
-**State:** in a pull request, from `main` as it was before group 1 merged (it does not need group 1's code; the two touch the same handoff and wording files, which I will bring together when group 1 merges). Typecheck, lint and 648 tests pass. It changes native code (Kotlin, Java, Swift), so it waits for both native builds and for **a review by a session that did not write it**. The bundle format goes from 0.9 to **0.10**.
+**State:** in a pull request (#46), with `main` merged in after group 1 (it does not need group 1's code; the two touched the same handoff and workflow files, now brought together). Typecheck, lint and 678 tests pass with group 1 in, and both native builds passed before that merge; they run again on it. It changes native code (Kotlin, Java, Swift), so it still waits for **a review by a session that did not write it**. The bundle format goes from 0.9 to **0.10**.
 
 **What was built.**
 1. **Reading free space** (`src/platform/storage/read.ts`), through `Paths.availableDiskSpace`. What each phone reports there, read in expo-file-system 58.0.10:
@@ -187,7 +187,7 @@ Everything a signed record holds comes back exactly: the file's name, kind, size
 
 ### Group 3: one file per signing key (branch `repair-a/3-signing-keys`)
 
-**State:** in a pull request. Typecheck, lint and 695 tests pass. **No native code of its own.** It uses group 1's safe write and takes the format number after group 2's, so its branch carries both groups, and its pull request shows their changes too until they are merged; it should merge last. The bundle format goes from 0.10 to **0.11**.
+**State:** in a pull request (#47). Typecheck, lint and 695 tests pass. **No native code of its own.** It uses group 1's safe write and takes the format number after group 2's, so its branch carries both. Group 1 is now on `main`; its pull request shows group 2's changes too until #46 is merged, and it should merge last. The bundle format goes from 0.10 to **0.11**.
 
 **What was built.**
 1. **One file per key, never overwritten:** `evidence/keys/<keyId>.json`. A key's file is written when the key is made, and rewritten only for that same key (its App Attest result arriving), through group 1's safe write. No key's file is ever written over by another's. The old `device-key.json` is moved to `keys/<its keyId>.json` the first time anything asks for a key after the update, and also when the app opens; nothing is deleted, and an old file that can't be read stays where it is.
