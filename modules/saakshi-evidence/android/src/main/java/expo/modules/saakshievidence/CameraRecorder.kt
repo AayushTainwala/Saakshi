@@ -722,6 +722,8 @@ object CameraRecorder {
       json.put("closedAt", iso(closedAt))
       json.put("endReason", endReason)
     }
-    marker.writeText(json.toString())
+    // Beside, then swapped in one step (repair round A, group 1): a kill or a power cut during
+    // this write leaves the old marker or the new one, never an empty file that recovery can't read.
+    AtomicFile.write(marker, json.toString().toByteArray())
   }
 }

@@ -27,6 +27,7 @@ jest.mock('../export/videoActions', () => ({
   playVideo: jest.fn(),
   shareFile: async (_: string, item: { sequence: number }, title: string) => void mockCalls.push(`share file ${item.sequence} (${title})`),
   shareJoinedCopy: async (_: string, title: string) => void mockCalls.push(`share joined (${title})`),
+  shareOriginal: async (uri: string, title: string) => void mockCalls.push(`share as it is ${uri.split('/').slice(-2).join('/')} (${title})`),
 }));
 jest.mock('../export/bundle', () => ({
   BundleBusyError: class extends Error {},
@@ -193,5 +194,71 @@ describe('the record screen\'s two actions (fix round 1, group 9)', () => {
       body: '0001.mp4 is missing or has changed size; run Check files.',
       buttons: undefined,
     });
+  });
+});
+
+describe('a recording whose index was lost (repair round A, group 1)', () => {
+  beforeAll(() => {
+    initI18n('en');
+  });
+
+  beforeEach(() => {
+    mockCalls.length = 0;
+    mockFolder = null;
+  });
+
+  it('says in plain words that the index was rebuilt, and what could not be brought back', async () => {
+    mockSession = { ...session([item(0), item(1)]), rebuilt: { at: at(40) } };
+    await render(wrap(<SessionDetail id="s1" />));
+    expect(screen.getByText("This recording's index was rebuilt")).toBeTruthy();
+    expect(screen.getByText(/On 06\/11\/2026 11:10 IST that list could not be read, so Saakshi made it again from the recording's signed records/)).toBeTruthy();
+    expect(screen.getByText(/witness messages sent before then may not be shown/)).toBeTruthy();
+    // It is still a record like any other: it can be checked and exported.
+    expect(screen.getByRole('button', { name: 'Export evidence bundle' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Check files' })).toBeTruthy();
+  });
+
+  it('says nothing of the kind on a record whose index was never lost', async () => {
+    mockSession = session([item(0)]);
+    await render(wrap(<SessionDetail id="s1" />));
+    expect(screen.queryByText("This recording's index was rebuilt")).toBeNull();
+  });
+
+  it('shows a file found without a signed record as that, and lets it be shared as it is', async () => {
+    mockSession = { ...session([item(0), item(6, { status: 'saved', noRecord: true, media: '0006-clip2-seg0.mp4' })]), rebuilt: { at: at(40) } };
+    await render(wrap(<SessionDetail id="s1" />));
+    expect(screen.getByText(/No signed record was found for this file/)).toBeTruthy();
+    expect(screen.getByText('1 of 2 files')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Share this file' }));
+    expect(mockCalls).toEqual(['share as it is media/0006-clip2-seg0.mp4 (Share this file)']);
+  });
+
+  it('lists a recording whose index is damaged with the files still in its folder, each to share', async () => {
+    mockSession = {
+      ...session([]),
+      damaged: {
+        files: [
+          { folder: 'media', name: '0003-clip0-seg0.mp4', size: 30_080, modifiedAt: Date.parse(at(12)) },
+          { folder: 'incoming', name: 'rec-c.mp4', size: 2 * 1024 * 1024, modifiedAt: Date.parse(at(15)) },
+        ],
+      },
+    };
+    await render(wrap(<SessionDetail id="s1" />));
+    expect(screen.getByText("This recording's index is damaged")).toBeTruthy();
+    expect(screen.getByText(/Nothing has been deleted/)).toBeTruthy();
+    expect(screen.getByText('0003-clip0-seg0.mp4')).toBeTruthy();
+    expect(screen.getByText('Last written 06/11/2026 10:42:00 IST · 29 KB')).toBeTruthy();
+    expect(screen.getByText('Last written 06/11/2026 10:45:00 IST · 2.0 MB')).toBeTruthy();
+    // No bundle can be made without a signed record, and the screen doesn't offer one.
+    expect(screen.queryByRole('button', { name: 'Export evidence bundle' })).toBeNull();
+    await fireEvent.press(screen.getAllByRole('button', { name: 'Share this file' })[1]);
+    expect(mockCalls).toEqual(['share as it is incoming/rec-c.mp4 (Share this file)']);
+    expect(screen.getByRole('button', { name: 'Delete this record' })).toBeTruthy();
+  });
+
+  it('says so when a damaged recording has no files left', async () => {
+    mockSession = { ...session([]), damaged: { files: [] } };
+    await render(wrap(<SessionDetail id="s1" />));
+    expect(screen.getByText('No recorded files were found in its folder.')).toBeTruthy();
   });
 });

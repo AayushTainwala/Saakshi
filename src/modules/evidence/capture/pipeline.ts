@@ -280,12 +280,18 @@ export class CaptureSession {
       ),
       updatedAt: this.deps.now().toISOString(),
     };
-    this.deps.store.writeSession(this.state);
+    // One line added to the session's log, about every 10 seconds; session.json is rewritten only
+    // when a file closes or something else changes (repair round A, group 1).
+    this.deps.store.appendCheckpoint(current.id, item);
     this.emit();
     return item;
   }
 
-  /** Saves the item into session.json, replacing an earlier save of the same sequence number. */
+  /**
+   * Saves the item into session.json, replacing an earlier save of the same sequence number. The
+   * whole of what this session holds in memory is written each time, so if session.json was lost
+   * while recording, the next file to close puts it back.
+   */
   private commit(item: EvidenceItem): void {
     const session = this.session();
     const items = session.items.filter((existing) => existing.sequence !== item.sequence);

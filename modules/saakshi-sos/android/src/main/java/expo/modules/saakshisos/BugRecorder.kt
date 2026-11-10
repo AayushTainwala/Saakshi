@@ -6,6 +6,8 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -321,7 +323,30 @@ object BugRecorder {
         put("endReason", endReason)
       }
     }
-    File(cfg.pendingDir, "${piece.file.name}.json").writeText(json.toString())
+    replaceFile(File(cfg.pendingDir, "${piece.file.name}.json"), json.toString())
+  }
+
+  /**
+   * Writes the text into a file beside the target and renames it into place (repair round A,
+   * group 1), so that a kill or a power cut leaves the old marker or the new one, whole, never an
+   * empty file that recovery can't read. File.renameTo is rename(2), which swaps in one step. The
+   * same as AtomicFile in the saakshi-evidence module, which this module does not depend on.
+   */
+  private fun replaceFile(target: File, text: String) {
+    val temporary = File(target.path + ".tmp")
+    try {
+      FileOutputStream(temporary).use { out ->
+        out.write(text.toByteArray())
+        out.fd.sync()
+      }
+    } catch (error: Exception) {
+      temporary.delete()
+      throw error
+    }
+    if (!temporary.renameTo(target)) {
+      temporary.delete()
+      throw IOException("Could not put ${target.name} in place")
+    }
   }
 
   private fun emit(name: String, body: Map<String, Any?>) {

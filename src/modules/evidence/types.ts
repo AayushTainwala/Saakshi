@@ -103,8 +103,12 @@ export type FileDigests = {
   sha256: string;
   sha1: string;
   md5: string;
-  /** CRC-32 of the file, kept for writing the export ZIP without reading the file twice. */
-  crc32: number;
+  /**
+   * CRC-32 of the file, kept for writing the export ZIP without reading the file twice. Null when
+   * the bookkeeping was made again from the signed records, which don't hold it (locker/rebuild.ts);
+   * it is then worked out when the record is next exported.
+   */
+  crc32: number | null;
 };
 
 export type ItemStatus = 'saved' | 'hashed' | 'sealed' | 'failed';
@@ -134,6 +138,11 @@ export type EvidenceItem = {
   mode?: CaptureMode;
   /** Degrees to turn the picture upright (MPEG-TS), as in the signed record. */
   rotationDegrees?: number | null;
+  /**
+   * A file found in the session's media folder with no signed record of its own, when the
+   * bookkeeping was made again (locker/rebuild.ts). Its times are the file's last write.
+   */
+  noRecord?: boolean;
 };
 
 export type WitnessEntry = {
@@ -165,7 +174,22 @@ export type SessionState = {
   checkpoints?: CheckpointItem[];
   /** The last on-phone check of files, records and chain. */
   lastCheck?: { at: string; ok: boolean; problems: { sequence: number; problem: string }[] };
+  /**
+   * Set when session.json was missing or unreadable and this bookkeeping was made again from the
+   * signed records in the session's folder (repair round A, group 1). It is a note in the
+   * bookkeeping only: no signed record says it, and none was changed.
+   */
+  rebuilt?: { at: string };
+  /**
+   * session.json was missing or unreadable and no signed record could be read to make it again.
+   * Never saved: the locker tries again each time it reads the session. `files` are the recorded
+   * files still in its folder, so that they can be shared out.
+   */
+  damaged?: { files: LooseFile[] };
 };
+
+/** A recorded file in a damaged session's folder: in `media/`, or still in `incoming/`. */
+export type LooseFile = { folder: 'media' | 'incoming'; name: string; size: number; modifiedAt: number };
 
 export type LocationFix = {
   latitude: number;

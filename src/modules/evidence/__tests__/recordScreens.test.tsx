@@ -142,6 +142,23 @@ describe('the records list and the player (fix round 1, group 3)', () => {
     expect(screen.getByText('Started 06/11/2026 10:40 IST')).toBeTruthy();
   });
 
+  it('lists a record whose index is damaged, saying so, and never leaves it out (repair round A, group 1)', async () => {
+    const session: SessionState = {
+      version: 1,
+      id: 's-damaged',
+      createdAt: at(9),
+      updatedAt: at(20),
+      items: [],
+      witness: [],
+      certificate: null,
+      damaged: { files: [{ folder: 'media', name: '0003-clip0-seg0.mp4', size: 30_080, modifiedAt: 0 }, { folder: 'incoming', name: 'rec.ts', size: 10, modifiedAt: 1 }] },
+    };
+    await render(wrap(<RecordRow session={session} pressed={false} />));
+    expect(screen.getByText("This recording's index is damaged")).toBeTruthy();
+    expect(screen.getByText('2 files are still on your phone')).toBeTruthy();
+    expect(screen.queryByText(/Started/)).toBeNull();
+  });
+
   it('names an evidence-camera record by what it holds', async () => {
     const session: SessionState = {
       version: 1,

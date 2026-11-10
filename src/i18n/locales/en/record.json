@@ -68,7 +68,8 @@
     "deleteConfirm": "Delete",
     "deleteBusy": "This record is still being recorded, saved or copied. Try again when that has finished.",
     "video": "Video",
-    "audio": "Sound"
+    "audio": "Sound",
+    "itemNoRecord": "No signed record was found for this file, so it can't be checked or put in an evidence bundle. You can still share it."
   },
   "witness": {
     "send": "Send witness message",
@@ -344,5 +345,19 @@
   "pocket": {
     "open": "Pocket recording",
     "openHint": "Sound only, like a body-cam for sound, with the phone in your pocket or bag."
+  },
+  "rebuilt": {
+    "title": "This recording's index was rebuilt",
+    "body": "Saakshi keeps a list of each recording's files. On {{time}} that list could not be read, so Saakshi made it again from the recording's signed records. The recordings and their signed records were not changed.",
+    "lost": "Three things could not be brought back: witness messages sent before then may not be shown, the last check is not shown, and copies made for sharing will be made again when you next share. Tap \"Check files\" to check this recording now."
+  },
+  "damaged": {
+    "title": "This recording's index is damaged",
+    "body": "Saakshi keeps a list of each recording's files. This recording's list can't be read, and Saakshi found no signed record to make it again from. Nothing has been deleted: the recorded files found in its folder are below, and you can share each one. Without a signed record they can't go into an evidence bundle.",
+    "none": "No recorded files were found in its folder.",
+    "files_one": "{{count}} file is still on your phone",
+    "files_other": "{{count}} files are still on your phone",
+    "fileWritten": "Last written {{time}} · {{size}}",
+    "share": "Share this file"
   }
 }
