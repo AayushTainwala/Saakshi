@@ -17,6 +17,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, Button } from '@/components';
 import { type BatteryAction, useLowBattery } from '@/platform/battery';
+import {
+  cameraBytesPerSecond,
+  canStart,
+  noRoomLabel,
+  readFreeBytes,
+  roomLabel,
+  SAFETY_FLOOR_BYTES,
+  secondsLeft,
+  useFreeBytes,
+  useStorageSettings,
+  watchStorage,
+} from '@/platform/storage';
 import { palettes, radius, spacing, touchTarget } from '@/theme';
 
 import { fileLocker } from '../locker/store';
@@ -44,6 +56,8 @@ function formatElapsed(seconds: number): string {
 
 export function CaptureScreen() {
   const { t } = useTranslation('record');
+  const { t: ts } = useTranslation('storage');
+  const storage = useStorageSettings();
   const camera = useRef<CameraView>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
@@ -160,8 +174,21 @@ export function CaptureScreen() {
   }, [recording]);
   const elapsed = Math.max(0, Math.floor((clock - recordingSince) / 1000));
 
+  // Free storage, stage one (SPEC section 4, "Storage"; repair round A, group 2). The evidence
+  // camera has warnings and no automatic stop above the safety floor, as with the battery; at the
+  // floor nothing is recorded, and a video being recorded is stopped and saved.
+  const [storageNote, setStorageNote] = useState<string | null>(null);
+  /** True if there is room above the floor (or the phone doesn't say); otherwise says why not. */
+  const roomToRecord = useCallback(() => {
+    const free = readFreeBytes();
+    if (free === null || canStart(free, SAFETY_FLOOR_BYTES)) return true;
+    setStorageNote(noRoomLabel(ts, free, null));
+    return false;
+  }, [ts]);
+
   const takePhoto = useCallback(async () => {
     if (!camera.current || busy) return;
+    if (!roomToRecord()) return;
     setBusy(true);
     try {
       const at = new Date();
@@ -179,7 +206,7 @@ export function CaptureScreen() {
     } finally {
       setBusy(false);
     }
-  }, [busy, location, session]);
+  }, [busy, location, roomToRecord, session]);
 
   const controller = useRef<VideoController | null>(null);
 
@@ -223,6 +250,8 @@ export function CaptureScreen() {
   /** One video, one file, from start to stop (spec E1). */
   const startRecording = useCallback(async () => {
     if (recordingRef.current) return;
+    if (!roomToRecord()) return;
+    setStorageNote(null);
     recordingRef.current = true;
     const common = { session, store: fileLocker, location, mode: 'camera' as const, clip: session.nextClip() };
     const next = OWN_RECORDER ? androidVideoController({ ...common, quality: 720 }) : iosVideoController(camera, common);
@@ -238,7 +267,7 @@ export function CaptureScreen() {
       controller.current = null;
       setRecording(false);
     }
-  }, [location, session]);
+  }, [location, roomToRecord, session]);
 
   const stopRecording = useCallback(async (reason: EndReason = 'stopped') => {
     if (!recordingRef.current) return;
@@ -259,6 +288,35 @@ export function CaptureScreen() {
     [t],
   );
   useLowBattery(recording, onBattery);
+
+  // While a video records: warnings at about 30 and 10 minutes of room left before the floor, a
+  // note once the phone is below the room the user keeps free (recording carries on), and at the
+  // floor the video is stopped and saved ("storage-full"). A reading that fails stops nothing.
+  useEffect(() => {
+    if (!recording) return;
+    let pastKeepFree = false;
+    const watch = watchStorage(
+      () => ({ limitBytes: SAFETY_FLOOR_BYTES, floorBytes: SAFETY_FLOOR_BYTES, bytesPerSecond: cameraBytesPerSecond() }),
+      (action) => {
+        if (action.type === 'warn') setStorageNote(ts('warn.video', { minutes: action.minutes }));
+        else if (action.type === 'floor') {
+          setStorageNote(ts('warn.stoppedFloor'));
+          void stopRecording('storage-full');
+        } else if (action.type === 'unknown') setStorageNote(ts('warn.unknown'));
+        else if (action.type === 'known') setStorageNote(null);
+      },
+      readFreeBytes,
+      (free) => {
+        if (free === null || pastKeepFree || free > storage.keepFreeBytes || free <= SAFETY_FLOOR_BYTES) return;
+        pastKeepFree = true;
+        setStorageNote(ts('warn.pastKeepFree'));
+      },
+    );
+    return watch.stop;
+  }, [recording, stopRecording, storage.keepFreeBytes, ts]);
+  // Always shown before a video starts: how long the free room allows, down to the floor.
+  const freeBytes = useFreeBytes(mode === 'video' && !recording);
+  const room = mode === 'video' && !recording ? roomLabel(ts, 'video', secondsLeft(freeBytes, SAFETY_FLOOR_BYTES, cameraBytesPerSecond())) : null;
 
   const close = useCallback(async () => {
     await stopRecording();
@@ -368,6 +426,15 @@ export function CaptureScreen() {
             {batteryNote ? (
               <AppText variant="small" style={{ color: colors.warning }}>
                 {batteryNote}
+              </AppText>
+            ) : null}
+            {storageNote ? (
+              <AppText variant="small" style={{ color: colors.warning }}>
+                {storageNote}
+              </AppText>
+            ) : room ? (
+              <AppText variant="small" style={{ color: colors.textMuted }}>
+                {room}
               </AppText>
             ) : null}
             <AppText variant="small" style={{ color: colors.text }}>

@@ -280,3 +280,110 @@ describe('WitnessThrottle', () => {
     expect(throttle.allow(0, 41 * minute)).toBe(false);
   });
 });
+
+describe('Pocket recording and the phone\'s room (repair round A, group 2)', () => {
+  const GB = 1024 ** 3;
+  const FLOOR = 300 * 1024 ** 2;
+  const KEEP = 5 * GB;
+  const RATE = 8_800;
+
+  function withStorage(free: number | null = 20 * GB) {
+    const ctx = setup();
+    let onAction: ((action: import('@/platform/storage').StorageAction) => void) | null = null;
+    let target: (() => import('@/platform/storage').StorageTarget) | null = null;
+    const unwatch = jest.fn();
+    const room = { free };
+    ctx.deps.storage = {
+      free: () => room.free,
+      watch: (nextTarget, next) => {
+        target = nextTarget;
+        onAction = next;
+        return { stop: unwatch };
+      },
+      keepFreeBytes: () => KEEP,
+      floorBytes: FLOOR,
+      bytesPerSecond: RATE,
+    };
+    return { ...ctx, room, unwatch, target: () => target!(), storage: (action: import('@/platform/storage').StorageAction) => onAction?.(action) };
+  }
+
+  it('watches for the amount the user keeps free, warns as room runs low, and stops there with "storage-full"', async () => {
+    const { bug, storage, target, stopEngine, unwatch } = withStorage();
+    await bug.start();
+    expect(target()).toEqual({ limitBytes: KEEP, floorBytes: FLOOR, bytesPerSecond: RATE });
+    storage({ type: 'warn', minutes: 30 });
+    expect(bug.getState()).toMatchObject({ running: true, storageMinutes: 30 });
+    storage({ type: 'warn', minutes: 10 });
+    expect(bug.getState().storageMinutes).toBe(10);
+    expect(stopEngine).not.toHaveBeenCalled();
+
+    storage({ type: 'limit' });
+    await bug.settled();
+    await Promise.resolve();
+    expect(stopEngine).toHaveBeenCalledWith('storage-full');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(bug.getState()).toMatchObject({ running: false, stoppedForStorage: 'keep-free' });
+    expect(unwatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('"My phone is being taken" records past the amount kept free and stops at the floor', async () => {
+    const { bug, storage, target, stopEngine } = withStorage();
+    await bug.start({ startedFrom: 'phone-taken', liveActivity: false });
+    expect(target()).toEqual({ limitBytes: FLOOR, floorBytes: FLOOR, bytesPerSecond: RATE });
+    // Even if the keep-free amount is said (it was the limit when it was read), nothing stops.
+    storage({ type: 'limit' });
+    expect(stopEngine).not.toHaveBeenCalled();
+    expect(bug.getState().running).toBe(true);
+
+    storage({ type: 'floor' });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(stopEngine).toHaveBeenCalledWith('storage-full');
+    expect(bug.getState()).toMatchObject({ running: false, stoppedForStorage: 'floor' });
+  });
+
+  it('goes on down to the floor when "My phone is being taken" starts over a Pocket recording', async () => {
+    const { bug, storage, target, stopEngine } = withStorage();
+    await bug.start();
+    expect(target().limitBytes).toBe(KEEP);
+    await bug.start({ startedFrom: 'phone-taken', liveActivity: false });
+    expect(target().limitBytes).toBe(FLOOR);
+    storage({ type: 'limit' });
+    expect(stopEngine).not.toHaveBeenCalled();
+    storage({ type: 'floor' });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(stopEngine).toHaveBeenCalledWith('storage-full');
+  });
+
+  it('never stops because the phone didn\'t say how much room is free', async () => {
+    const { bug, storage, stopEngine } = withStorage();
+    await bug.start();
+    storage({ type: 'unknown' });
+    expect(bug.getState()).toMatchObject({ running: true, storageUnknown: true });
+    storage({ type: 'known' });
+    expect(bug.getState()).toMatchObject({ running: true, storageUnknown: false });
+    expect(stopEngine).not.toHaveBeenCalled();
+  });
+
+  it('does not start below the amount kept free, and says how much is free', async () => {
+    const { bug, deps } = withStorage(KEEP - GB);
+    await expect(bug.start()).rejects.toMatchObject({ name: 'Error', freeBytes: KEEP - GB, keepFreeBytes: KEEP });
+    expect(deps.startEngine).not.toHaveBeenCalled();
+    expect(bug.getState().running).toBe(false);
+  });
+
+  it('"My phone is being taken" starts below the amount kept free, but not below the floor', async () => {
+    const below = withStorage(KEEP - GB);
+    await below.bug.start({ startedFrom: 'phone-taken', liveActivity: false });
+    expect(below.bug.getState().running).toBe(true);
+
+    const full = withStorage(FLOOR);
+    await expect(full.bug.start({ startedFrom: 'phone-taken', liveActivity: false })).rejects.toMatchObject({ freeBytes: FLOOR, keepFreeBytes: null });
+    expect(full.deps.startEngine).not.toHaveBeenCalled();
+  });
+
+  it('starts when the phone doesn\'t say how much room is free', async () => {
+    const { bug } = withStorage(null);
+    await bug.start();
+    expect(bug.getState().running).toBe(true);
+  });
+});

@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 
 import i18n from '@/i18n';
 import { setSavingMode, watchBattery } from '@/platform/battery';
+import { loadStorageSettings, readFreeBytes, SAFETY_FLOOR_BYTES, soundBytesPerSecond, watchStorage } from '@/platform/storage';
 import type { UploadPart } from '@/modules/evidence';
 import { canTextWithoutTap, getTrustedContacts, textTrustedContacts } from '@/modules/sos';
 
@@ -38,6 +39,13 @@ export const bugMode = new BugModeController({
     ),
   watchBattery,
   savingMode: setSavingMode,
+  storage: {
+    free: readFreeBytes,
+    watch: (target, onAction) => watchStorage(target, onAction),
+    keepFreeBytes: () => loadStorageSettings().keepFreeBytes,
+    floorBytes: SAFETY_FLOOR_BYTES,
+    bytesPerSecond: soundBytesPerSecond(),
+  },
   // The people ticked for witness messages (fix round 1, group 6).
   witnessCost: async () => ((await canTextWithoutTap()) ? (await getTrustedContacts('witness')).length : 0),
   witness: async (message) => {

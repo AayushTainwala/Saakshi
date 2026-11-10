@@ -13,6 +13,11 @@
     "body": "Open Saakshi's SOS screen straight from the Lock Screen, the Action Button, Back Tap, a widget or a notification.",
     "open": "Set up the quick trigger"
   },
+  "storage": {
+    "heading": "Storage",
+    "body": "How much of the phone Saakshi keeps free while recording, how much room its recordings take, and what happens when the phone fills up.",
+    "open": "Open Storage"
+  },
   "language": {
     "heading": "Language",
     "system": "Phone's language",

@@ -166,6 +166,10 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
   private var handOverReason: String?
   /// When the last frame was written, for 15 frames a second in saving mode.
   private var lastWrittenFrame = CMTime.invalid
+  /// Sound only (repair round A, group 2): the phone is down to the free room the user keeps.
+  /// Video has stopped and does not start again, the camera is off, and sound carries on in
+  /// sound-only files, as it does while the app is in the background. Until the recording ends.
+  private var soundOnlyMode = false
 
   var isRunning: Bool {
     lock.lock()
@@ -276,6 +280,24 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     queue.async { [self] in saving = on }
   }
 
+  /**
+   * Body-cam carries on as sound only (repair round A, group 2; bundle format 0.10): the video file
+   * being written closes with `reason` ("storage-sound-only") and the sound carries on in a
+   * sound-only file, the same way as when the app leaves the screen (`endVideoStretch`), so the
+   * sound has no gap. From then on frames are ignored and the camera is stopped; coming back to the
+   * app does not start video again. If sound was already recording on its own, it simply carries on.
+   */
+  func soundOnly(reason: String) {
+    queue.async { [self] in
+      guard isRunning, !stopping, !soundOnlyMode else { return }
+      soundOnlyMode = true
+      endVideoStretch(reason: reason, interruption: nil)
+      sessionQueue.async { [self] in
+        if let capture, capture.isRunning { capture.stopRunning() }
+      }
+    }
+  }
+
   private func teardown() {
     let observed = !observers.isEmpty
     for observer in observers { NotificationCenter.default.removeObserver(observer) }
@@ -345,6 +367,7 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     videoRetryAt = .invalid
     soundRetryAt = .invalid
     videoFinishes = 0
+    soundOnlyMode = false
   }
 
   private func makeCapture(quality: Int) throws -> (AVCaptureSession, AVCaptureVideoDataOutput) {
@@ -456,7 +479,10 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
       }
       self.emitError("The camera stopped: \(error?.localizedDescription ?? "unknown error")")
       self.sessionQueue.async {
-        if self.isRunning, let capture = self.capture, !capture.isRunning { capture.startRunning() }
+        // Not once body-cam is sound only: the camera stays off.
+        if self.isRunning, !self.queue.sync(execute: { self.soundOnlyMode }), let capture = self.capture, !capture.isRunning {
+          capture.startRunning()
+        }
       }
     })
     observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: AVAudioSession.sharedInstance(), queue: nil) {
@@ -595,7 +621,8 @@ final class BodyCamRecorder: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
   }
 
   func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-    guard let config, !stopping, let sample = hostTimed(sampleBuffer) else { return }
+    // Sound only: a frame still on its way from the camera opens no new video file.
+    guard let config, !stopping, !soundOnlyMode, let sample = hostTimed(sampleBuffer) else { return }
     let pts = CMSampleBufferGetPresentationTimeStamp(sample)
     if let last = lastFrame, pts > last {
       let gap = (pts - last).seconds

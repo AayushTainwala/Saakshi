@@ -10,6 +10,8 @@ export default function SettingsLayout() {
       <Stack.Screen name="contacts" options={{ title: t('contacts.title', { ns: 'sos' }), headerLargeTitle: false }} />
       <Stack.Screen name="trigger" options={{ title: t('trigger.title', { ns: 'sos' }), headerLargeTitle: false }} />
       <Stack.Screen name="lock" options={{ title: t('lock.title', { ns: 'sos' }), headerLargeTitle: false }} />
+      {/* Free storage, stage one (repair round A, group 2). */}
+      <Stack.Screen name="storage" options={{ title: t('storage.heading'), headerLargeTitle: false }} />
     </Stack>
   );
 }

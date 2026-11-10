@@ -92,6 +92,12 @@ public class SaakshiEvidenceModule: Module {
       BodyCamRecorder.shared.handOver(reason: reason, saving: saving)
     }
 
+    // Free storage, stage one (repair round A, group 2): at the room the user keeps free, the video
+    // file closes with `reason` and body-cam carries on as sound only.
+    AsyncFunction("bodyCamSoundOnly") { (reason: String) in
+      BodyCamRecorder.shared.soundOnly(reason: reason)
+    }
+
     // Saving mode off (the phone is charging): the next body-cam file is at the normal quality.
     AsyncFunction("bodyCamSetSaving") { (saving: Bool) in
       BodyCamRecorder.shared.setSaving(saving)

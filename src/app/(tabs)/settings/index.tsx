@@ -63,6 +63,13 @@ export default function SettingsScreen() {
         <Button variant="secondary" label={t('trigger.open')} onPress={() => router.push('/settings/trigger')} />
       </Card>
 
+      {/* Free storage, stage one (SPEC section 4, "Storage"; repair round A, group 2). */}
+      <Card>
+        <AppText variant="heading">{t('storage.heading')}</AppText>
+        <AppText>{t('storage.body')}</AppText>
+        <Button variant="secondary" label={t('storage.open')} onPress={() => router.push('/settings/storage')} />
+      </Card>
+
       <AppText variant="heading">{t('language.heading')}</AppText>
       <OptionGroup
         label={t('language.heading')}

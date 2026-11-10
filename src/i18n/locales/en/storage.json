@@ -1,0 +1,54 @@
+{
+  "room": {
+    "video": "Room for about {{time}} of video",
+    "sound": "Room for about {{time}} of sound",
+    "unknown": "Saakshi can't read how much room this phone has free. It will not stop a recording for lack of room."
+  },
+  "time": {
+    "hoursMinutes": "{{h}} h {{m}} min",
+    "hours": "{{h}} h",
+    "minutes": "{{m}} min",
+    "underMinute": "less than a minute"
+  },
+  "size": {
+    "gb": "{{value}} GB",
+    "mb": "{{value}} MB"
+  },
+  "explain": {
+    "title": "Room on your phone",
+    "long": "Body-cam and Pocket recording are made for long recordings that nobody is watching, so Saakshi looks after the phone's room for them.",
+    "perHour": "An hour of body-cam video takes about {{video}}. An hour of sound takes about {{sound}}.",
+    "keepFree": "Saakshi leaves {{amount}} of the phone free for everything else. You can change this in Settings, under Storage.",
+    "atKeepFreeSoundOnly": "When only that much is left, body-cam stops video and carries on recording sound, which takes far less room. Pocket recording stops and saves its recording.",
+    "atKeepFreeStop": "When only that much is left, body-cam and Pocket recording stop and save the recording.",
+    "floor": "Saakshi never records into the last {{floor}} of the phone. That room is kept so that a recording can always be closed and signed. There, every recording stops and is saved.",
+    "phoneTaken": "“My phone is being taken” keeps recording past the amount you keep free, down to that last {{floor}}.",
+    "gotIt": "I understand"
+  },
+  "start": {
+    "belowKeepFree": "Saakshi can't start recording. The phone has {{free}} free, and Saakshi keeps {{amount}} free for everything else. Make room on the phone, or lower the amount in Settings, under Storage.",
+    "belowFloor": "Saakshi can't start recording. The phone has only {{free}} free, and Saakshi never records into the last {{floor}}. Make room on the phone first."
+  },
+  "warn": {
+    "video": "Room for about {{minutes}} more minutes of video.",
+    "sound": "Room for about {{minutes}} more minutes of sound.",
+    "soundOnly": "The phone is down to the room you keep free. Video has stopped. Sound is still recording.",
+    "pastKeepFree": "The phone is below the room you keep free. Recording carries on until the phone is almost full.",
+    "stoppedKeepFree": "The phone was down to the room you keep free, so the recording was stopped and saved.",
+    "stoppedFloor": "The phone was almost full, so the recording was stopped and saved.",
+    "unknown": "Saakshi can't read how much room is left. Recording carries on."
+  },
+  "settings": {
+    "free": "Free on this phone now: {{free}}",
+    "freeUnknown": "Saakshi can't read how much of this phone is free.",
+    "used": "Saakshi's recordings take about {{used}}.",
+    "usedNone": "Saakshi has no recordings on this phone.",
+    "keepFreeHeading": "Keep free",
+    "keepFreeBody": "How much of the phone Saakshi leaves for everything else. Body-cam and Pocket recording stop before they use this room.",
+    "keepFreeOption": "{{gb}} GB",
+    "soundOnlyHeading": "When body-cam reaches that amount",
+    "soundOnlyOn": "Stop video and keep recording sound",
+    "soundOnlyOff": "Stop the recording",
+    "soundOnlyBody": "Sound takes far less room than video, so a recording that would have stopped can carry on for hours."
+  }
+}

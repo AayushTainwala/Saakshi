@@ -14,6 +14,8 @@ export const END_REASON_KEYS = {
   'audio-interrupted': 'ended.audioInterrupted',
   'sound-resumed': 'ended.soundResumed',
   'video-resumed': 'ended.videoResumed',
+  'storage-sound-only': 'ended.storageSoundOnly',
+  'storage-full': 'ended.storageFull',
   interrupted: 'ended.interrupted',
   error: 'ended.error',
 } as const satisfies Record<EndReason, string>;

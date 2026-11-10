@@ -31,6 +31,8 @@ export { CertificateProfile } from './ui/CertificateProfile';
 export { PhotoViewer } from './ui/PhotoViewer';
 export { RecordHome } from './ui/RecordHome';
 export { SessionDetail } from './ui/SessionDetail';
+/** Settings → Storage (repair round A, group 2). */
+export { StorageSettings } from './ui/StorageSettings';
 export type {
   CaptureMode,
   ClosedFile,
