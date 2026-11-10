@@ -67,7 +67,7 @@ Play asks for a short video of each feature; record them on a test phone. Google
 
 ## The screen lock (device admin), from round 2
 
-"My phone is being taken" can lock the screen on Android. It uses a device-admin receiver with the force-lock policy only; no permission is requested for it, so it does not appear in the table above (docs/BUILD_HANDOFF.md, group 1.7, which quotes Google's policies read on 9 Nov).
+"My phone is being taken" can lock the screen on Android. It uses a device-admin receiver with the force-lock policy only; no permission is requested for it, so it does not appear in the table above (docs/handoff/round-2-part-1.md, group 1.7, which quotes Google's policies read on 9 Nov).
 - It is off until the user switches it on in Settings, after an explanation, and is switched off there in one tap.
 - While it is on, Android asks for it to be switched off before Saakshi can be deleted ("Deactivate & uninstall").
 - **The store listing says both things openly** (owner, 10 Nov): that Saakshi can lock the screen, and how to switch that off and delete the app. It never presents the feature as a way to stop Saakshi being deleted.
@@ -91,7 +91,7 @@ Play asks for a short video of each feature; record them on a test phone. Google
 ## App signing
 
 The owner's decision of 21 Oct: Play signs with **our EAS keystore**, not a key Google makes. The Play copy and the GitHub APK then share one signature, so a user can move between them without uninstalling, and without losing the recordings kept in the app.
-- At the first upload, when the Console asks about the app signing key, choose to use your own key, and follow Google's export steps with the keystore downloaded from EAS (docs/BUILD_HANDOFF.md, Stream D, step 4).
+- At the first upload, when the Console asks about the app signing key, choose to use your own key, and follow Google's export steps with the keystore downloaded from EAS (docs/handoff/streams-r1-r2.md, Stream D, step 4).
 - Google's export steps couldn't be read from this session, so follow the Console's own instructions.
 
 ## Developer contact

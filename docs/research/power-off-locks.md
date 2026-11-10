@@ -73,7 +73,7 @@ Conclusion for iPhone: the walkthrough can say what Find My does after power-off
 2. **Part 4 walkthrough.** A phone-setup page that tells the user where their maker's setting is, only for makers marked [P] and tested, and a general line for the rest ("look in Settings for a setting that asks for your PIN to power off; not every phone has one"). Do not ship [S]-only paths as facts.
 3. **Test list (owner's phones or borrowed).** Samsung (stable One UI), Pixel, Realme, OnePlus, Vivo, Xiaomi, Nothing, Motorola. For each: does the setting exist, where, what does it accept (PIN only, or fingerprint or face), and does it also apply from the lock screen power menu and the hardware button hold.
 4. **No device admin, accessibility or Knox request in Saakshi for this.** Revisit only if the owner decides to ship a managed-device variant.
-5. **Release.** The release notes and requests to Apple, Google and makers are on the release checklist (BUILD_HANDOFF.md). Which makers "offer it" in those notes must come only from the tested rows above.
+5. **Release.** The release notes and requests to Apple, Google and makers are on the release checklist (docs/release/checklist.md). Which makers "offer it" in those notes must come only from the tested rows above.
 
 ## Not verified in this research
 

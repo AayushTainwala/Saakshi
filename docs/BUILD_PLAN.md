@@ -92,11 +92,11 @@ The rules are in [CLAUDE.md](../CLAUDE.md). In short:
 2. **Apple.**
    - Register the App ID `in.aayushtainwala.saakshi` with App Attest.
    - Create the App Store Connect app record "Saakshi".
-   - Give EAS its credentials with one command on your own computer, following BUILD_HANDOFF.md, Stream D, "Owner's one-time steps". It creates the distribution certificate and the App Store Connect API key, or uploads one you made. The `.p8` file is never committed.
+   - Give EAS its credentials with one command on your own computer, following handoff/streams-r1-r2.md, Stream D, "Owner's one-time steps". It creates the distribution certificate and the App Store Connect API key, or uploads one you made. The `.p8` file is never committed.
 3. **Google Play.** Personal account; an Android phone for device verification; 15–20 closed-test testers.
 4. **Cloud environment for build sessions** (claude.ai/code → environment selector under the message box → New environment):
    - **Name:** `saakshi`.
    - **Network access:** Custom. Tick "Also include default list of common package managers", and add `expo.dev`, `*.expo.dev` and `*.expo.io` to Allowed domains.
    - **Environment variables:** `BASH_DEFAULT_TIMEOUT_MS=600000` and `BASH_MAX_TIMEOUT_MS=1800000`.
-5. **Start the streams** with the prompts in [BUILD_HANDOFF.md](BUILD_HANDOFF.md).
+5. **Start the streams** with the prompts in [handoff/streams-r1-r2.md](handoff/streams-r1-r2.md) (done, October 2026). Later rounds start from a brief in [briefs/](briefs/) and the state in [BUILD_HANDOFF.md](BUILD_HANDOFF.md).
 6. **Round 2 setup, in one early sitting** (the plain guide is in the owner's vault, "Round 2 setup guide"): (a) an **Apple push key** (`.p8`) for notifications to iPhones; (b) a **Google Cloud project**, with Firebase added for notifications to Android phones, and the **Drive** permission screen and sign-in for E7; (c) an **iCloud container** for iCloud Drive copies. No paid maps (owner, 9 Nov 2026), so no Maps key. The keys and the notification service account are kept in Supabase's and EAS's secret stores, never in the repository. Parts 2 and 3 cannot be finished without them.
