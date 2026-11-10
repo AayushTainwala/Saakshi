@@ -6,7 +6,7 @@ SPEC section 2 requires that every release is published, with its SHA-256 checks
 
 The signing certificate fingerprint, not the host. Every release has the same certificate SHA-256, published in the GitHub Release notes, in `SIGNING-CERTIFICATE.txt` beside the APK, and on every mirror. Android refuses to update an installed Saakshi with an APK signed by anyone else. So a copy passed around on WhatsApp or Telegram is safe to install if its fingerprints match, and harmless if they don't, because it won't install over the real app.
 
-**Lose the keystore and this guarantee is gone.** Back it up (docs/BUILD_HANDOFF.md, Stream D, step 4).
+**Lose the keystore and this guarantee is gone.** Back it up (docs/handoff/streams-r1-r2.md, Stream D, step 4).
 
 ## Plan
 
