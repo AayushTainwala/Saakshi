@@ -12,12 +12,12 @@
 <p class="lang"><a href="hi/" lang="hi">हिंदी में पढ़ें</a></p>
 
 <h1>Saakshi privacy policy</h1>
-<p class="meta">Last updated: 21 October 2026. This policy covers Saakshi version 1.0 on iPhone and Android.</p>
+<p class="meta">Last updated: 10 November 2026. This policy covers Saakshi version 1.0 on iPhone and Android.</p>
 
 <h2>In short</h2>
 <ul>
 <li>Saakshi has no account, no ads, no analytics, no crash reporting and no tracking.</li>
-<li>We run one small server, used only for live location: while you share your location, your positions pass through it to the people you sent the link to, and they are deleted when sharing stops. Apart from that, we do not receive your recordings, your contacts, your location or anything else about you.</li>
+<li>We run one small server, used only for live location: while your location is being shared, your positions pass through it to the people you sent the link to. They are deleted when sharing stops; a share started by "My phone is being taken" is deleted a week after your phone last reported. Apart from that, we do not receive your recordings, your contacts, your location or anything else about you.</li>
 <li>What you record and type stays on your phone, in the app's own storage, until you send it somewhere yourself or delete it.</li>
 </ul>
 
@@ -27,24 +27,36 @@
 <h2>What the app uses, and where it goes</h2>
 
 <h3>Camera and microphone</h3>
-<p>Used only when you record, including in body-cam mode and in bug mode, which records sound in short pieces until you stop it. Photos, video and sound are saved in the app's own storage on your phone. We never receive them. They leave your phone only when you share or export them yourself, for example through the share sheet.</p>
+<p>Used only when you record, including in body-cam mode and in Pocket recording, which records sound as one file until you stop it. Photos, video and sound are saved in the app's own storage on your phone. We never receive them. They leave your phone only when you share or export them yourself, for example through the share sheet.</p>
 
 <h3>Location</h3>
-<p>Used while you use the app, and while live location sharing is on, if you allow it. Your position is added to the record of each recording, and to messages you choose to send. Apart from live location, below, we never receive it.</p>
+<p>Used while you use the app, and while live location sharing is on, if you allow it. Your position is added to the record of each recording (in body-cam mode and Pocket recording, about every 10 seconds), and to messages you choose to send. Apart from live location, below, we never receive it.</p>
 
 <h3>Live location</h3>
-<p>If you turn on live location, the app sends your position about every 30 seconds to our server, so that the people you send the link to can follow it in any web browser. You choose how long it runs, up to 24 hours. The server runs on Supabase, in its Mumbai (India) region. It has no accounts and nothing that names you: each share has a random code, and it keeps only the latest 300 positions. When you stop sharing, or the time you chose runs out, the share and all its positions are deleted. Supabase's own logs may record your phone's internet address, as with any web request, for as long as Supabase keeps its logs. When someone opens your link, their browser contacts GitHub (which serves the page), our server and OpenStreetMap (for the map); the code in the link is not sent to GitHub.</p>
+<p>Live location starts when you choose "Share my location", and as part of "I need help" and "My phone is being taken". While it is on, the app finds your position about every 30 seconds and sends it to our server, so that the people you send the link to can follow it in any web browser.</p>
+<ul>
+<li><strong>How long it runs.</strong> "Share my location" and "I need help" run for the time set in Settings: 1, 4, 8 or 24 hours (4 unless you change it). When you stop sharing, or the time runs out, the share and all its positions are deleted. "My phone is being taken" has no fixed end: it runs until you stop it with your secret code, and if the phone stops reporting, the server deletes the share and its positions a week after the phone last reported.</li>
+<li><strong>Battery level.</strong> When your battery is at 20% or less, its level is sent with each position and shown to the people who have the link. Above 20% it is not sent. At 5%, while body-cam mode or Pocket recording is running, positions are sent together every 5 minutes to save power.</li>
+<li><strong>The server.</strong> It runs on Supabase, in its Mumbai (India) region. It has no accounts and nothing that names you: each share has a random code, and the server keeps only the latest 300 positions. Supabase's own logs may record your phone's internet address, as with any web request, for as long as Supabase keeps its logs.</li>
+<li><strong>When someone opens your link.</strong> Their browser contacts GitHub, which serves the page, and our server; the code in the link is not sent to GitHub. To draw the map, the page asks OpenStreetMap for a map of the area around your latest position. OpenStreetMap's servers therefore receive that position and the viewer's internet address, but not your link or anything that names you; the OpenStreetMap Foundation handles them under its <a href="https://osmfoundation.org/wiki/Privacy_Policy">privacy policy</a>. The page also has links that open a position in Google Maps or on OpenStreetMap's site; those sites receive a position only if the viewer taps such a link.</li>
+</ul>
 
 <h3>Your trusted contacts</h3>
 <p>The names and numbers you add, from your address book or by typing them, are kept only in the app on your phone.</p>
 
 <h3>Text messages (SMS)</h3>
-<p>The witness message (the fingerprint, time and place of a recording) and the SOS message (your location and the time) go to the people you choose, as ordinary SMS through your mobile operator. Standard SMS charges may apply.</p>
+<p>The witness message (the fingerprint, time and place of a recording) and alerts go to the people you choose, as ordinary SMS through your mobile operator. An alert ("I need help" or "My phone is being taken") carries the time, a map link to your position, the live-location link, and your battery level when it is 20% or less. Standard SMS charges may apply.</p>
 <ul>
-<li>On iPhone, and in the version from Google Play, the app opens your Messages app with the message filled in, and you tap Send.</li>
-<li>In the Android version from our GitHub releases, SOS sends its message to your trusted contacts by itself when you start it. It does not read your messages.</li>
-<li>In that version, bug mode also texts the fingerprint of its latest recording to your trusted contacts, at most once every 10 minutes.</li>
+<li>On iPhone, and in the version from Google Play, the app opens Messages with the message filled in, and you tap Send.</li>
+<li>In the Android version from our GitHub releases, an alert is sent to your trusted contacts by itself when you start it. The app does not read your messages.</li>
+<li>In that version, Pocket recording also texts the fingerprint of the recording so far to your trusted contacts, at most once every 10 minutes. At 5% battery, while your location is being shared, it texts them once that the battery is low and that your location will now update every 5 minutes.</li>
 </ul>
+
+<h3>The secret code</h3>
+<p>The 4-digit code that turns off whatever is running, and the recovery code some phones are given with it, are checked on your phone only. They are kept in the phone's secure storage and are never sent anywhere.</p>
+
+<h3>Locking the screen (Android)</h3>
+<p>If you switch it on, Saakshi uses Android's device-admin permission to lock the screen when "My phone is being taken" starts. The permission lets Saakshi lock the screen and nothing else: it cannot erase the phone, change your screen lock or read anything. You can switch it off in Saakshi's Settings at any time. While it is on, Android asks for it to be switched off before Saakshi can be deleted.</p>
 
 <h3>The signing key on your phone</h3>
 <p>To show that a recording has not been changed, Saakshi creates a key inside your phone's security hardware and signs a record of each file with it. The private key never leaves the phone.</p>
@@ -63,14 +75,14 @@
 <p>The app may download the public list of helpline numbers from GitHub, so the list stays current. Nothing about you is sent with the request, but, as with any download, GitHub receives your phone's internet address. GitHub handles it under the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub Privacy Statement</a>.</p>
 
 <h2>What we share</h2>
-<p>We sell nothing and share nothing. Your live location positions can be seen only by people who have the link you sent; Supabase hosts the server for us. Apart from those positions we hold no data about you. Copies you send to other people, or keep in other apps or services, are held by them, not by us.</p>
+<p>We sell nothing and share nothing. Your live location positions can be seen only by people who have the link you sent. Supabase hosts the server for us, and OpenStreetMap receives the position a viewer's map is drawn for (see Live location). Apart from those positions, and the battery level sent with them at 20% or less, we hold no data about you. Copies you send to other people, or keep in other apps or services, are held by them, not by us.</p>
 
 <h2>How long data is kept, and how to delete it</h2>
 <ul>
 <li>Data stays on your phone until you delete it. In the app you can delete a recording session, which removes its files, records and certificate.</li>
 <li>Copies you chose to back up stay in your own cloud account until you delete them there.</li>
 <li>Uninstalling the app deletes everything it kept on the phone. Export anything you want to keep first.</li>
-<li>Live location positions are deleted from our server when sharing stops, or after 24 hours at most. We receive nothing else of yours, so there is nothing else for us to delete. Messages and files you have sent are with the people you sent them to.</li>
+<li>Live location positions are deleted from our server when sharing stops or its time runs out, which is 24 hours at most. A share started by "My phone is being taken" is deleted when you stop it, or a week after your phone last reported. We receive nothing else of yours, so there is nothing else for us to delete. Messages and files you have sent are with the people you sent them to.</li>
 <li>You can withdraw a permission (camera, microphone, location) at any time in your phone's Settings.</li>
 </ul>
 
@@ -78,7 +90,7 @@
 <p>Recordings are kept in the app's own storage, which other apps cannot read. Each file's fingerprint and signed record let you, your lawyer or a court check later that the file has not been changed. Live location travels over an encrypted connection (HTTPS), and the server gives out a share's positions only to someone who has its link.</p>
 
 <h2>Changes</h2>
-<p>Later versions will add features that send data off the phone only when you turn them on, such as copies to your own cloud storage from inside the app. This policy will be updated before any such feature is released, and the date above will change.</p>
+<p>Later versions will add features that send data off the phone only when you turn them on, such as copies to your own cloud storage from inside the app, and alerts sent between people who use Saakshi. This policy will be updated before any such feature is released, and the date above will change.</p>
 
 <h2>Contact</h2>
 <p>Questions about privacy: write to Aayush Tainwala at <a href="mailto:tainwala.aayush@gmail.com">tainwala.aayush@gmail.com</a>, or open an issue at <a href="https://github.com/AayushTainwala/Saakshi/issues">github.com/AayushTainwala/Saakshi/issues</a>. An issue there is public; email is private.</p>
