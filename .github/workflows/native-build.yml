@@ -41,6 +41,8 @@ jobs:
           distribution: temurin
           java-version: 17
       - run: modules/saakshi-evidence/verify/verify-hashing.sh 1024
+      # Repair round A, group 2: where whole ADTS frames end, for body-cam's sound-only checkpoints.
+      - run: modules/saakshi-evidence/verify/adts-frames.sh
 
   android:
     name: Android emulator build

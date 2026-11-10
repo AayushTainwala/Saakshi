@@ -13,14 +13,20 @@ import java.security.MessageDigest
  * running SHA-256, and reports the length so far and the SHA-256 of those bytes; the file is never
  * re-read. Checkpoint lengths are whole TS packets, so every checkpointed prefix is itself a
  * playable transport stream. Not for MP4, whose header MediaRecorder rewrites when it stops.
+ *
+ * With `adts` (body-cam's sound-only file; repair round A, group 2) the file is ADTS AAC, which
+ * AOSP's AACWriter also only appends to, and checkpoint lengths are whole ADTS frames (AdtsFrames).
+ * If the bytes turn out not to be ADTS, [checkpoint] throws once and takes no more checkpoints;
+ * recording carries on, and [finish] still fingerprints the whole file.
  */
-class Checkpointer(private val file: File) {
+class Checkpointer(private val file: File, private val adts: Boolean = false) {
   data class Snapshot(val bytes: Long, val sha256: String)
 
   private val digest = MessageDigest.getInstance("SHA-256")
   private val buffer = ByteArray(1 shl 16)
   private var offset = 0L
   private var finished = false
+  private var stopped = false
   /** How many checkpoints have been taken. */
   @Volatile var checkpointsTaken = 0
     private set
@@ -31,7 +37,7 @@ class Checkpointer(private val file: File) {
    */
   @Synchronized
   fun checkpoint(): Snapshot? {
-    if (finished) return null
+    if (finished || stopped) return null
     // Measure first, then flush to storage, so every byte the checkpoint names has been flushed.
     // (fsync works on the file, whichever descriptor wrote it.)
     val length = file.length()
@@ -40,7 +46,7 @@ class Checkpointer(private val file: File) {
     } catch (e: Exception) {
       // Some file systems refuse; the bytes are still in the page cache.
     }
-    val target = length - length % TS_PACKET
+    val target = if (adts) adtsTarget(length) else length - length % TS_PACKET
     if (target <= offset) return null
     read(target)
     val copy = try {
@@ -63,6 +69,23 @@ class Checkpointer(private val file: File) {
     return Snapshot(offset, hex(digest.digest()))
   }
 
+  /** The end of the last whole ADTS frame on disk, reading at most MAX_ADTS_READ beyond the last checkpoint. */
+  private fun adtsTarget(length: Long): Long {
+    if (length <= offset) return offset
+    val window = minOf(length - offset, MAX_ADTS_READ).toInt()
+    val pending = ByteArray(window)
+    RandomAccessFile(file, "r").use { input ->
+      input.seek(offset)
+      input.readFully(pending)
+    }
+    try {
+      return offset + AdtsFrames.wholeFrames(pending, window)
+    } catch (e: IllegalStateException) {
+      stopped = true
+      throw IllegalStateException("${file.name} is ${e.message}")
+    }
+  }
+
   private fun read(target: Long) {
     if (target <= offset) return
     RandomAccessFile(file, "r").use { input ->
@@ -78,6 +101,8 @@ class Checkpointer(private val file: File) {
 
   companion object {
     const val TS_PACKET = 188
+    /** At 64 kbit/s, ten seconds of sound is about 80 KB; anything beyond 4 MB comes with the next checkpoint. */
+    private const val MAX_ADTS_READ = 4L shl 20
 
     fun hex(bytes: ByteArray): String {
       val out = StringBuilder(bytes.size * 2)

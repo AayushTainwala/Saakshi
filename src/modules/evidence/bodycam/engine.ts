@@ -19,6 +19,12 @@ export type BodyCamEngine = {
   handOver: (saving: boolean) => Promise<void>;
   /** Saving mode on or off (off once the phone is charging); it applies from the next file. */
   setSaving: (on: boolean) => Promise<void>;
+  /**
+   * Free storage, stage one (repair round A, group 2; bundle format 0.10): at the room the user
+   * keeps free, the video file closes as "storage-sound-only" and the recording carries on as sound
+   * only, in a new file of the same recording, until it is stopped.
+   */
+  soundOnly: () => Promise<void>;
 };
 
 type Common = {
@@ -32,7 +38,7 @@ type Common = {
 
 type NativeBodyCam = Pick<
   NonNullable<typeof SaakshiEvidence>,
-  'addListener' | 'bodyCamStart' | 'bodyCamStop' | 'bodyCamHandOver' | 'bodyCamSetSaving'
+  'addListener' | 'bodyCamStart' | 'bodyCamStop' | 'bodyCamHandOver' | 'bodyCamSetSaving' | 'bodyCamSoundOnly'
 >;
 
 function requireNative(native: NativeBodyCam | null | undefined): NativeBodyCam {
@@ -134,8 +140,9 @@ export function androidBodyCam(
   const marks = checkpoints(native, common);
   const subscription = native.addListener('onRecordingClosed', (event: RecordingClosedEvent) => {
     marks.closed(event, common.session.add(closedFileFromEvent(event, common.location(), stopReason)));
-    // A piece or the low-battery handover is followed by the next file; anything else was the last.
-    if (event.endReason !== 'piece-complete' && event.endReason !== 'low-battery') {
+    // A piece, the low-battery handover and the drop to sound only are each followed by the next
+    // file; anything else was the last.
+    if (event.endReason !== 'piece-complete' && event.endReason !== 'low-battery' && event.endReason !== 'storage-sound-only') {
       finished = true;
       onFinal?.();
     }
@@ -156,6 +163,7 @@ export function androidBodyCam(
     },
     handOver: (saving) => native.bodyCamHandOver('low-battery', saving),
     setSaving: (on) => native.bodyCamSetSaving(on),
+    soundOnly: () => native.bodyCamSoundOnly('storage-sound-only'),
     async stop(reason = 'stopped') {
       stopReason = reason;
       // Already over, for example stopped from the notification.
@@ -231,6 +239,7 @@ export function iosBodyCam(
     },
     handOver: (saving) => native.bodyCamHandOver('low-battery', saving),
     setSaving: (on) => native.bodyCamSetSaving(on),
+    soundOnly: () => native.bodyCamSoundOnly('storage-sound-only'),
     async stop(reason = 'stopped') {
       stopReason = reason;
       try {

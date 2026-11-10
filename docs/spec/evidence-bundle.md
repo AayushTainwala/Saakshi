@@ -1,6 +1,6 @@
 # Saakshi evidence bundle format
 
-**Version 0.9** (6 November 2026, round 2; the app writes 0.9 from round 2, group 1.5; 0.8 and the versions before it: 0.5, 0.6 and 0.7 were also 6 November 2026, 0.3 and 0.4 were 5 November 2026, 0.2 was 21 October 2026, 0.1 was 20 October 2026). Status: in use by the app from its first release; may change before 1.0, always with a new version number.
+**Version 0.10** (10 November 2026, repair round A, group 2: free storage, stage one; 0.9 was 6 November 2026, round 2, written by the app from round 2, group 1.5; 0.8 and the versions before it: 0.5, 0.6 and 0.7 were also 6 November 2026, 0.3 and 0.4 were 5 November 2026, 0.2 was 21 October 2026, 0.1 was 20 October 2026). Status: in use by the app from its first release; may change before 1.0, always with a new version number.
 
 This document defines how Saakshi records the integrity of photos and videos, and the bundle it exports. It is written so that anyone (a lawyer, a court-appointed expert, another app) can check a bundle with standard tools and without Saakshi. Other apps and forks may produce and read this format. The key words MUST, SHOULD and MAY are used as in RFC 2119.
 
@@ -40,6 +40,7 @@ What this format does and does not show:
    - **iPhone, body-cam sound-only files (from 0.5):** ADTS AAC (`.aac`, `audio/aac`), encoded and written by the app while it is in the background: a stream of self-contained frames with nothing written at the end, so a cut-off file plays up to the cut. (In 0.3 and 0.4: `.m4a` written by `AVAudioFile`, not cut-off safe.)
    - **Android 8 and later:** MPEG transport stream (`.ts`, `video/mp2t`, H.264 and AAC) from the app's own recorder. It needs nothing written at the end, so a cut-off file plays up to the last data written.
    - **Android 7, or a phone that refuses MPEG-TS:** MP4 (`.mp4`), which is **not** cut-off safe: a cut-off MP4 has no index and does not play.
+   - **Android, body-cam sound-only files (from 0.10):** ADTS AAC (`.aac`, `audio/aac`; mono, 44.1 kHz, 64 kbit/s) from MediaRecorder's `AAC_ADTS` output, as bug mode's. It needs nothing written at the end, so a cut-off file plays up to the cut.
    - **Bug mode (from 0.6):** ADTS AAC (`.aac`, `audio/aac`) on both platforms, which needs nothing written at the end, so a cut-off file plays up to the cut. Android: MediaRecorder's `AAC_ADTS` output, as before. iPhone: encoded and written by the app, as for body-cam's sound-only files. (Before 0.6, bug mode on iPhone wrote `.m4a` pieces, AAC in MP4, which are not cut-off safe.)
 3. **Markers.** When a recording starts, the app writes a small marker in the session folder (`pending/`) naming the file, its start time and what is recording, and updates it when the file closes. The marker is removed once the file has been hashed and moved into the locker.
 4. When the camera closes the file (a photo is saved, recording stops, or a piece is complete), the app reads the file once, in fixed-size chunks, and computes SHA-256, SHA-1, MD5 and the size. It does this before moving the file into the evidence locker, and never writes to the file again. Moving within the app's storage does not change the bytes.
@@ -52,7 +53,12 @@ What this format does and does not show:
    - When the user returns, video with sound starts again as a new clip, and the sound-only file ends about half a second later (`endReason: "video-resumed"`).
    - If the phone stops sound recording (for example, for a phone call), a sound-only piece ends with `"audio-interrupted"`. A video piece carries on, without sound from that moment; when sound recording comes back, it ends with `"sound-resumed"` and the next piece of the same clip has sound again.
    - `capture.gapBeforeMs` of a video file counts from the end of the previous video file (the gap in the picture). Of a sound-only file, it counts from the end of the previous file that carried sound (the gap in the sound); a negative value means the two overlap.
-9. **Checkpoints (body-cam from 0.5, bug mode from 0.6).** While a body-cam or bug-mode file is being written, the app keeps a running SHA-256 over its bytes. About every 10 seconds (body-cam on iPhone, at each segment; body-cam on Android, every 10 seconds, at a 188-byte packet boundary; bug mode, about every 10 seconds of sound, at the end of an ADTS frame) it flushes the file to storage and signs a checkpoint record (section 4a): the file's length so far and the SHA-256 of those bytes, taken from the running hash, so the file is not re-read. Each checkpoint goes into the session's chain as it is made.
+8a. **Body-cam carrying on as sound only (from 0.10; free storage, stage one).** When the phone's free space falls to the amount the user has chosen to keep free, body-cam stops video and carries on as sound, unless the user has switched that off (then it stops, as below). The video file is closed cleanly, with `endReason: "storage-sound-only"`, and the sound continues in a sound-only file of the same recording until the recording ends:
+   - **iPhone:** a sound-only file (`.aac`), a new clip, started the same way as when the app leaves the screen (step 8), so it overlaps the video's sound by about half a second and `gapBeforeMs` is negative. Video does not start again when the user returns.
+   - **Android:** the next file of the same clip (`segment.index` + 1), ADTS AAC (step 2), in the same foreground service, with the camera closed. Its `gapBeforeMs` is the time from the video file's end to its start.
+
+   When the free space then falls to the app's safety floor (300 MB), the recording is stopped cleanly and its last file ends with `endReason: "storage-full"`. Bug mode (Pocket recording) is stopped the same way at the keep-free amount, or at the floor when it was started by "My phone is being taken" (`capture.startedFrom: "phone-taken"`). The evidence camera stops a video only at the floor. A file that ends with `"storage-full"` or `"storage-sound-only"` was closed by its recorder in the ordinary way and is hashed and sealed like any other; it is not `interrupted`.
+9. **Checkpoints (body-cam from 0.5, bug mode from 0.6).** While a body-cam or bug-mode file is being written, the app keeps a running SHA-256 over its bytes. About every 10 seconds (body-cam on iPhone, at each segment; body-cam on Android, every 10 seconds, at a 188-byte packet boundary, or for its sound-only files from 0.10 at the end of an ADTS frame; bug mode, about every 10 seconds of sound, at the end of an ADTS frame) it flushes the file to storage and signs a checkpoint record (section 4a): the file's length so far and the SHA-256 of those bytes, taken from the running hash, so the file is not re-read. Each checkpoint goes into the session's chain as it is made.
    - The file is only ever appended to, so the bytes a checkpoint covers never change: its first `file.size` bytes keep the SHA-256 the checkpoint signed. (Android's MediaRecorder writes MPEG-TS through AOSP's `MPEG2TSWriter`, which only appends 188-byte packets and never seeks back, and ADTS AAC through AOSP's `AACWriter`, which only appends each frame's 7-byte header and then its data; on iPhone the app writes every byte itself, and if a write fails part-way it cuts the file back to the last whole write, which it fingerprinted, and starts a new file.)
    - On iPhone each `.mp4` file's own timeline starts at 0; when it started by the phone's clock is in its record.
    - When the file closes, its own record (section 4) carries the same `recording` id as its checkpoints, and its first bytes must agree with every one of them.
@@ -67,7 +73,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 ```json
 {
   "type": "saakshi.evidence.record",
-  "version": "0.9",
+  "version": "0.10",
   "id": "3f0a1c9e-5d0b-4a8e-9a3c-2f1b7c6d5e4f",
   "session": "8c2d4b6a-1e3f-4a5b-9c7d-0e1f2a3b4c5d",
   "sequence": 3,
@@ -122,7 +128,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 
 | Member | Meaning |
 |---|---|
-| `type`, `version` | Always `"saakshi.evidence.record"` and `"0.9"` for this version. |
+| `type`, `version` | Always `"saakshi.evidence.record"` and `"0.10"` for this version. Versions are compared as listed in section 12, not as numbers: 0.10 comes after 0.9. |
 | `id` | UUID (version 4) of this record. |
 | `session` | UUID of the capture session. |
 | `sequence` | Position in the session's chain, from 0, counting every record in the order it was made: each file's record when the file closed, and from 0.5 each checkpoint (section 4a). |
@@ -136,7 +142,7 @@ A record is a JSON object with exactly these members. Members marked "or null" a
 | `capture.batteryPercent` | From 0.9, optional: the battery level, 0–100, when the file closed (in a file's record) or when the checkpoint was made (in a checkpoint). Absent when the phone did not say. Like the location, it is the phone's report and not proof. |
 | `capture.startedAt`, `endedAt` | When the camera started and stopped writing this file, by the phone's clock. Equal for a photo. |
 | `capture.endedAtSource` | `"recorder"`: the recorder reported the end. `"file-modified"`: the file's last-write time, for an interrupted file. |
-| `capture.endReason` | `"stopped"` (by the user), `"piece-complete"`, `"app-left"` (iPhone video stopped because the app left the screen or the phone was locked), `"camera-in-use"` (from 0.4, iPhone body-cam: iOS stopped the camera because another app took it), `"system-pressure"` (from 0.4, iPhone body-cam: iOS stopped the camera because the phone was under strain, such as from heat), `"camera-lost"` (the system or another app took the camera, for any other reason), `"low-battery"` (up to 0.8: the app stopped and saved the recording at 3% battery. From 0.9: the file was closed cleanly at 5% battery in body-cam or Pocket recording, and a new file of the same clip follows, `segment.index` + 1, at lower power in body-cam (iPhone: 480p, 15 frames a second; Android, from round 2, group 1.6: the same picture size at half the video bit rate, and 15 frames a second where the camera offers it). Nothing ends with `"low-battery"` in the evidence camera from 0.9: it never stops by itself), `"audio-interrupted"` (the system stopped sound recording, for example for a phone call on iPhone), `"sound-resumed"` (from 0.3, iPhone body-cam: a video piece whose sound stopped part-way, or which had none, ended because sound recording came back; the next piece has sound), `"video-resumed"` (from 0.3, iPhone body-cam: a sound-only piece ended because video with sound started again), `"interrupted"` or `"error"`. For a piece, a negative `gapBeforeMs` means it started before the previous piece stopped (iPhone sound pieces overlap so there is no silence; section 3, step 8). |
+| `capture.endReason` | `"stopped"` (by the user), `"piece-complete"`, `"app-left"` (iPhone video stopped because the app left the screen or the phone was locked), `"camera-in-use"` (from 0.4, iPhone body-cam: iOS stopped the camera because another app took it), `"system-pressure"` (from 0.4, iPhone body-cam: iOS stopped the camera because the phone was under strain, such as from heat), `"camera-lost"` (the system or another app took the camera, for any other reason), `"low-battery"` (up to 0.8: the app stopped and saved the recording at 3% battery. From 0.9: the file was closed cleanly at 5% battery in body-cam or Pocket recording, and a new file of the same clip follows, `segment.index` + 1, at lower power in body-cam (iPhone: 480p, 15 frames a second; Android, from round 2, group 1.6: the same picture size at half the video bit rate, and 15 frames a second where the camera offers it). Nothing ends with `"low-battery"` in the evidence camera from 0.9: it never stops by itself), `"audio-interrupted"` (the system stopped sound recording, for example for a phone call on iPhone), `"sound-resumed"` (from 0.3, iPhone body-cam: a video piece whose sound stopped part-way, or which had none, ended because sound recording came back; the next piece has sound), `"video-resumed"` (from 0.3, iPhone body-cam: a sound-only piece ended because video with sound started again), `"storage-sound-only"` (from 0.10, body-cam only: the app closed the video file because the phone's free space had fallen to the amount the user keeps free, and the recording carries on as sound only in the next file; section 3, step 8a), `"storage-full"` (from 0.10: the app stopped the recording and saved this file because the phone was running out of free space, at the amount the user keeps free or at the app's safety floor of 300 MB; section 3, step 8a), `"interrupted"` or `"error"`. For a piece, a negative `gapBeforeMs` means it started before the previous piece stopped (iPhone sound pieces overlap so there is no silence; section 3, step 8). |
 | `capture.rotationDegrees` | Degrees clockwise to turn the picture to show it upright, as the recorder set it when the file started. Given only for MPEG-TS files, whose container has no field for it, so a player may show them on their side; null otherwise (QuickTime and MP4 carry their own rotation, and photos and audio have none). |
 | `capture.gapBeforeMs` | For a piece: milliseconds between the end of the previous piece of the same recording and the start of this one. Otherwise null. |
 | `capture.hashedAt` | When hashing finished. |
@@ -156,7 +162,7 @@ A checkpoint is signed while a body-cam file (from 0.5) or a bug-mode file (from
 ```json
 {
   "type": "saakshi.evidence.checkpoint",
-  "version": "0.9",
+  "version": "0.10",
   "id": "5d1e…",
   "session": "8c2d4b6a-1e3f-4a5b-9c7d-0e1f2a3b4c5d",
   "sequence": 7,
@@ -233,7 +239,7 @@ Apple's attestation object (CBOR, with a certificate chain to Apple's App Attest
 ```json
 {
   "type": "saakshi.device-key",
-  "version": "0.9",
+  "version": "0.10",
   "keyId": "…",
   "algorithm": "ES256",
   "publicKeySpki": "<Base64 of DER SubjectPublicKeyInfo>",
@@ -289,7 +295,7 @@ Up to 0.7 the layout was `manifest.json`, `device-key.json`, `media/<file.name>`
 ```json
 {
   "type": "saakshi.evidence.bundle",
-  "version": "0.9",
+  "version": "0.10",
   "session": "8c2d4b6a-…",
   "name": "2026-11-05 10-40 IST Body-cam",
   "createdAt": "2026-11-05T06:15:00.000Z",
@@ -382,7 +388,7 @@ With standard tools (`unzip`, `sha256sum`, `openssl`):
    - Android: verify the certificate chain up to a Google hardware attestation root, check the leaf's public key equals the device key, and read the attestation extension (package name `in.aayushtainwala.saakshi`, the app's signing-certificate digest published with each release, security level, verified-boot state). Also check Google's attestation revocation list.
    - iPhone: verify the App Attest object as Apple documents for servers ("Validating apps that connect to your server"), with App ID `<Team ID>.in.aayushtainwala.saakshi` and `clientDataHash` equal to SHA-256 of the device key's DER public key.
 
-`tools/verify-bundle.mjs` in the Saakshi repository runs steps 2–5 with Node.js and no other dependencies, step 4a included (it reads each file once and takes the SHA-256 of every checkpointed prefix on the way). The tool reads versions 0.1 to 0.9, lists each file it checked, and does not yet check attestation chains (step 6). From 0.9 it also checks the shape of `capture.batteryPercent` (a whole number from 0 to 100) and `capture.startedFrom` ("pocket" or "phone-taken", only with `capture.mode` "bug"), and fails a record of an earlier version that carries either. For a 0.8 bundle it works out every name from the signed records and fails on any that differ, in the folders or in the manifest. For any bundle it fails on:
+`tools/verify-bundle.mjs` in the Saakshi repository runs steps 2–5 with Node.js and no other dependencies, step 4a included (it reads each file once and takes the SHA-256 of every checkpointed prefix on the way). The tool reads versions 0.1 to 0.10, lists each file it checked, and does not yet check attestation chains (step 6). From 0.10 it accepts the end reasons `"storage-full"` and `"storage-sound-only"`, fails a record of an earlier version that ends with either, fails `"storage-sound-only"` in a record that is not body-cam's, and fails either in a record marked `interrupted`. From 0.9 it also checks the shape of `capture.batteryPercent` (a whole number from 0 to 100) and `capture.startedFrom` ("pocket" or "phone-taken", only with `capture.mode` "bug"), and fails a record of an earlier version that carries either. For a 0.8 bundle it works out every name from the signed records and fails on any that differ, in the folders or in the manifest. For any bundle it fails on:
 - a file that is not part of the bundle's one layout (for example a copy in a look-alike folder, or at the top);
 - a file in the originals' or records' folder that no record accounts for;
 - names a computer may treat as the same (they differ only in case, or in how a letter is written);
@@ -449,6 +455,7 @@ To check a joined copy: verify its record's signature as in section 10, step 3; 
 - **0.7** (6 November 2026): joined copies of a record's files for sharing, with their own signed records (section 11a). No member of the records in a bundle was added or removed.
 - **0.8** (6 November 2026): the bundle, its folders and its files have names a person can read (section 7): `Saakshi <record name>.zip`, `Original files/`, `Signed records/`, `Hash report.txt`, `Certificate Part A.pdf`; the manifest gains `name` and, for each record, `recordId` and `fileName`, and is how a reader finds a record's original; README.txt is in English and Hindi. No record member was added or removed.
 - **0.9** (6 November 2026, specified for round 2): the low-battery handover at 5% instead of the 3% stop (`capture.endReason: "low-battery"`, section 4); optional `capture.batteryPercent` in file and checkpoint records; optional `capture.startedFrom` (`"pocket"` or `"phone-taken"`); upload parts and their lengthening schedule (section 4b); bug mode is called Pocket recording in names and in the witness text, with `capture.mode` still `"bug"`. No required member was added or removed. Written by the app from round 2, group 1.5 (`FORMAT_VERSION` "0.9"; `tools/verify-bundle.mjs` reads it). The battery level is read when each record is signed, right after its file closes or its checkpoint is made, and is left out of a file sealed after a cut-off. Round 2, group 1.6 (9 November 2026) changed only how Android body-cam saves power after the handover (no 480p, no camera rebuild: the same size at half the bit rate); no member changed, so it stays 0.9.
+- **0.10** (10 November 2026, repair round A, group 2: free storage, stage one): new `capture.endReason` values `"storage-sound-only"` (body-cam's video file closed at the keep-free amount, the recording carrying on as sound only) and `"storage-full"` (the app stopped the recording for lack of room); on Android, body-cam's sound-only files are ADTS AAC, checkpointed at the end of whole frames (section 3, steps 2, 8a and 9). No record member was added or removed; only the version and the allowed `endReason` values changed. `tools/verify-bundle.mjs` reads it, and older bundles still verify.
 - **Witness message v1** (6 November 2026): section 9. The message's format is versioned on its own; the bundle format is unchanged by it.
 - **Later (planned):** OpenTimestamps proofs for each chain head and record, in `timestamps/<recordSha256>.ots`, listed in the manifest's `timestamps`; upload state for copies in the user's cloud drive (`uploads`, section 4b, built with E7).
 - **1.1 of the app** (planned): C2PA Content Credentials and sensor readings.

@@ -15,6 +15,10 @@ export type CaptureMode = 'camera' | 'body-cam' | 'bug';
  * `sound-resumed`, a video piece whose sound stopped part-way (or which had none) ended so that the
  * next one has sound again;
  * `video-resumed`, a sound-only file ended because video with sound started again.
+ * From format 0.10 (free storage, stage one): `storage-sound-only`, a body-cam video file ended
+ * because the phone was down to the keep-free amount, and the recording carries on as sound only
+ * in a new file; `storage-full`, the app stopped the recording cleanly for lack of room (at the
+ * keep-free amount, or at the safety floor).
  */
 export type EndReason =
   | 'stopped'
@@ -27,6 +31,8 @@ export type EndReason =
   | 'audio-interrupted'
   | 'sound-resumed'
   | 'video-resumed'
+  | 'storage-sound-only'
+  | 'storage-full'
   | 'interrupted'
   | 'error';
 

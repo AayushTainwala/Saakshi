@@ -287,6 +287,8 @@
     "audioInterrupted": "Sound stopped, for example for a phone call.",
     "soundResumed": "Ended so that the next file has sound again.",
     "videoResumed": "Ended when video started again.",
+    "storageSoundOnly": "Video stopped because the phone was down to the room you keep free. The recording carried on as sound only.",
+    "storageFull": "Stopped and saved because the phone was running out of room.",
     "interrupted": "Cut off: the app closed or the phone switched off. It plays up to the cut, and was sealed when the app next opened.",
     "error": "Ended because the file could not be written."
   },

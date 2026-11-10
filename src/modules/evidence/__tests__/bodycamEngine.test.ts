@@ -35,6 +35,10 @@ function fakeNative() {
     async bodyCamSetSaving(on: boolean) {
       native.saving.push(on);
     },
+    soundOnly: [] as string[],
+    async bodyCamSoundOnly(reason: string) {
+      native.soundOnly.push(reason);
+    },
     fire(name: string, event: unknown) {
       for (const listener of listeners.get(name) ?? []) listener(event as never);
     },
@@ -262,6 +266,46 @@ describe('androidBodyCam', () => {
       ['video', { clip: 0, index: 1 }, 'stopped'],
     ]);
     expect(native.listenerCount()).toBe(0);
+  });
+});
+
+describe('body-cam carrying on as sound only (repair round A, group 2; format 0.10)', () => {
+  it('Android: the video file closes as "storage-sound-only", sound follows in the same clip, and Stop waits for it', async () => {
+    const { native, common, session, locker, file } = setup();
+    const engine = androidBodyCam({ ...common, notificationTitle: 't', notificationText: 'x' }, native);
+    await engine.start();
+    await engine.soundOnly();
+    expect(native.soundOnly).toEqual(['storage-sound-only']);
+    // The video file's close is not the end of the recording.
+    native.fire('onRecordingClosed', closed({ uri: file('file:///s/incoming/rec-1-0-0.ts'), kind: 'video', endReason: 'storage-sound-only', rotationDegrees: 90 }));
+    let stopped = false;
+    const stopping = engine.stop('storage-full').then(() => (stopped = true));
+    await Promise.resolve();
+    expect(stopped).toBe(false);
+    native.fire('onRecordingClosed', closed({ uri: file('file:///s/incoming/rec-2-0-1.aac'), kind: 'audio', index: 1, endReason: 'stopped', gapBeforeMs: 420 }));
+    await stopping;
+    await session.finish();
+    expect(locker.store.readSession('sess')!.items.map((i) => [i.kind, i.media, i.segment, i.endReason])).toEqual([
+      ['video', '0000-clip0-seg0.ts', { clip: 0, index: 0 }, 'storage-sound-only'],
+      ['audio', '0001-audio0-seg1.aac', { clip: 0, index: 1 }, 'storage-full'],
+    ]);
+    expect(native.listenerCount()).toBe(0);
+  });
+
+  it('iPhone: the video file closes as "storage-sound-only" and a sound-only file carries on until Stop', async () => {
+    const { native, common, session, locker, file } = setup();
+    const engine = iosBodyCam(common, native);
+    await engine.start();
+    await engine.soundOnly();
+    expect(native.soundOnly).toEqual(['storage-sound-only']);
+    native.fire('onRecordingClosed', closed({ uri: file('file:///s/incoming/bodycam-0-0-1.mp4'), kind: 'video', endReason: 'storage-sound-only' }));
+    native.stopResult = [closed({ uri: file('file:///s/incoming/bodycam-1-0-2.aac'), kind: 'audio', clip: 1, endReason: 'stopped', gapBeforeMs: -500 })];
+    await engine.stop('storage-full');
+    await session.finish();
+    expect(locker.store.readSession('sess')!.items.map((i) => [i.kind, i.segment, i.endReason])).toEqual([
+      ['video', { clip: 0, index: 0 }, 'storage-sound-only'],
+      ['audio', { clip: 1, index: 0 }, 'storage-full'],
+    ]);
   });
 });
 

@@ -60,6 +60,14 @@ declare class SaakshiEvidenceModule extends NativeModule<SaakshiEvidenceEvents> 
   bodyCamHandOver(reason: string, saving: boolean): Promise<void>;
   /** Saving mode on or off; it applies from the next file. */
   bodyCamSetSaving(saving: boolean): Promise<void>;
+  /**
+   * Free storage, stage one (repair round A, group 2; bundle format 0.10): the video file being
+   * written closes with `reason` ("storage-sound-only") and body-cam carries on as sound only, in
+   * a sound-only file (`kind: "audio"` in its events), until it is stopped. Android: the next file
+   * of the same clip, ADTS AAC, in the same foreground service, with the camera closed. iPhone: a
+   * sound-only file as when the app leaves the screen, with the camera stopped.
+   */
+  bodyCamSoundOnly(reason: string): Promise<void>;
   /** iPhone: Pocket recording's handover (the file closes with `reason`, the next continues). */
   soundHandOver(reason: string): Promise<void>;
   /**
