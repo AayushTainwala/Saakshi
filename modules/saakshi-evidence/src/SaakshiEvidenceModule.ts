@@ -17,6 +17,12 @@ import type {
 declare class SaakshiEvidenceModule extends NativeModule<SaakshiEvidenceEvents> {
   /** Reads a local file once and returns its size, SHA-256, SHA-1, MD5 and CRC-32. */
   hashFile(uri: string): Promise<FileHashes>;
+  /**
+   * Replaces a small text file in one step (repair round A, group 1): the text is written to
+   * `<uri>.tmp` beside it, flushed to storage, and renamed over the file, so that a kill or a power
+   * cut leaves the old file or the new one, whole. Throws if it can't; the old file then stands.
+   */
+  writeTextAtomic(uri: string, text: string): void;
   /** The device key, or null before it is created. On iOS `attestation` is always null here. */
   getDeviceKey(): Promise<NativeDeviceKey | null>;
   /** Creates the device key if there is none (Android attests it at creation). */

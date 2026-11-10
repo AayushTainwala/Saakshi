@@ -1,4 +1,4 @@
-import { BUNDLE_TYPE, FORMAT_VERSION } from '../constants';
+import { BUNDLE_TYPE, CERTIFICATE_FILE, FORMAT_VERSION } from '../constants';
 import type { DeviceKeyFile } from '../integrity/deviceKey';
 import type { CheckpointRecord, EvidenceRecord } from '../integrity/record';
 import type { RecordSummary } from '../locker/summary';
@@ -31,7 +31,7 @@ export type BundledCheckpoint = {
 };
 
 /** The certificate's name in the session folder; in the bundle it is CERTIFICATE_NAME. */
-export const CERTIFICATE_FILE = 'certificate-part-a.pdf';
+export { CERTIFICATE_FILE };
 
 /** "2026-11-05 10-40 IST Body-cam", as the app and the witness message name the record. */
 export function bundleRecordName(session: SessionState, recordMode?: (item: EvidenceItem) => CaptureMode | null): string {

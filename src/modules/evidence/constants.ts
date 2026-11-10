@@ -7,3 +7,5 @@ export const RECORD_TYPE = 'saakshi.evidence.record';
 export const CHECKPOINT_TYPE = 'saakshi.evidence.checkpoint';
 export const DEVICE_KEY_TYPE = 'saakshi.device-key';
 export const BUNDLE_TYPE = 'saakshi.evidence.bundle';
+/** The certificate's file in a session's folder (its name in a bundle is in export/layout.ts). */
+export const CERTIFICATE_FILE = 'certificate-part-a.pdf';

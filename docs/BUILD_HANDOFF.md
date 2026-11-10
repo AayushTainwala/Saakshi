@@ -4,7 +4,7 @@ The pickup file for build sessions: where things stand, what is next, and the qu
 
 ## Where things stand (10 Nov 2026)
 
-- **On `main`:** R1 and R2 (#1 to #9), fix round 1 (#16 to #27) and round 2, Part 1 with groups 1.6 and 1.7 (#31 to #36, #41, #43). Typecheck, lint, 598 tests and both native builds pass.
+- **On `main`:** R1 and R2 (#1 to #9), fix round 1 (#16 to #27) and round 2, Part 1 with groups 1.6 and 1.7 (#31 to #36, #41, #43), and repair round A, group 1 (#45). Typecheck, lint, 628 tests and both native builds pass.
 - **What has run on a phone:** the evidence camera and body-cam as they were on 5 Nov, on the owner's iPhone. Nothing built since then has run on a phone, and the Android app has never run on a phone or an emulator. Treat every "Not verified" note in the archived reports as still open.
 - **New feature code is paused** (owner, 10 Nov) until repairs 1 to 4 below are done. Group 3.1 (documents only) may go ahead. Parts 2, 3 and 4 of round 2 wait.
 - **Pace:** no deadline. The next goal is a beta for about 50 testers on iPhone and Android ([BUILD_PLAN.md](BUILD_PLAN.md), "Road to the beta").
@@ -23,7 +23,7 @@ The repairs come from the review of `main` on 10 Nov. Each round gets a brief in
 | # | Work | What it covers | State |
 |---|---|---|---|
 | 1 | **Run on phones** | The Android emulator on the owner's Mac, then his Android phone (from 12 Nov); the iPhone tests owed for Part 1, 1.6 and 1.7; then test sections D to J. One fix round follows what they find. | The owner's sittings. Test builds: [release/try-a-build.md](release/try-a-build.md). |
-| 2 | **Repair round A: evidence that survives** | The bookkeeping file (`session.json`) written safely and rebuilt from the signed records if unreadable; free storage watched, stage one; one file per signing key, never overwritten. | **Being built.** Groups 1 and 2 are in pull requests, each waiting for the native builds and a native review; group 3 follows. Reports below. Brief: [briefs/2026-11-10-repair-round-a.md](briefs/2026-11-10-repair-round-a.md). |
+| 2 | **Repair round A: evidence that survives** | The bookkeeping file (`session.json`) written safely and rebuilt from the signed records if unreadable; free storage watched, stage one; one file per signing key, never overwritten. | **Being built.** Group 1 is merged (#45). Group 2 is in a pull request (#46), with both native builds passed, waiting for a native review. Group 3 is in a pull request (#47) and merges last. Reports below. Brief: [briefs/2026-11-10-repair-round-a.md](briefs/2026-11-10-repair-round-a.md). |
 | 3 | **Repair round B: safety that keeps running** | Android video that notices a failed recorder and restarts; body-cam's start check; "My phone is being taken" restarting by itself after the app is killed; time limits on server calls; a phone with no SIM set for texts; the alert sent at once with the link following; the lock at once. | Brief to be written; two points are open with the owner (below). May run beside round A. |
 | 4 | **Our own web address** | A `.org` and a `.in` name in front of the server and the live page, with a short list of addresses for the app to try. | The owner is choosing the names. |
 | 5 | **Tidy-ups** | The small batch (dependencies listed, `.gitignore`, the server's migration record, pinned build tools), and native builds on every pull request so the merge rule can require them. | Brief to be written. |
@@ -55,6 +55,11 @@ The decisions are in [SPEC.md](SPEC.md); this list says only where to look.
 
 Builders add questions here as `- [ ] (Round or stream) question`. Answered questions move to [handoff/owner-questions-answered.md](handoff/owner-questions-answered.md).
 
+- [ ] (Repair A) **Signed records are still written the old way.** Group 1 made the files that are *rewritten* safe (session.json, the markers, the key file). A signed record and its signature are written once and never again, through the file library's plain write, and are not flushed to storage. A cut-off at that moment can leave the newest record half-written; the app now ignores a record that has no signature beside it, so nothing breaks, but that last checkpoint is lost. Writing them through the same one-step write is small (the native function needs a second form that takes bytes, for the signature). **I recommend doing it in this round,** in group 3's pull request. Shall I?
+- [ ] (Repair A) **A file with no signed record.** When an index is rebuilt, a file found in the recording's folder with no signed record (the app died after saving it and before signing) is listed, marked "No signed record was found for this file", and can be shared as it is. It is not signed afterwards. Signing it later would need a decision on what such a late record says (its start time is not known; only the file's last write is). **I recommend leaving it as built** until you decide that. Right?
+- [ ] (Repair A) **A recording whose index is damaged** (unreadable, and no signed record to rebuild from) shows each recorded file with a "Share this file" button. That is what "its files reachable for export" became, since an evidence bundle needs signed records. Is one-file-at-a-time sharing enough, or do you want one ZIP of the whole folder as it is? **I recommend leaving it:** it should be very rare.
+- [ ] (Repair A) **Witness messages now go in the append-only file too,** not into session.json. The brief said the whole file is rewritten when "something other than a checkpoint changes"; I put witness messages beside the checkpoints because that is the only way they survive a rebuild, and it stops a recording in progress from writing over them. Confirm, or say to move them back.
+- [ ] (Repair A) **Wording, `NEEDS OWNER REVIEW`:** the rebuilt notice, the damaged screen and the "no signed record" line, in English and Hindi (listed in the report below). In Hindi "index" is "सूची".
 - [ ] (Repair A) **Where body-cam's sound-only recording stops, and where Pocket recording stops.** The brief and the SPEC say that at the keep-free amount body-cam drops to sound only "so a recording that would have stopped carries on for hours", and "then" stops. Built so: body-cam's sound carries on **below** the keep-free amount, down to the 300 MB floor, and stops there; with the setting off, body-cam stops at the keep-free amount. **Pocket recording stops at the keep-free amount.** So a body-cam recording that has become sound outlasts a Pocket recording started at the same moment. Sound takes about 30 to 60 MB an hour, so it eats little of the room kept free. Is this what you meant, or should Pocket recording also go on to the floor, or body-cam's sound stop sooner? **I recommend keeping it as built.**
 - [ ] (Repair A) **The iPhone evidence camera's rate is not known.** It records through the phone's own movie recorder at 720p, at a rate Saakshi does not set. For "Room for about …" and its warnings I assumed 12 Mbit/s, on the high side so that the app promises less time rather than more. Two ways to make it real: tell me the size and length of a video you recorded with the evidence camera on your iPhone, and I will put the measured rate in; or let me set the rate (3 Mbit/s, as body-cam's), which changes the evidence camera's files and so needs your word. **I recommend the measurement first.**
 - [ ] (Repair A) **Photos at the floor.** The brief speaks of the evidence camera's video. I also made the camera refuse a photo when the phone is at or below the 300 MB floor, saying why, because the floor is "never recorded into" and a photo's record must be writable too. Keep, or let photos through?
@@ -75,9 +80,62 @@ Builders add questions here as `- [ ] (Round or stream) question`. Answered ques
 
 Brief: [briefs/2026-11-10-repair-round-a.md](briefs/2026-11-10-repair-round-a.md). One builder, three pull requests. Nothing here has run on a phone.
 
+### Group 1: the bookkeeping file can't be lost (branch `repair-a/1-session-file`)
+
+**State:** merged on 10 Nov (#45). Typecheck, lint and 628 tests passed, and both native builds. It changes native code (Kotlin, Java, Swift). No change to what a signed record or a bundle holds: the bundle format stays 0.9.
+
+**The reading of the file library, confirmed.** In the installed `expo-file-system` 58.0.10:
+- iPhone writes text with `content.write(to: url, atomically: false, …)` (`ios/FileSystemFile.swift`, line 117), and bytes with `data.write(to: url)`, which is not all-or-nothing either.
+- Android writes through `file.outputStream(append)` (`android/…/FileSystemFile.kt`, line 101), which is `FileOutputStream(this, append)` (`unifiedfile/JavaFile.kt`, line 74): it empties the file when it opens it.
+- **Moving a file over another is not one step either,** on either phone: iPhone removes the target and then moves (`ios/FileSystemPath.swift`, lines 86 to 90); Android deletes the target while preparing the move and then renames (`fsops/CopyMoveStrategy.kt`). `rename()` refuses if the target exists. So the file library alone can't replace a file in one step, and the brief's native function was needed.
+
+**What was built.**
+1. **Write beside, then swap.** A native function `writeTextAtomic(uri, text)` in `modules/saakshi-evidence`: the text goes into `<name>.tmp` beside the file, is flushed to storage, and is renamed over the file with `rename(2)`, which replaces in one step (Android: `AtomicFile.java`, `File.renameTo` after `FileDescriptor.sync`; iPhone: `AtomicFile.swift`, `rename` after `F_FULLFSYNC`). If anything fails before the rename, the old file is untouched. `session.json`, the JavaScript-written `pending/` markers and `device-key.json` all go through it (`src/modules/evidence/locker/files.ts`, `replaceText`).
+2. **Android's own markers.** The Android recorders wrote their markers with a plain overwrite (`CameraRecorder.kt`, `BugRecorder.kt`); they now write beside and rename too. The iPhone recorders already wrote theirs with `.atomic`.
+3. **Leftovers.** A `.tmp` file from an interrupted write is never read, and is removed when the app next opens (`repair`, run before cut-off recordings are sealed).
+4. **One line per checkpoint.** A checkpoint adds one line to `session.log` beside `session.json`, which is only ever added to. `session.json` is rewritten only when a file closes or something else changes, and no longer holds what the log holds, so it stays small however long the recording. Reading a session joins the two. A line that can't be read is ignored; each line starts on a new line, so a line cut short does not spoil the next one. Sessions saved before this, with their checkpoints inside `session.json`, read as before and keep them.
+5. **Rebuild when unreadable** (`locker/rebuild.ts`). If `session.json` is missing, empty, cut short or not this session's, the index is made again from the session's folder and saved, marked `rebuilt` with the time. It reads every record in `records/` that has its signature beside it, the files in `media/`, the certificate PDF and the log.
+6. **Catching up.** When the app opens, any signed record in the folder that the index doesn't list is added to it. This closes a hole that existed before: if the app died between signing a checkpoint and noting it, the cut-off file's record was given the same number at the next open and **overwrote that checkpoint**. Now the cut-off file is chained after it.
+7. **Damaged, but listed.** With no readable signed record, the session is listed as "This recording's index is damaged", and its screen shows each recorded file in `media/` and `incoming/` with a share button and the delete button. This state is never saved: the locker tries again each time it reads the session. Recovery never writes into such a session.
+8. **On screen.** The record's screen says "This recording's index was rebuilt", when, that the recordings and signed records were not changed, and what could not be brought back.
+
+**What a rebuild cannot bring back,** and what the app shows instead:
+
+| Lost | Why | In its place |
+|---|---|---|
+| Each file's CRC-32 (used only to write the ZIP) | It is not in the signed record | Worked out again from the file the next time the record is exported; the file is first checked against its signed SHA-256, and the export stops if it differs |
+| Witness messages sent before this update | They were only in `session.json` | "Witness message sent: Not yet". Messages sent after this update are in the log and come back |
+| The last "Check files" result | Only in `session.json` | "Not yet", and the notice says to tap "Check files" |
+| The note of copies made for sharing (Android's MP4 copy, the joined copy) | Only in `session.json` | The copy is made again the next time it is shared or played |
+| When the certificate was made | Only in `session.json` | The PDF's last-write time |
+| When the session was created | Only in `session.json` | The first file's start time, which is what the list already shows |
+| Why a file failed to seal, and that a file differed from what the recorder wrote | Only in `session.json` | A file with no signed record is listed as "No signed record was found for this file", with its times taken from its last write, and can be shared as it is |
+
+Everything a signed record holds comes back exactly: the file's name, kind, size, fingerprints, times, mode, why it ended, whether it was cut off, and its place in the chain.
+
+**What was found.**
+- The record-number hole in point 6.
+- A recording in progress keeps its own copy of the index and writes that. Anything else written to `session.json` meanwhile (a check result, a copy made for sharing) is lost at the recording's next save. Witness messages are now safe from this, being in the log; the others are not, and I did not change that.
+- A signed record and its signature are written once with the plain write and not flushed (first owner question above).
+- If a file fails to seal and a later file in the same session seals, the later record's number is one too high and `tools/verify-bundle.mjs` fails the bundle ("a record is missing or out of order"). This is older than this round and outside it; I have suggested it as a separate task.
+- The in-app SHA-256 is asynchronous, and a rebuild has to finish before the session is read, so `integrity/sha256Sync.ts` is a small SHA-256 in JavaScript used only for the index. It is tested against Node's at every length around the block edges.
+
+**Tests** (`__tests__/sessionIndex.test.ts`, `sha256Sync.test.ts`, and additions to the two screen tests): a write interrupted before the swap leaves the old file readable, for `session.json`, a marker and the key file; a missing, an empty, a truncated, a garbage and a wrong-session `session.json` are each rebuilt; a rebuilt session passes the on-phone check, exports, and its bundle passes `tools/verify-bundle.mjs` with the same files as before; a session with nothing to rebuild from is listed as damaged and left untouched; a half-written checkpoint line is ignored, and so is one in the middle; a recording in progress when the index is lost carries on and is sealed; a cut-off file is chained after a checkpoint signed just before the cut; a cut-off recording whose index was lost too is rebuilt and sealed. `modules/saakshi-evidence/verify/atomic-write.sh` kills a JVM that is rewriting a file 200 times and checks the file is whole each time (it runs in the native-build workflow). As a control, the same harness against a plain overwrite left a broken file in 12 of 40 kills.
+
+**Not verified** (only a phone, or the native builds, can show):
+- That the Kotlin and Swift compile: the native builds on the pull request show it.
+- `writeTextAtomic` on a phone at all, and how long it takes there. `F_FULLFSYNC` on iPhone can take tens of milliseconds; it now happens once per file opened or closed, not every 10 seconds.
+- A real power cut. The kill test shows the swap survives the process dying, on a JVM, for the Android code only. Nothing has tested the Swift code, and nothing can test a power cut but a phone forced off.
+- The file library's append (`writeSync` with `append: true`) on either phone.
+- How long a rebuild takes for a long recording. It reads every record (about 360 for an hour) on the app's main thread, once.
+- On iPhone, the replaced file is a new file: I have not checked on a phone that it keeps the "not backed up" mark, which is set on the folder and on each file there at the time (`BackupExclusion.swift`).
+- The owner's test: start body-cam, hold the power button until the phone goes off, switch on, and find the recording listed, playable to the cut and marked interrupted.
+
+**`NEEDS OWNER REVIEW` (wording, English and Hindi, `record.json`):** `rebuilt.title`, `rebuilt.body`, `rebuilt.lost`; `damaged.title`, `damaged.body`, `damaged.none`, `damaged.files`, `damaged.fileWritten`, `damaged.share`; `locker.itemNoRecord`.
+
 ### Group 2: free storage, stage one (branch `repair-a/2-free-storage`)
 
-**State:** in a pull request, from `main` as it was before group 1 merged (it does not need group 1's code; the two touch the same handoff and wording files, which I will bring together when group 1 merges). Typecheck, lint and 648 tests pass. It changes native code (Kotlin, Java, Swift), so it waits for both native builds and for **a review by a session that did not write it**. The bundle format goes from 0.9 to **0.10**.
+**State:** in a pull request (#46), with `main` merged in after group 1 (it does not need group 1's code; the two touched the same handoff and workflow files, now brought together). Typecheck, lint and 678 tests pass with group 1 in, and both native builds passed before that merge; they run again on it. It changes native code (Kotlin, Java, Swift), so it still waits for **a review by a session that did not write it**. The bundle format goes from 0.9 to **0.10**.
 
 **What was built.**
 1. **Reading free space** (`src/platform/storage/read.ts`), through `Paths.availableDiskSpace`. What each phone reports there, read in expo-file-system 58.0.10:

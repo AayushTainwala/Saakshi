@@ -65,6 +65,15 @@ export async function shareFile(sessionId: string, item: EvidenceItem, dialogTit
   await Sharing.shareAsync(uri, { mimeType, ...(UTI[mimeType] ? { UTI: UTI[mimeType] } : {}), dialogTitle });
 }
 
+/**
+ * Shares a file from a session's folder as it is, for a file with no signed record of its own
+ * (repair round A, group 1): one found when a recording's index was made again, or in a recording
+ * whose index is damaged. No copy is made, and nothing is written.
+ */
+export async function shareOriginal(uri: string, dialogTitle: string): Promise<void> {
+  await Sharing.shareAsync(uri, { dialogTitle });
+}
+
 const joinDeps: JoinDeps = {
   store: fileLocker,
   join: async (request) => {

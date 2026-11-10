@@ -41,6 +41,23 @@ export function Thumbnail({ sessionId, item, size = SIZE }: { sessionId: string;
 export function RecordRow({ session, pressed }: { session: SessionState; pressed: boolean }) {
   const { t } = useTranslation('record');
   const { colors } = useTheme();
+  // Its index can't be read and can't be made again (repair round A, group 1): it is listed all
+  // the same, saying so, and opens onto the files still in its folder.
+  if (session.damaged) {
+    return (
+      <Card style={[styles.card, pressed && { backgroundColor: colors.surfaceRaised }]}>
+        <View style={styles.text}>
+          <AppText variant="label" color="warning">
+            {t('damaged.title')}
+          </AppText>
+          <AppText color="textMuted">{session.damaged.files.length ? t('damaged.files', { count: session.damaged.files.length }) : t('damaged.none')}</AppText>
+        </View>
+        <AppText variant="label" color="textMuted">
+          ›
+        </AppText>
+      </Card>
+    );
+  }
   const summary = summarize(session, (item) => recordModeOf(session.id, item));
   const recording = isActive(session.id);
   const kind = kindLabel(t, summary);

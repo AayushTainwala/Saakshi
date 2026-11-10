@@ -1,13 +1,16 @@
-import { Directory, File, Paths } from 'expo-file-system';
-
-import type { SessionState } from '../types';
+import type { CheckpointItem, SessionState, WitnessEntry } from '../types';
+import { deviceFiles, join, type LockerFiles, TEMPORARY_SUFFIX } from './files';
 import type { PendingMarker } from './pending';
+import { INDEX_FILE, joinLog, LOG_FILE, logLine, parseIndex, parseLog, rebuildSession, unlistedRecords, withoutLogged } from './rebuild';
 
 /**
  * The evidence locker on disk, inside the app's private documents directory:
  *
  *   evidence/device-key.json
- *   evidence/sessions/<session id>/session.json   the locker's bookkeeping (unsigned)
+ *   evidence/sessions/<session id>/session.json   the locker's bookkeeping (unsigned), replaced in
+ *                                                  one step whenever it changes
+ *   evidence/sessions/<session id>/session.log    the bookkeeping's checkpoints and witness
+ *                                                  messages, one line each, only ever added to
  *   evidence/sessions/<session id>/media/…        original files, never modified
  *   evidence/sessions/<session id>/records/…      signed records (<n>.json and <n>.json.sig)
  *   evidence/sessions/<session id>/certificate-part-a.pdf
@@ -16,9 +19,26 @@ import type { PendingMarker } from './pending';
  */
 export interface LockerStore {
   createSession(id: string, createdAt: string): SessionState;
+  /**
+   * A session's bookkeeping: session.json joined with its log. Null only if the session has no
+   * folder. If session.json is missing or can't be read, the bookkeeping is made again from the
+   * signed records (`rebuilt`), or, with none to go on, comes back as `damaged` (rebuild.ts).
+   */
   readSession(id: string): SessionState | null;
+  /** Replaces session.json in one step. What the log holds is left to the log. */
   writeSession(state: SessionState): void;
+  /** Notes a signed checkpoint: one line added to the session's log, session.json untouched. */
+  appendCheckpoint(sessionId: string, checkpoint: CheckpointItem): void;
+  /** Notes a witness message, in the session's log. */
+  appendWitness(sessionId: string, entry: WitnessEntry): void;
+  /** Every session that has a folder, the rebuilt and the damaged included. */
   listSessions(): SessionState[];
+  /**
+   * Run when the app opens: removes what interrupted writes left behind, makes unreadable
+   * bookkeeping again, and lists signed records the bookkeeping missed. Sessions `skip` names
+   * (those being recorded) are left alone.
+   */
+  repair(options?: { skip?: (id: string) => boolean }): RepairReport;
   deleteSession(id: string): void;
   /** Moves a file the camera wrote into the session's media folder. Returns its new URI. */
   moveMedia(sessionId: string, sourceUri: string, name: string): string;
@@ -41,6 +61,9 @@ export interface LockerStore {
   writeDeviceKeyJson(json: string): void;
 }
 
+/** What `repair` did, by session id. */
+export type RepairReport = { rebuilt: string[]; damaged: string[]; caughtUp: string[]; leftovers: number };
+
 type Listener = () => void;
 const listeners = new Set<Listener>();
 let version = 0;
@@ -61,164 +84,200 @@ export function notifyLockerChanged(): void {
   for (const listener of listeners) listener();
 }
 
-function root(): Directory {
-  return new Directory(Paths.document, 'evidence');
-}
+/** The locker's logic over any set of files: the phone's (below), or the tests' in memory. */
+export function createLocker(files: LockerFiles, now: () => Date = () => new Date()): LockerStore {
+  const dirOf = (id: string) => files.sessionUri(id);
 
-function sessionsDir(): Directory {
-  return new Directory(root(), 'sessions');
-}
-
-function sessionDir(id: string): Directory {
-  return new Directory(sessionsDir(), id);
-}
-
-function ensure(dir: Directory): Directory {
-  if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
-  return dir;
-}
-
-function writeText(file: File, text: string): void {
-  if (!file.exists) file.create({ intermediates: true });
-  file.writeSync(text);
-}
-
-export const fileLocker: LockerStore = {
-  createSession(id, createdAt) {
-    const dir = ensure(sessionDir(id));
-    ensure(new Directory(dir, 'media'));
-    ensure(new Directory(dir, 'records'));
-    const state: SessionState = {
-      version: 1,
-      id,
-      createdAt,
-      updatedAt: createdAt,
-      items: [],
-      witness: [],
-      certificate: null,
-    };
-    this.writeSession(state);
-    return state;
-  },
-
-  readSession(id) {
-    const file = new File(sessionDir(id), 'session.json');
-    if (!file.exists) return null;
+  function textOrNull(uri: string): string | null {
     try {
-      return JSON.parse(file.textSync()) as SessionState;
+      return files.stat(uri) ? files.readText(uri) : null;
     } catch {
       return null;
     }
-  },
+  }
 
-  writeSession(state) {
-    writeText(new File(ensure(sessionDir(state.id)), 'session.json'), JSON.stringify(state));
-    notifyLockerChanged();
-  },
+  const logOf = (id: string) => parseLog(textOrNull(join(dirOf(id), LOG_FILE)));
 
-  listSessions() {
-    const dir = sessionsDir();
-    if (!dir.exists) return [];
-    const sessions: SessionState[] = [];
-    for (const entry of dir.list()) {
-      if (entry instanceof Directory) {
-        const state = this.readSession(entry.name);
+  /** session.json for a state, in one step. Throws if it can't be written; the old file then stands. */
+  function save(state: SessionState): void {
+    if (state.damaged) throw new Error("This recording's index is damaged; it is not written back.");
+    files.replaceText(join(dirOf(state.id), INDEX_FILE), JSON.stringify(withoutLogged(state, logOf(state.id))));
+  }
+
+  function rebuild(id: string): SessionState {
+    const state = rebuildSession(files, id, now());
+    if (!state.damaged) {
+      try {
+        save(state);
+      } catch {
+        // No room to save it, say. It is made again at the next read.
+      }
+    }
+    return state;
+  }
+
+  function removeLeftovers(folderUri: string): number {
+    let removed = 0;
+    for (const entry of files.list(folderUri)) {
+      if (entry.folder || !entry.name.endsWith(TEMPORARY_SUFFIX)) continue;
+      try {
+        files.remove(join(folderUri, entry.name));
+        removed++;
+      } catch {
+        // It stays until the next time.
+      }
+    }
+    return removed;
+  }
+
+  const store: LockerStore = {
+    createSession(id, createdAt) {
+      const dir = dirOf(id);
+      files.makeFolder(dir);
+      files.makeFolder(join(dir, 'media'));
+      files.makeFolder(join(dir, 'records'));
+      const state: SessionState = {
+        version: 1,
+        id,
+        createdAt,
+        updatedAt: createdAt,
+        items: [],
+        witness: [],
+        certificate: null,
+      };
+      store.writeSession(state);
+      return state;
+    },
+
+    readSession(id) {
+      if (!files.folderExists(dirOf(id))) return null;
+      const base = parseIndex(textOrNull(join(dirOf(id), INDEX_FILE)), id);
+      return base ? joinLog(base, logOf(id)) : rebuild(id);
+    },
+
+    writeSession(state) {
+      save(state);
+      notifyLockerChanged();
+    },
+
+    appendCheckpoint(sessionId, checkpoint) {
+      files.appendText(join(dirOf(sessionId), LOG_FILE), logLine({ checkpoint }));
+      notifyLockerChanged();
+    },
+
+    appendWitness(sessionId, entry) {
+      files.appendText(join(dirOf(sessionId), LOG_FILE), logLine({ witness: entry }));
+      notifyLockerChanged();
+    },
+
+    listSessions() {
+      const sessions: SessionState[] = [];
+      for (const id of files.sessionIds()) {
+        const state = store.readSession(id);
         if (state) sessions.push(state);
       }
-    }
-    return sessions.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  },
+      return sessions.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    },
 
-  deleteSession(id) {
-    const dir = sessionDir(id);
-    if (dir.exists) dir.delete();
-    // Its last export, if one is still in the cache (export/bundle.ts, exportCacheFor).
-    const exports = new Directory(Paths.cache, 'exports', id);
-    if (exports.exists) exports.delete();
-    notifyLockerChanged();
-  },
-
-  moveMedia(sessionId, sourceUri, name) {
-    const destination = new File(ensure(new Directory(sessionDir(sessionId), 'media')), name);
-    const source = new File(sourceUri);
-    source.moveSync(destination);
-    return destination.uri;
-  },
-
-  mediaUri(sessionId, name) {
-    return new File(sessionDir(sessionId), 'media', name).uri;
-  },
-
-  writeRecord(sessionId, name, body, signatureDer) {
-    const dir = ensure(new Directory(sessionDir(sessionId), 'records'));
-    writeText(new File(dir, name), body);
-    const signature = new File(dir, `${name}.sig`);
-    if (!signature.exists) signature.create();
-    signature.writeSync(signatureDer);
-  },
-
-  readRecordBytes(sessionId, name) {
-    return new File(sessionDir(sessionId), 'records', name).bytesSync();
-  },
-
-  readRecordText(sessionId, name) {
-    return new File(sessionDir(sessionId), 'records', name).textSync();
-  },
-
-  recordUri(sessionId, name) {
-    return new File(sessionDir(sessionId), 'records', name).uri;
-  },
-
-  sessionFileUri(sessionId, name) {
-    return new File(sessionDir(sessionId), name).uri;
-  },
-
-  copyUri(sessionId, name) {
-    return new File(ensure(new Directory(sessionDir(sessionId), 'copies')), name).uri;
-  },
-
-  writeCopyRecord(sessionId, mediaName, body, signatureDer) {
-    const dir = ensure(new Directory(sessionDir(sessionId), 'copies'));
-    writeText(new File(dir, `${mediaName}.json`), body);
-    const signature = new File(dir, `${mediaName}.json.sig`);
-    if (!signature.exists) signature.create();
-    signature.writeSync(signatureDer);
-  },
-
-  sessionDirUri(sessionId) {
-    return sessionDir(sessionId).uri;
-  },
-
-  listPending(sessionId) {
-    const dir = new Directory(sessionDir(sessionId), 'pending');
-    if (!dir.exists) return [];
-    const out: { name: string; marker: PendingMarker }[] = [];
-    for (const entry of dir.list()) {
-      if (!(entry instanceof File) || !entry.name.endsWith('.json')) continue;
-      try {
-        out.push({ name: entry.name, marker: JSON.parse(entry.textSync()) as PendingMarker });
-      } catch {
-        // A marker cut off mid-write; its file, if any, stays in incoming/ for the next check.
+    repair(options = {}) {
+      const report: RepairReport = { rebuilt: [], damaged: [], caughtUp: [], leftovers: removeLeftovers(files.rootUri) };
+      for (const id of files.sessionIds()) {
+        if (options.skip?.(id)) continue;
+        const dir = dirOf(id);
+        report.leftovers += removeLeftovers(dir) + removeLeftovers(join(dir, 'pending'));
+        const base = parseIndex(textOrNull(join(dir, INDEX_FILE)), id);
+        if (!base) {
+          (rebuild(id).damaged ? report.damaged : report.rebuilt).push(id);
+          continue;
+        }
+        try {
+          const state = joinLog(base, logOf(id));
+          const missed = unlistedRecords(files, dir, state);
+          if (missed.checkpoints.length) {
+            files.appendText(join(dir, LOG_FILE), missed.checkpoints.map((checkpoint) => logLine({ checkpoint })).join(''));
+          }
+          if (missed.items.length) {
+            const sequences = new Set(missed.items.map((item) => item.sequence));
+            const items = [...state.items.filter((item) => !sequences.has(item.sequence)), ...missed.items].sort((a, b) => a.sequence - b.sequence);
+            save({ ...state, items, updatedAt: now().toISOString() });
+          }
+          if (missed.checkpoints.length || missed.items.length) report.caughtUp.push(id);
+        } catch {
+          // It could not be written now; the records are still there for the next time.
+        }
       }
-    }
-    return out;
-  },
+      if (report.rebuilt.length || report.caughtUp.length || report.leftovers) notifyLockerChanged();
+      return report;
+    },
 
-  writePending(sessionId, name, marker) {
-    writeText(new File(ensure(new Directory(sessionDir(sessionId), 'pending')), name), JSON.stringify(marker));
-  },
+    deleteSession(id) {
+      files.remove(dirOf(id));
+      files.sessionDeleted?.(id);
+      notifyLockerChanged();
+    },
 
-  deletePending(sessionId, name) {
-    const file = new File(sessionDir(sessionId), 'pending', name);
-    if (file.exists) file.delete();
-  },
+    moveMedia(sessionId, sourceUri, name) {
+      const destination = join(dirOf(sessionId), 'media', name);
+      files.move(sourceUri, destination);
+      return destination;
+    },
 
-  readDeviceKeyJson() {
-    const file = new File(root(), 'device-key.json');
-    return file.exists ? file.textSync() : null;
-  },
+    mediaUri: (sessionId, name) => join(dirOf(sessionId), 'media', name),
 
-  writeDeviceKeyJson(json) {
-    writeText(new File(ensure(root()), 'device-key.json'), json);
-  },
-};
+    writeRecord(sessionId, name, body, signatureDer) {
+      files.write(join(dirOf(sessionId), 'records', name), body);
+      files.write(join(dirOf(sessionId), 'records', `${name}.sig`), signatureDer);
+    },
+
+    readRecordBytes: (sessionId, name) => files.readBytes(join(dirOf(sessionId), 'records', name)),
+
+    readRecordText: (sessionId, name) => files.readText(join(dirOf(sessionId), 'records', name)),
+
+    recordUri: (sessionId, name) => join(dirOf(sessionId), 'records', name),
+
+    sessionFileUri: (sessionId, name) => join(dirOf(sessionId), name),
+
+    copyUri(sessionId, name) {
+      files.makeFolder(join(dirOf(sessionId), 'copies'));
+      return join(dirOf(sessionId), 'copies', name);
+    },
+
+    writeCopyRecord(sessionId, mediaName, body, signatureDer) {
+      files.write(join(dirOf(sessionId), 'copies', `${mediaName}.json`), body);
+      files.write(join(dirOf(sessionId), 'copies', `${mediaName}.json.sig`), signatureDer);
+    },
+
+    sessionDirUri: (sessionId) => dirOf(sessionId),
+
+    listPending(sessionId) {
+      const folder = join(dirOf(sessionId), 'pending');
+      const out: { name: string; marker: PendingMarker }[] = [];
+      for (const entry of files.list(folder)) {
+        if (entry.folder || !entry.name.endsWith('.json')) continue;
+        try {
+          out.push({ name: entry.name, marker: JSON.parse(files.readText(join(folder, entry.name))) as PendingMarker });
+        } catch {
+          // A marker that can't be read; its file, if any, stays in incoming/ for the next check.
+        }
+      }
+      return out;
+    },
+
+    writePending(sessionId, name, marker) {
+      files.replaceText(join(dirOf(sessionId), 'pending', name), JSON.stringify(marker));
+    },
+
+    deletePending(sessionId, name) {
+      files.remove(join(dirOf(sessionId), 'pending', name));
+    },
+
+    readDeviceKeyJson: () => textOrNull(join(files.rootUri, 'device-key.json')),
+
+    writeDeviceKeyJson(json) {
+      files.replaceText(join(files.rootUri, 'device-key.json'), json);
+    },
+  };
+  return store;
+}
+
+export const fileLocker: LockerStore = createLocker(deviceFiles);

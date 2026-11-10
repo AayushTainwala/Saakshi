@@ -3,9 +3,11 @@ import * as Sharing from 'expo-sharing';
 
 import { attestIfNeeded } from '../integrity/deviceKey';
 import { appInfo } from '../integrity/environment';
+import { hashFile } from '../integrity/hash';
 import { isActive, whileBusy } from '../locker/active';
 import { fileLocker } from '../locker/store';
 import { CERTIFICATE_FILE } from './contents';
+import { fillMissingCrc } from './crc';
 import { planBundle } from './plan';
 import { bytesEntry, type ZipEntry, writeZip } from './zip';
 
@@ -51,6 +53,8 @@ export async function writeBundleTo(id: string, open: (fileName: string) => Bund
 export class BundleBusyError extends Error {}
 
 async function write(id: string, open: (fileName: string) => BundleOutput | Promise<BundleOutput>): Promise<string> {
+  // Bookkeeping made again from the signed records has no CRC-32s for the ZIP (crc.ts).
+  await fillMissingCrc(fileLocker, hashFile, id);
   const session = fileLocker.readSession(id);
   if (!session) throw new Error('No such session');
   const key = await attestIfNeeded(fileLocker);

@@ -11,6 +11,7 @@ import expo.modules.kotlin.functions.Queues
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -158,6 +159,21 @@ class SaakshiEvidenceModule : Module() {
     }
 
     AsyncFunction("recorderStop") { CameraRecorder.stopRecording() }
+
+    // Replaces a small file in one step (AtomicFile; repair round A, group 1). Synchronous, so the
+    // locker's bookkeeping is written from JavaScript in the order things happen.
+    Function("writeTextAtomic") { uri: String, text: String ->
+      val parsed = Uri.parse(uri)
+      val path = (if (parsed.scheme == null || parsed.scheme == "file") parsed.path else null)
+        ?: throw CodedException("ERR_FILE_URI", "Not a local file URI: $uri", null)
+      val target = File(path)
+      target.parentFile?.mkdirs()
+      try {
+        AtomicFile.write(target, text.toByteArray(Charsets.UTF_8))
+      } catch (error: IOException) {
+        throw CodedException("ERR_FILE_WRITE", error.message ?: "The file could not be written", error)
+      }
+    }
 
     // Reads the file once and returns its size, SHA-256, SHA-1, MD5 and CRC-32.
     // Runs on the IO dispatcher so a large file doesn't hold up other modules' calls.

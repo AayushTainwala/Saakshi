@@ -28,13 +28,20 @@ function findIosFile(marker: PendingMarker, files: RecoveryFiles, claimed: Set<s
 
 /**
  * Seals files left behind by a recording that was cut off (crash, forced power-off) or closed but
- * not yet sealed. Runs when the app opens. A file whose recorder never closed it is sealed with
+ * not yet sealed, after putting the locker's bookkeeping right. Runs when the app opens. A file whose recorder never closed it is sealed with
  * `interrupted: true`, its end time taken from its last write. Returns the items it added.
  */
 export async function recoverPending(deps: PipelineDeps, files: RecoveryFiles): Promise<EvidenceItem[]> {
   const recovered: EvidenceItem[] = [];
+  // First the bookkeeping (repair round A, group 1): what interrupted writes left behind goes,
+  // unreadable bookkeeping is made again from the signed records, and records signed just before
+  // the cut-off are listed, so that the files sealed below chain after them and never take their
+  // numbers.
+  deps.store.repair({ skip: isActive });
   for (const state of deps.store.listSessions()) {
     if (isActive(state.id)) continue;
+    // With no signed record to go on, nothing can be chained: its files stay as they are, listed.
+    if (state.damaged) continue;
     const markers = deps.store
       .listPending(state.id)
       .sort((a, b) => Date.parse(a.marker.startedAt) - Date.parse(b.marker.startedAt));

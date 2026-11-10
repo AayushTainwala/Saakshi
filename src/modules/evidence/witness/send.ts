@@ -34,8 +34,9 @@ export async function sendWitnessMessage(
     recipients: recipients.length,
     result,
   };
-  const latest = fileLocker.readSession(sessionId) ?? session;
-  fileLocker.writeSession({ ...latest, witness: [...latest.witness, entry] });
+  // One line in the session's log, which is only ever added to: it survives the bookkeeping being
+  // made again, and a recording in progress can't write over it (repair round A, group 1).
+  fileLocker.appendWitness(sessionId, entry);
   return entry;
 }
 
