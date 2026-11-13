@@ -4,8 +4,8 @@ The pickup file for build sessions: where things stand, what is next, and the qu
 
 ## Where things stand (10 Nov 2026)
 
-- **On `main`:** R1 and R2 (#1 to #9), fix round 1 (#16 to #27) and round 2, Part 1 with groups 1.6 and 1.7 (#31 to #36, #41, #43), and repair round A, group 1 (#45). Typecheck, lint, 628 tests and both native builds pass.
-- **What has run on a phone:** the evidence camera and body-cam as they were on 5 Nov, on the owner's iPhone. Nothing built since then has run on a phone, and the Android app has never run on a phone or an emulator. Treat every "Not verified" note in the archived reports as still open.
+- **On `main`:** R1 and R2 (#1 to #9), fix round 1 (#16 to #27), round 2, Part 1 with groups 1.6 and 1.7 (#31 to #36, #41, #43), and repair round A, groups 1 to 3 (#45, #46, #47). Typecheck, lint, 695 tests and both native builds pass. The bundle format is 0.11.
+- **What has run on a phone:** the evidence camera and body-cam as they were on 5 Nov, on the owner's iPhone. Nothing built since then has run on a phone, and the Android app has never run on a phone or an emulator. The owner has chosen to skip the emulator: Android first runs on his phone, from 12 Nov. Treat every "Not verified" note in the archived reports as still open.
 - **New feature code is paused** (owner, 10 Nov) until repairs 1 to 4 below are done. Group 3.1 (documents only) may go ahead. Parts 2, 3 and 4 of round 2 wait.
 - **Pace:** no deadline. The next goal is a beta for about 50 testers on iPhone and Android ([BUILD_PLAN.md](BUILD_PLAN.md), "Road to the beta").
 
@@ -22,10 +22,10 @@ The repairs come from the review of `main` on 10 Nov. Each round gets a brief in
 
 | # | Work | What it covers | State |
 |---|---|---|---|
-| 1 | **Run on phones** | The Android emulator on the owner's Mac, then his Android phone (from 12 Nov); the iPhone tests owed for Part 1, 1.6 and 1.7; then test sections D to J. One fix round follows what they find. | The owner's sittings. Test builds: [release/try-a-build.md](release/try-a-build.md). |
-| 2 | **Repair round A: evidence that survives** | The bookkeeping file (`session.json`) written safely and rebuilt from the signed records if unreadable; free storage watched, stage one; one file per signing key, never overwritten. | **Built.** Group 1 is merged (#45). Group 2 is in a pull request (#46), with both native builds passed, waiting for a native review. Group 3 is in a pull request (#47); it has no native code of its own, is built on groups 1 and 2, and merges last. Reports below. Brief: [briefs/2026-11-10-repair-round-a.md](briefs/2026-11-10-repair-round-a.md). |
-| 3 | **Repair round B: safety that keeps running** | Android video that notices a failed recorder and restarts; body-cam's start check; "My phone is being taken" restarting by itself after the app is killed; time limits on server calls; a phone with no SIM set for texts; the alert sent at once with the link following; the lock at once. | Brief to be written; two points are open with the owner (below). May run beside round A. |
-| 4 | **Our own web address** | A `.org` and a `.in` name in front of the server and the live page, with a short list of addresses for the app to try. | The owner is choosing the names. |
+| 1 | **Run on phones** | The owner's Android phone (from 12 Nov; no emulator sitting); the iPhone tests owed for round 2, Part 1, groups 1.6 and 1.7, and repair round A; then test sections D to J. One fix round follows what they find. | The owner's sittings; the review session makes the test page. Test builds: [release/try-a-build.md](release/try-a-build.md). |
+| 2 | **Repair round A: evidence that survives** | The bookkeeping file (`session.json`) written safely and rebuilt from the signed records if unreadable; free storage watched, stage one; one file per signing key, never overwritten. | **Merged on 10 Nov** (#45, #46, #47), each reviewed by a session that did not write it. **A short follow-up waits for the owner's answers** to the builder's questions below, and carries one thing already decided: the keep-free amount starts at 5 GB or a tenth of the phone's storage, whichever is smaller (`startingKeepFreeBytes`; note that the Storage page offers fixed amounts, so say how a starting value between them is shown). Reports below. Brief: [briefs/2026-11-10-repair-round-a.md](briefs/2026-11-10-repair-round-a.md). |
+| 3 | **Repair round B: safety that keeps running** | Android video that notices a failed recorder and restarts; body-cam's start check; "My phone is being taken" restarting by itself after the app is killed; time limits on server calls; a phone with no SIM set for texts; the alert sent at once with the link following; the lock at once. | Brief to be written; the owner's answers of 10 Nov have released it (below). May run beside round A's follow-up. |
+| 4 | **Our own web address** | A `.org` and a `.in` name in front of the server and the live page, with a short list of addresses for the app to try. | The owner chose `saakshiapp.org` and `saakshiapp.in` (10 Nov) and is buying them. Then: a comparison of Supabase's custom-domain add-on with a relay of our own, and the brief. |
 | 5 | **Tidy-ups** | The small batch (dependencies listed, `.gitignore`, the server's migration record, pinned build tools), and native builds on every pull request so the merge rule can require them. | Brief to be written. |
 | 6 | **Documents** | [SPEC.md](SPEC.md) rewritten as settled text with a separate change log; a note on what each proof in a bundle shows. | Not started. |
 | 7 | **Group 3.1, the alerts protocol** | Documents only. Its brief gains: our own web address, limits per caller on the server, the secret code's waits off the phone's clock, and phone tests of the silence alarm's two assumptions. | Brief to be revised, then 3.1. |
@@ -47,9 +47,21 @@ The decisions are in [SPEC.md](SPEC.md); this list says only where to look.
 - **"My phone is being taken" locks at once** and sends its alert at once, with the live link following (SPEC 5.4). Group 1.7 built a lock that waits; round B changes it.
 - **The owner's answers on group 1.7** (#43): the reminder's third line and its place at the top of the page are accepted; the app says that Saakshi's lock needs the PIN only after a phone test confirms it; the Play listing says the lock openly, with the uninstall step.
 - **Storage** in two stages (SPEC, section 4, "Storage").
-- **Body-cam** shows a start check and goes dark only when recording is confirmed; Android video restarts by itself if the recorder fails (SPEC, body-cam mode).
+- **Body-cam** shows a start check and goes dark only when recording is confirmed; a position is shown but is not a condition. Android video restarts by itself if the recorder fails, with no limit, at most 5 seconds between tries, sound throughout and a vibration (SPEC, body-cam mode).
 - **The bundle is described as several proofs**, each saying what it shows; motion readings and two time proofs come before the public release (SPEC E3).
-- **Proposed, not decided:** the microphone rule in "My phone is being taken"; whether body-cam may go dark without a position; time and place stamped on the picture (SPEC marks each **Proposed**).
+- **The microphone in "My phone is being taken"** (owner, 10 Nov): the mode arms only with the microphone allowed; about two seconds of retries; the lock regardless; retries behind the lock (SPEC 5.4).
+- **Time and place on the picture** (owner, 10 Nov): a stamped copy when sharing, and no setting to stamp the original (SPEC E1). After the repairs.
+- **Proposed, not decided:** the guard against a recorder that restarts and fails again at once (SPEC, body-cam mode).
+
+## Found in repair round A, for later rounds
+
+From the builder's report below. None is fixed yet.
+
+- **A file that fails to seal, followed by one that seals:** the later record's number is one too high, and `tools/verify-bundle.mjs` fails the bundle ("a record is missing or out of order"). Older than round A. For repair round B.
+- **"My phone is being taken" does not notice its recording stopping** at the storage floor: its screen still shows the recording as on. For repair round B, with the restart work.
+- **A recording in progress keeps its own copy of the index** and writes that, so a check result or a copy noted meanwhile is lost at its next save. Witness messages are safe (they are in the log).
+- **Android's `VIBRATE` permission is removed from every build** (`app.config.ts`). Round B restores it, since the owner has decided that body-cam vibrates when its recorder fails.
+- **The warnings on body-cam's dark screen are words only.** Round B decides how a dark screen tells the wearer something; the builder's notes on vibration, sound and notifications on each phone are in the report.
 
 ## Owner questions
 
