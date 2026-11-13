@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saakshi features by build</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a ledger. One row per feature, one column per build; built builds in solid ink,
+   planned builds outlined; colour is used only for what changed. */
+:root {
+  --bg: #f2f4f6;
+  --surface: #ffffff;
+  --ink: #18212c;
+  --muted: #5d6977;
+  --line: #d7dde4;
+  --accent: #1d4f91;
+  --new: #156a41;
+  --new-tint: #e2f3e9;
+  --changed: #8a5200;
+  --changed-tint: #fcefd3;
+  --same-tint: #eceff3;
+  --open: #a3262a;
+  --display: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --cols: minmax(170px, 0.95fr) repeat(5, minmax(0, 1fr));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #12171d; --surface: #1a212a; --ink: #e6eaef; --muted: #9aa6b4; --line: #2f3945;
+    --accent: #8db8f2; --new: #7fd3a4; --new-tint: #173526; --changed: #f0bf6a; --changed-tint: #3a2c10;
+    --same-tint: #232c37; --open: #f08a8d;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #12171d; --surface: #1a212a; --ink: #e6eaef; --muted: #9aa6b4; --line: #2f3945;
+  --accent: #8db8f2; --new: #7fd3a4; --new-tint: #173526; --changed: #f0bf6a; --changed-tint: #3a2c10;
+  --same-tint: #232c37; --open: #f08a8d;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 15px/1.5 var(--body); }
+.wrap { max-width: 1500px; margin: 0 auto; padding: 28px 20px 64px; display: flex; flex-direction: column; gap: 22px; }
+h1 { font: 600 30px/1.15 var(--display); margin: 0; text-wrap: balance; }
+h2 { font: 600 20px/1.25 var(--display); margin: 0; text-wrap: balance; }
+p { margin: 0; }
+.lede { max-width: 68ch; color: var(--muted); }
+.lede strong { color: var(--ink); font-weight: 600; }
+.meta { color: var(--muted); font-size: 13px; }
+header { display: flex; flex-direction: column; gap: 10px; }
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* The five builds */
+.builds { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.build { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--ink); border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; text-align: left; cursor: pointer; }
+.build.planned { border-top-style: dashed; border-top-color: var(--muted); }
+.build[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.build b { font-weight: 600; font-size: 16px; }
+.build .when { font-size: 12.5px; color: var(--muted); }
+.build .what { font-size: 13px; color: var(--muted); }
+.build .counts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 4px; }
+
+.chip { font-style: normal; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; line-height: 1; padding: 4px 7px; border-radius: 4px; white-space: nowrap; }
+.chip.new { background: var(--new-tint); color: var(--new); }
+.chip.changed { background: var(--changed-tint); color: var(--changed); }
+.chip.same { background: var(--same-tint); color: var(--muted); font-weight: 500; }
+.chip.none { border: 1px dashed var(--line); color: var(--muted); font-weight: 500; }
+.chip.ran { border: 1px solid var(--accent); color: var(--accent); }
+.chip.by { background: transparent; border: 1px solid var(--line); color: var(--ink); font-weight: 500; white-space: normal; line-height: 1.25; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+
+/* Controls */
+.controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.field input, .field select { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 7px 9px; min-width: 190px; color: var(--ink); font-size: 14px; }
+.field input { min-width: 220px; }
+.field select { max-width: 250px; }
+.btn { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 7px 11px; cursor: pointer; font-size: 14px; }
+.btn:hover { border-color: var(--accent); }
+.btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.spacer { flex: 1; }
+.shown { font-size: 13px; color: var(--muted); align-self: center; }
+
+/* The table */
+.head { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: var(--cols); background: var(--ink); color: var(--bg); border-radius: 6px 6px 0 0; font-size: 13px; }
+.head > div { padding: 8px 10px; border-left: 1px solid color-mix(in srgb, var(--bg) 25%, transparent); }
+.head > div:first-child { border-left: 0; }
+.head b { display: block; font-weight: 600; font-size: 14px; }
+.head .planned-tag { opacity: 0.75; }
+.table { display: flex; flex-direction: column; gap: 14px; }
+.tabs { display: none; }
+
+details.group { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+details.group > summary { list-style: none; cursor: pointer; padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
+details.group > summary::-webkit-details-marker { display: none; }
+details.group > summary::before { content: "+"; font: 600 18px/1 var(--body); width: 14px; color: var(--accent); }
+details.group[open] > summary::before { content: "–"; }
+details.group > summary .sum { color: var(--muted); font-size: 13.5px; flex: 1 1 260px; }
+details.group > summary .n { color: var(--muted); font-size: 12.5px; }
+
+.row { display: grid; grid-template-columns: var(--cols); border-top: 1px solid var(--line); }
+.row > div { padding: 10px; border-left: 1px solid var(--line); min-width: 0; overflow-wrap: anywhere; }
+.row > div:first-child { border-left: 0; }
+.feat { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+.feat .title { font-weight: 600; font-size: 14.5px; line-height: 1.3; }
+.feat .what { font-size: 13px; color: var(--muted); }
+.feat .ref { font-size: 11.5px; color: var(--muted); }
+.feat .more { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font-size: 12.5px; text-decoration: underline; text-underline-offset: 2px; }
+.feat .flag { font-size: 12px; font-weight: 600; color: var(--open); }
+.cell { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; line-height: 1.45; }
+.cell .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.cell ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.cell li { padding-left: 9px; border-left: 2px solid var(--line); }
+.cell.is-new li, .cell.is-changed li.fresh { border-left-color: currentColor; }
+.cell.is-new li { border-left-color: var(--new); }
+.cell.is-changed li.fresh { border-left-color: var(--changed); }
+.cell li.kept, .cell.is-same li, .cell.is-none li { color: var(--muted); }
+.cell.is-none li { font-style: italic; border-left-style: dashed; }
+.cell.planned { background: color-mix(in srgb, var(--bg) 55%, var(--surface)); }
+.cell .timing { font-size: 12px; color: var(--open); }
+.cell .asbefore { font-size: 12.5px; color: var(--muted); }
+body.short .cell.is-same ul, body.short .cell li.kept { display: none; }
+body:not(.short) .cell .asbefore { display: none; }
+
+.extra { grid-column: 1 / -1; background: color-mix(in srgb, var(--bg) 55%, var(--surface)); display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; }
+.extra[hidden] { display: none; }
+.extra p { max-width: 90ch; }
+.extra b { font-weight: 600; }
+.extra .openline b { color: var(--open); }
+
+.end { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.card ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
+.card li b { font-weight: 600; }
+.card .small { font-size: 13px; color: var(--muted); }
+.empty { padding: 24px; text-align: center; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: 6px; }
+.empty[hidden] { display: none; }
+
+@media (max-width: 1080px) {
+  .builds { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  .head { display: none; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; position: sticky; top: 0; z-index: 3; background: var(--bg); padding: 8px 0; }
+  .row { grid-template-columns: minmax(0, 1fr); }
+  .row > div { border-left: 0; }
+  .row > .cell { display: none; border-top: 1px dashed var(--line); }
+  .table[data-one="r1"] .cell[data-b="r1"], .table[data-one="r2"] .cell[data-b="r2"], .table[data-one="beta"] .cell[data-b="beta"],
+  .table[data-one="public"] .cell[data-b="public"], .table[data-one="later"] .cell[data-b="later"] { display: flex; }
+  .field input, .field select { min-width: 0; width: 100%; }
+  .field { flex: 1 1 200px; }
+}
+@media (prefers-reduced-motion: no-preference) { .btn, .build { transition: border-color 0.15s; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Saakshi: features by build</h1>
+    <p class="lede">Every feature of the app, and how it stands in each of five builds. <strong>This table is a mirror of the long spec (docs/SPEC.md in the repository), which is always the master.</strong> Each box shows the feature as it is in that build, with what changed marked. Open a row for how it works and what is still open with you.</p>
+    <p class="meta" id="meta"></p>
+  </header>
+
+  <section class="builds" id="builds" aria-label="The five builds"></section>
+
+  <div class="legend" aria-label="What the marks mean">
+    <span><i class="chip new">New</i> first appears in this build</span>
+    <span><i class="chip changed">Changed</i> differs from the build before</span>
+    <span><i class="chip same">No change</i> as in the build before</span>
+    <span><i class="chip none">Not in this build</i></span>
+    <span><i class="chip ran">Run on your iPhone</i> tried by you on 5 Nov</span>
+    <span><i class="chip by">Comes with …</i> the piece of work that builds it</span>
+  </div>
+
+  <div class="controls">
+    <label class="field" for="q">Find a word
+      <input id="q" type="search" placeholder="battery, swipe, certificate …" autocomplete="off">
+    </label>
+    <label class="field" for="fbuild">Show only rows that change in
+      <select id="fbuild"><option value="">every row</option></select>
+    </label>
+    <label class="field" for="fwork">Show only what this work brings
+      <select id="fwork"><option value="">any work</option></select>
+    </label>
+    <button class="btn" id="short" type="button" aria-pressed="false">Shorten unchanged boxes</button>
+    <span class="spacer"></span>
+    <span class="shown" id="shown"></span>
+    <button class="btn" id="openall" type="button">Open all groups</button>
+    <button class="btn" id="closeall" type="button">Close all groups</button>
+  </div>
+
+  <div>
+    <div class="tabs" id="tabs" role="group" aria-label="Which build to show"></div>
+    <div class="head" id="head" aria-hidden="true"></div>
+    <main class="table" id="table" data-one="r2"></main>
+    <p class="empty" id="empty" hidden>No row matches. Clear the word or the filters above.</p>
+  </div>
+
+  <section class="end" aria-label="Summaries">
+    <div class="card"><h2>Where the spec names no build</h2><p class="small">These are decided, but the spec does not say which build they belong to. They are placed in the column that fits best; tell Claude if one should move.</p><ul id="timing"></ul></div>
+    <div class="card"><h2>Open with you</h2><p class="small">Rows that carry a point waiting for your word or for a phone test. The full list is section 10 of the spec.</p><ul id="open"></ul></div>
+    <div class="card"><h2>The work that brings each change</h2><ul id="work"></ul></div>
+  </section>
+</div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script>
+(function () {
+  var T = JSON.parse(document.getElementById('data').textContent);
+  var BUILDS = T.builds, PLANNED = { beta: 1, public: 1, later: 1 };
+  var $ = function (id) { return document.getElementById(id); };
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  var buildName = {}; BUILDS.forEach(function (b) { buildName[b.id] = b.short; });
+
+  // Work out what each box holds: an unchanged box carries the build before; a box that adds keeps it too.
+  var rows = [];
+  T.groups.forEach(function (g) {
+    g.features.forEach(function (f) {
+      var prev = null;
+      BUILDS.forEach(function (b) {
+        var c = f.builds[b.id], r = { mark: c.mark, by: c.by || [], ran: !!c.ran, timing: c.timing || '' };
+        if (c.mark === 'same') { r.kept = prev.kept.concat(prev.fresh); r.fresh = []; r.base = prev.base; r.since = prev.since; }
+        else if (c.mark === 'changed' && c.adds) { r.kept = prev.kept.concat(prev.fresh); r.fresh = c.points; r.base = 'present'; r.since = b.id; }
+        else { r.kept = []; r.fresh = c.points; r.base = c.mark === 'none' ? 'none' : 'present'; r.since = b.id; }
+        f.builds[b.id].r = r; prev = r;
+      });
+      f.group = g;
+      f.text = [f.title, f.what || '', f.notes || '', f.open || '', f.spec.join(' ')].concat(BUILDS.map(function (b) { return (f.builds[b.id].points || []).join(' '); })).join(' ').toLowerCase();
+      rows.push(f);
+    });
+  });
+
+  $('meta').textContent = 'Updated ' + T.updated + '. Mirrors ' + T.specAsOf + '. ' + rows.length + ' rows in ' + T.groups.length + ' groups.';
+
+  // Build cards and column heads
+  var state = { q: '', build: '', work: '' };
+  BUILDS.forEach(function (b) {
+    var n = 0, ch = 0;
+    rows.forEach(function (f) { var m = f.builds[b.id].mark; if (m === 'new') n++; if (m === 'changed') ch++; });
+    var card = el('button', 'build' + (PLANNED[b.id] ? ' planned' : '')); card.type = 'button'; card.setAttribute('aria-pressed', 'false'); card.dataset.b = b.id;
+    card.title = 'Show only the rows that change in ' + b.name;
+    card.appendChild(el('b', '', b.name)); card.appendChild(el('span', 'when', b.when)); card.appendChild(el('span', 'what', b.what));
+    var counts = el('span', 'counts'); counts.appendChild(el('i', 'chip new', n + ' new')); counts.appendChild(el('i', 'chip changed', ch + ' changed')); card.appendChild(counts);
+    card.addEventListener('click', function () { state.build = state.build === b.id ? '' : b.id; $('fbuild').value = state.build; apply(); });
+    $('builds').appendChild(card);
+    var o = el('option', '', b.name); o.value = b.id; $('fbuild').appendChild(o);
+    var h = el('div'); h.appendChild(el('b', '', b.name)); h.appendChild(el('span', PLANNED[b.id] ? 'planned-tag' : '', PLANNED[b.id] ? 'Planned' : b.when)); $('head').appendChild(h);
+    var tab = el('button', 'btn', b.short); tab.type = 'button'; tab.dataset.b = b.id; tab.setAttribute('aria-pressed', b.id === 'r2' ? 'true' : 'false');
+    tab.addEventListener('click', function () { one(b.id); }); $('tabs').appendChild(tab);
+  });
+  $('head').insertBefore(el('div', '', 'Feature'), $('head').firstChild);
+  function one(id) { $('table').dataset.one = id; Array.prototype.forEach.call($('tabs').children, function (t) { t.setAttribute('aria-pressed', t.dataset.b === id ? 'true' : 'false'); }); }
+
+  Object.keys(T.work).forEach(function (k) {
+    var o = el('option', '', T.work[k].name); o.value = k; $('fwork').appendChild(o);
+    var li = el('li'); li.appendChild(el('b', '', T.work[k].name + '. ')); li.appendChild(document.createTextNode(T.work[k].state)); $('work').appendChild(li);
+  });
+
+  // Rows
+  var LABEL = { new: 'New', changed: 'Changed', same: 'No change', none: 'Not in this build' };
+  T.groups.forEach(function (g) {
+    var d = el('details', 'group'); d.open = true; d.id = 'g-' + g.id;
+    var s = el('summary'); s.appendChild(el('h2', '', g.title)); s.appendChild(el('span', 'sum', g.summary)); s.appendChild(el('span', 'n', g.features.length + ' rows')); d.appendChild(s);
+    g.features.forEach(function (f) {
+      var row = el('div', 'row'); row.id = f.id; f.row = row;
+      var feat = el('div', 'feat'); feat.appendChild(el('span', 'title', f.title));
+      if (f.what) feat.appendChild(el('span', 'what', f.what));
+      feat.appendChild(el('span', 'ref', 'Spec: ' + f.spec.join('; ')));
+      if (f.open) feat.appendChild(el('span', 'flag', 'Has a point open with you'));
+      var extra = null;
+      if (f.notes || f.open) {
+        var more = el('button', 'more', 'How it works, and what is open'); more.type = 'button'; more.setAttribute('aria-expanded', 'false');
+        extra = el('div', 'extra'); extra.hidden = true;
+        if (f.notes) { var p = el('p'); p.appendChild(el('b', '', 'In plain words. ')); p.appendChild(document.createTextNode(f.notes)); extra.appendChild(p); }
+        if (f.open) { var q = el('p', 'openline'); q.appendChild(el('b', '', 'Open. ')); q.appendChild(document.createTextNode(f.open)); extra.appendChild(q); }
+        more.addEventListener('click', function () { extra.hidden = !extra.hidden; more.setAttribute('aria-expanded', String(!extra.hidden)); more.textContent = extra.hidden ? 'How it works, and what is open' : 'Hide'; });
+        feat.appendChild(more);
+      }
+      row.appendChild(feat);
+      BUILDS.forEach(function (b) {
+        var r = f.builds[b.id].r, shown = r.mark === 'same' && r.base === 'none' ? 'none' : r.mark;
+        var cell = el('div', 'cell is-' + shown + (PLANNED[b.id] ? ' planned' : '')); cell.dataset.b = b.id;
+        var tags = el('div', 'tags');
+        tags.appendChild(el('i', 'chip ' + shown, shown === 'none' ? LABEL.none : LABEL[r.mark]));
+        if (r.ran) tags.appendChild(el('i', 'chip ran', 'Run on your iPhone'));
+        r.by.forEach(function (k) { tags.appendChild(el('i', 'chip by', 'Comes with: ' + T.work[k].name)); });
+        cell.appendChild(tags);
+        if (r.mark === 'same' && r.base !== 'none') cell.appendChild(el('span', 'asbefore', 'As in ' + buildName[r.since] + '.'));
+        if (r.mark === 'changed' && r.kept.length) cell.appendChild(el('span', 'asbefore', 'Everything in ' + buildName[prevOf(b.id)] + ' still holds, and:'));
+        var ul = el('ul');
+        r.kept.forEach(function (p) { ul.appendChild(el('li', 'kept', p)); });
+        r.fresh.forEach(function (p) { ul.appendChild(el('li', 'fresh', p)); });
+        cell.appendChild(ul);
+        if (r.timing) cell.appendChild(el('span', 'timing', 'Which build: ' + r.timing));
+        row.appendChild(cell);
+      });
+      if (extra) row.appendChild(extra);
+      d.appendChild(row);
+    });
+    g.el = d; $('table').appendChild(d);
+  });
+  function prevOf(id) { for (var i = 1; i < BUILDS.length; i++) if (BUILDS[i].id === id) return BUILDS[i - 1].id; return id; }
+
+  // Summaries at the end
+  rows.forEach(function (f) {
+    BUILDS.forEach(function (b) {
+      var c = f.builds[b.id];
+      if (c.timing) { var li = el('li'); var a = el('a', '', f.title); a.href = '#' + f.id; var bb = el('b'); bb.appendChild(a); li.appendChild(bb); li.appendChild(document.createTextNode(' (shown under ' + b.name + '). ' + c.timing)); $('timing').appendChild(li); }
+    });
+    if (f.open) { var li2 = el('li'); var a2 = el('a', '', f.title); a2.href = '#' + f.id; var b2 = el('b'); b2.appendChild(a2); li2.appendChild(b2); li2.appendChild(document.createTextNode('. ' + f.open)); $('open').appendChild(li2); }
+  });
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('.end a'); if (!a) return;
+    e.preventDefault(); var row = $(a.getAttribute('href').slice(1)); if (!row) return;
+    state.q = ''; state.build = ''; state.work = ''; $('q').value = ''; $('fbuild').value = ''; $('fwork').value = ''; apply();
+    row.parentNode.open = true; row.scrollIntoView({ block: 'start' });
+  });
+
+  // Filters
+  function apply() {
+    var q = state.q.trim().toLowerCase(), n = 0;
+    rows.forEach(function (f) {
+      var ok = !q || f.text.indexOf(q) !== -1;
+      if (ok && state.build) { var m = f.builds[state.build].mark; ok = m === 'new' || m === 'changed'; }
+      if (ok && state.work) ok = BUILDS.some(function (b) { return (f.builds[b.id].by || []).indexOf(state.work) !== -1; });
+      f.row.hidden = !ok; f.row.style.display = ok ? '' : 'none'; if (ok) n++;
+    });
+    T.groups.forEach(function (g) {
+      var any = g.features.some(function (f) { return !f.row.hidden; });
+      g.el.style.display = any ? '' : 'none';
+      if (any && (q || state.build || state.work)) g.el.open = true;
+    });
+    $('empty').hidden = n !== 0;
+    $('shown').textContent = n === rows.length ? 'All ' + n + ' rows' : n + ' of ' + rows.length + ' rows';
+    Array.prototype.forEach.call($('builds').children, function (c) { c.setAttribute('aria-pressed', c.dataset.b === state.build ? 'true' : 'false'); });
+    if (state.build) one(state.build);
+  }
+  $('q').addEventListener('input', function () { state.q = this.value; apply(); });
+  $('fbuild').addEventListener('change', function () { state.build = this.value; apply(); });
+  $('fwork').addEventListener('change', function () { state.work = this.value; apply(); });
+  $('short').addEventListener('click', function () { var on = document.body.classList.toggle('short'); this.setAttribute('aria-pressed', String(on)); this.textContent = on ? 'Show unchanged boxes in full' : 'Shorten unchanged boxes'; });
+  $('openall').addEventListener('click', function () { T.groups.forEach(function (g) { g.el.open = true; }); });
+  $('closeall').addEventListener('click', function () { T.groups.forEach(function (g) { g.el.open = false; }); });
+  apply();
+})();
+</script>
+</body>
+</html>

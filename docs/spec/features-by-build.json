@@ -1,0 +1,3126 @@
+{
+  "about": "The owner's features-by-build table: a mirror of docs/SPEC.md, which is always the master. Change this file in the same pull request as any change to the spec. tools/features-table/check.mjs checks it; tools/features-table/build.mjs makes the page from it.",
+  "title": "Saakshi: features by build",
+  "updated": "2026-11-14",
+  "specAsOf": "docs/SPEC.md as of 14 Nov 2026, with the owner's answers to the five small points",
+  "builds": [
+    {
+      "id": "r1",
+      "name": "Round 1 test build",
+      "short": "Round 1",
+      "when": "Tested 5 Nov 2026",
+      "what": "The iPhone build you tested on 5 Nov (sections A to C: the evidence camera, records and export, body-cam). Made from the code as merged on 21 Oct (commit 9b81f92). Your seven exported bundles confirm it: all are in bundle format 0.2, which only this build wrote."
+    },
+    {
+      "id": "r2",
+      "name": "Round 2 test build",
+      "short": "Round 2",
+      "when": "The code today, 14 Nov 2026",
+      "what": "What an iPhone or Android build made from the code today would hold (commit 26154f5): the fixes from your test, round 2's Part 1, and repair round A. No build of it is on a phone yet, and none of it has run on one."
+    },
+    {
+      "id": "beta",
+      "name": "The beta",
+      "short": "Beta",
+      "when": "Planned",
+      "what": "The version for about 50 testers on iPhone and Android. Everything shown here is decided and still to build; it reaches you in test builds along the way, in the order of the work named in each box."
+    },
+    {
+      "id": "public",
+      "name": "The public release",
+      "short": "Public",
+      "when": "Planned",
+      "what": "The first version on the App Store, Google Play and GitHub."
+    },
+    {
+      "id": "later",
+      "name": "Later",
+      "short": "Later",
+      "when": "After the public release, or no build named",
+      "what": "Version 1.1, version 2, and things parked or with no build named in the spec."
+    }
+  ],
+  "marks": {
+    "new": "New in this build",
+    "changed": "Changed in this build",
+    "same": "No change from the build before",
+    "none": "Not in this build"
+  },
+  "work": {
+    "stops": {
+      "name": "When a recording stops by itself",
+      "state": "The builder's next piece. Its brief is written."
+    },
+    "repair-b": {
+      "name": "Repair round B",
+      "state": "Brief to be written; every decision it needs is made."
+    },
+    "part-2": {
+      "name": "Round 2, Part 2: cloud copies",
+      "state": "Paused behind the repairs. Needs Parts C and D of your setup."
+    },
+    "part-3": {
+      "name": "Round 2, Part 3: Saakshi-to-Saakshi and the silence alarm",
+      "state": "Paused behind the repairs. Its protocol document comes to you first."
+    },
+    "part-4": {
+      "name": "Round 2, Part 4: the first-open walkthrough",
+      "state": "Built last."
+    },
+    "design": {
+      "name": "Look and feel",
+      "state": "A review of other apps, then mock-ups for you to choose from, beside the repairs."
+    },
+    "after-repairs": {
+      "name": "After the repairs",
+      "state": "No round is named yet."
+    },
+    "address": {
+      "name": "Our own web address",
+      "state": "Names chosen; bought before the beta build goes to testers."
+    },
+    "wording": {
+      "name": "Your wording review and sign-offs",
+      "state": "One round, English and Hindi, legal and ordinary."
+    },
+    "before-beta": {
+      "name": "Other work due before the beta",
+      "state": "On the release checklist."
+    },
+    "release": {
+      "name": "Work due before the public release",
+      "state": "Decided; not started."
+    },
+    "v1.1": {
+      "name": "Version 1.1",
+      "state": "After the public release."
+    },
+    "v2": {
+      "name": "Version 2",
+      "state": "Later still."
+    },
+    "parked": {
+      "name": "Parked",
+      "state": "Not being worked on."
+    }
+  },
+  "groups": [
+    {
+      "id": "camera",
+      "title": "The evidence camera",
+      "summary": "Photos and videos you take by hand, inside Saakshi.",
+      "features": [
+        {
+          "id": "camera-fingerprint",
+          "title": "A fingerprint and a signature for every photo and video",
+          "spec": [
+            "E1. Evidence camera with fingerprint"
+          ],
+          "what": "What makes a recording checkable later: anyone can confirm that the file is the one the phone made.",
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "Photos and videos are taken inside Saakshi.",
+                "As each file is saved, the app works out its fingerprint: a long number (a SHA-256 hash) that changes if anything in the file changes.",
+                "A record beside the file holds the fingerprint, the time, the position and its accuracy, the phone's make and model, and the app version.",
+                "The record is signed with a key kept in the phone's security chip. Each record also carries the fingerprint of the record before it, so nothing can be added or removed unnoticed."
+              ],
+              "ran": true
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "The phone also vouches that the key belongs to the genuine app on an untampered phone (this is called attestation). The checking tool does not verify that part yet: see “The key check” under Proof for court."
+        },
+        {
+          "id": "camera-one-file",
+          "title": "A video is one file, and it survives a cut-off",
+          "spec": [
+            "E1. Evidence camera with fingerprint"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "A video runs from start to stop as one file, with one fingerprint and one signed record.",
+                "If the phone is forced off or the app crashes, the video stays playable up to the moment it stopped.",
+                "Such a file is fingerprinted and signed when the app next opens, and its record says the recording was interrupted.",
+                "Physical damage to the phone during a recording is not solved for."
+              ],
+              "ran": true
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "Your test of 5 Nov could not include a real cut-off (a forced restart while recording). That test is still owed."
+        },
+        {
+          "id": "camera-android-copy",
+          "title": "Android videos: the original, and a copy that plays everywhere",
+          "spec": [
+            "E1. Evidence camera with fingerprint"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "On Android the original is a file exactly as it came from the camera (a .ts file). It stays the evidence: the bundle and the certificate always use it.",
+                "To play or share it, the app makes an MP4 copy without re-recording the picture, labelled as a copy, with its own signed record naming the original.",
+                "Sharing asks whether to send the copy or the original."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "On Android the original is a file exactly as it came from the camera (a .ts file). It stays the evidence: the bundle and the certificate always use it.",
+                "To play or share it, the app makes an MP4 copy without re-recording the picture, labelled as a copy, with its own signed record naming the original.",
+                "Sharing always sends the copy, with no question first. The original goes only in the evidence bundle."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "The Android app has not yet run on any phone, so none of this has been tried."
+        },
+        {
+          "id": "camera-front-zoom",
+          "title": "Front and back camera, and zoom",
+          "spec": [
+            "E1. Evidence camera with fingerprint"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "The back camera only, with no zoom."
+              ]
+            },
+            "r2": {
+              "mark": "new",
+              "points": [
+                "A switch for the front and back camera, for photos and video (not during a video).",
+                "Pinch to zoom, and quick buttons for 0.5×, 1× and 2× where the phone has those lenses or reaches that zoom."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "Switching camera during a video, and recording front and back at once, are not built for now (your decision of 6 Nov)."
+        },
+        {
+          "id": "camera-rights-prompts",
+          "title": "Rights prompts over the camera",
+          "spec": [
+            "E6. Rights prompts while recording"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "Seven short prompts of what to say, such as asking for the grounds of arrest in writing, shown over the camera with previous, next and hide.",
+                "They are drawn on the screen only and are never part of the video."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "The prompts' wording, English and Hindi, read and signed off by you."
+              ],
+              "by": [
+                "wording"
+              ],
+              "adds": true
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "open": "The wording waits for your review."
+        },
+        {
+          "id": "camera-stamp",
+          "title": "Time and place on the picture",
+          "spec": [
+            "E1. Evidence camera with fingerprint"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Nothing is drawn on a photo or video. The time and position are in the signed record."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "When you share, the app offers a stamped copy: the time, position and accuracy drawn on a copy, labelled as a copy, with its own signed record naming the original.",
+                "There is no setting to stamp the original."
+              ],
+              "by": [
+                "after-repairs"
+              ],
+              "timing": "The spec says “after the repairs” and names no build. It is shown under the beta."
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "Why never the original: a stamp adds no proof (it is text from the same clock and position as the signed record), it would be permanent, cover part of the picture and show your location on every copy."
+        },
+        {
+          "id": "camera-more-proofs",
+          "title": "More proofs that a recording is real",
+          "spec": [
+            "E1. Evidence camera with fingerprint"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "new",
+              "points": [
+                "Motion readings (how the phone moved: its accelerometer and gyroscope) in a signed file beside each recording."
+              ],
+              "by": [
+                "release"
+              ]
+            },
+            "later": {
+              "mark": "changed",
+              "points": [
+                "Content Credentials (C2PA, an industry label for where a picture came from), and compass and network readings."
+              ],
+              "by": [
+                "v1.1"
+              ],
+              "adds": true
+            }
+          },
+          "notes": "The aim is to make a claim that a recording is AI-generated implausible and to put the burden on whoever makes it. Nothing makes a recording unquestionable."
+        }
+      ]
+    },
+    {
+      "id": "bodycam",
+      "title": "Body-cam mode",
+      "summary": "The phone worn on the chest, recording video continuously, hands free.",
+      "features": [
+        {
+          "id": "bodycam-start",
+          "title": "Start, the dark screen and the touch lock",
+          "spec": [
+            "Body-cam mode (B1–B4)"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "One button on the Record tab starts it. The screen goes dark at minimum brightness and touch is locked; recording carries on.",
+                "The app prompts you to turn on Battery Saver or Low Power Mode.",
+                "Touching the locked screen shows only “Screen locked. Use your unlock buttons.”, without naming the buttons."
+              ],
+              "ran": true
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "bodycam-start-check",
+          "title": "A clean start before the screen goes dark",
+          "spec": [
+            "Body-cam mode (B1–B4)"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "The screen goes dark as soon as the recorder says it has started."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "After Start, the screen stays lit on a short checklist and goes dark only when recording is confirmed: picture arriving, sound arriving, the file growing with room to record, the first record signed, and on Android the recording notice up.",
+                "If anything fails, the screen stays lit and says what failed. Nothing is retried at Start.",
+                "A position is shown as found or not yet found, and is not a condition: body-cam may go dark without one."
+              ],
+              "by": [
+                "repair-b"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "bodycam-unlock",
+          "title": "Unlocking, and the practice step",
+          "spec": [
+            "Body-cam mode (B1–B4)"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "Pressing volume-down twice unlocks the screen.",
+                "Before the first Start you tick “I know how to unlock it”."
+              ],
+              "ran": true
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "Pressing volume-up twice unlocks the screen, and no other button does.",
+                "A practice step replaces the tick: Start becomes available only once you have pressed volume-up twice. A short reminder stays on the start screen, and the practice can be repeated."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "Why volume-up: an iPhone cannot tell volume-down apart from the Camera Control, the Action button and AirPods clicks, so only volume-up can be the one key. It is the same on Android."
+        },
+        {
+          "id": "bodycam-saving",
+          "title": "How a body-cam recording is saved",
+          "spec": [
+            "Body-cam mode (B1–B4)"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "In one-minute pieces, each with its own fingerprint and signed record. A thirty-minute recording is thirty files."
+              ],
+              "ran": true
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "As one continuous file from Start to Stop, with its sound.",
+                "About every 10 seconds the app signs a checkpoint: a note of how much has been written so far and its fingerprint. A recording cut off is proven up to its last checkpoint and plays up to the cut.",
+                "A new file starts only as a fail-safe (on iPhone, when you leave Saakshi and come back)."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "bodycam-sound-leaving",
+          "title": "Sound, leaving the app, and one record per session",
+          "spec": [
+            "Body-cam mode (B1–B4)"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "iPhone: video stops whenever Saakshi leaves the screen, and sound-only pieces cover the time away. Android: recording continues with the screen off while you take calls and use other apps.",
+                "Faults you found on 5 Nov: the video's sound, and a swipe from the left edge ended body-cam."
+              ],
+              "ran": true
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "Video and sound are in the same file.",
+                "Nothing navigates away from the body-cam screen (not the back swipe on iPhone, not the back button on Android), so one session is one record from Start to Stop.",
+                "Android: recording continues with the screen off while you take calls and use other apps.",
+                "iPhone: video carries on while Saakshi is only covered (Notification Center, Control Center) and stops only when iOS stops the camera. Pressing the side button locks the phone, which stops video while sound carries on; the record says so in plain words. Before you leave the app it warns that video will stop; video restarts when you return, and every gap is logged."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "bodycam-failing-camera",
+          "title": "A camera that keeps failing part-way",
+          "spec": [
+            "Body-cam mode (B1–B4)"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Nothing built for it."
+              ]
+            },
+            "r2": {
+              "mark": "new",
+              "points": [
+                "iPhone restarts video by itself when it can. On Android a failed recorder is not noticed."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "1. Video breaks: sound carries on, the phone vibrates once, and video is tried again every second, into a new file of the same recording.",
+                "2. After three tries in a row that fail, or that die within 30 seconds: five long vibrations, and the dark screen lights up with “Video has stopped. Sound is still recording.” and three buttons: Keep trying video, Carry on with sound only, Stop and save. If the phone's own screen is off, the same message appears as a notification.",
+                "3. Until a button is tapped: sound records, video is not tried, and the five long vibrations repeat every minute.",
+                "4. Keep trying video starts the tries again. Carry on with sound only ends them; the recording continues as sound. Stop and save ends it and returns to the Record tab."
+              ],
+              "by": [
+                "repair-b"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "This is your own choice after the camera has failed. The app never drops body-cam to sound only by itself to save room."
+        },
+        {
+          "id": "bodycam-quality",
+          "title": "Picture quality",
+          "spec": [
+            "Body-cam mode (B1–B4)"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "720p by default; you can raise it to 1080p."
+              ],
+              "ran": true
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "bodycam-android-notice",
+          "title": "Android's recording notice",
+          "spec": [
+            "Body-cam mode (B1–B4)"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "On Android 13 and later, body-cam asks for permission to show notifications the first time, so that Android's “recording” notice appears. If you refuse, recording carries on and the app says where to find the running service.",
+                "The notice has a Stop button."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "On Android 13 and later, body-cam asks for permission to show notifications the first time, so that Android's “recording” notice appears. If you refuse, recording carries on and the app says where to find the running service.",
+                "The notice has no Stop button: every Stop goes through the secret code."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "pocket",
+      "title": "Pocket recording",
+      "summary": "Sound only, with the phone in a pocket or bag.",
+      "features": [
+        {
+          "id": "pocket-name-place",
+          "title": "What it is called and where it lives",
+          "spec": [
+            "E8. Pocket recording"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "Called “Bug mode”, on the SOS tab.",
+                "Records sound with the screen locked. On iPhone, Apple shows an orange dot and a Lock Screen timer (a Live Activity) while it records."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "Called “Pocket recording”, on the Record page.",
+                "Records sound with the screen locked. On iPhone, Apple shows an orange dot and a Lock Screen timer (a Live Activity) while it records.",
+                "“My phone is being taken” uses the same recorder."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "pocket-saving",
+          "title": "How a Pocket recording is saved",
+          "spec": [
+            "E8. Pocket recording"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "In pieces of about two minutes, each fingerprinted and signed, until stopped or the battery runs out."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "As one continuous sound file from Start to Stop, in a format that survives a sudden cut-off.",
+                "About every 10 seconds the app signs a checkpoint, as for body-cam. A recording cut off is proven up to its last checkpoint and plays up to the cut.",
+                "A new file starts only as a fail-safe: the microphone stopped and came back (for example after a phone call), or a file could not be written."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "pocket-witness",
+          "title": "Fingerprints texted to your contacts while it records",
+          "spec": [
+            "E8. Pocket recording"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "The latest fingerprint is texted to your contacts, at most once every 10 minutes, so that it cannot use up the texts you may need for an SOS.",
+                "Only where the phone can send a text without a tap: the Android app installed from our own file. Never from an iPhone."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "Each text carries the latest checkpoint's fingerprint, which vouches for everything recorded before it."
+              ],
+              "adds": true
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "pocket-uploads",
+          "title": "Uploading while it records",
+          "spec": [
+            "E8. Pocket recording",
+            "E7. Copies to the user's cloud"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Nothing is uploaded."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "The recording is uploaded to your own cloud in parts as it is made, with its link shared with your contacts. Parts made without signal upload as soon as it returns. See “Copies to your own cloud”."
+              ],
+              "by": [
+                "part-2"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "stops",
+      "title": "When a recording stops by itself",
+      "summary": "Room, battery and time: what may end a recording without you, and what you are told.",
+      "features": [
+        {
+          "id": "stops-floors",
+          "title": "The floors, and the amount you keep free",
+          "spec": [
+            "When a recording stops by itself",
+            "Storage"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Free room is not watched. A recording carries on until the phone is full."
+              ]
+            },
+            "r2": {
+              "mark": "new",
+              "points": [
+                "A safety floor of 300 MB, fixed: everything stops there, and a photo is refused there too.",
+                "A “keep free” amount you set in Settings (1, 2, 5, 10 or 20 GB), starting at 5 GB: how much of the phone to leave for everything else.",
+                "A recording stopped for room is closed and signed in the ordinary way, marked as ended because storage was full."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "Two fixed floors. The safety floor, 300 MB: no video starts below it, and a running video stops at it, in every mode. The last floor, about 50 MB: photos and sound can still be made below 300 MB, with a notice that room is critically low, and everything stops at the last floor, so that the signed records can always be written.",
+                "A “keep free” amount you set in Settings: how much of the phone to leave for everything else. It starts at 5 GB or a tenth of the phone's storage, whichever is smaller, so that a small phone can still record.",
+                "A recording stopped for room is closed and signed in the ordinary way, marked as ended because storage was full.",
+                "Nothing is recorded to a memory card for now."
+              ],
+              "by": [
+                "stops"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "stops-per-mode",
+          "title": "Where each kind of recording stops for room",
+          "spec": [
+            "When a recording stops by itself",
+            "Storage"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Nowhere: see above."
+              ]
+            },
+            "r2": {
+              "mark": "new",
+              "points": [
+                "Body-cam and Pocket recording do not start at or below the keep-free amount.",
+                "At the keep-free amount body-cam drops to sound only (a setting, on unless you switch it off), then stops. Pocket recording stops at the keep-free amount.",
+                "The evidence camera shows the warnings, says once when the phone is below the keep-free amount, and stops a video only at the 300 MB floor.",
+                "“My phone is being taken” records past the keep-free amount, down to the 300 MB floor."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "A recording may start below the keep-free amount, with a notice saying how much room is left and about how many minutes of this kind of recording that is.",
+                "Body-cam: a video that started above the keep-free amount stops at it; one that started below it runs to the 300 MB floor. Body-cam never drops to sound only to save room.",
+                "Pocket recording does not stop at the keep-free amount; it runs to the last floor.",
+                "The evidence camera is in your hand, so the keep-free amount does not stop it: it warns, says once when the phone is below the keep-free amount, stops a video at 300 MB, and takes photos down to the last floor.",
+                "“My phone is being taken”: its sound recording runs to the last floor."
+              ],
+              "by": [
+                "stops"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "stops-told",
+          "title": "What you are told about room",
+          "spec": [
+            "Storage"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Nothing."
+              ]
+            },
+            "r2": {
+              "mark": "new",
+              "points": [
+                "The first time you open body-cam or Pocket recording, and always under Settings → Storage: that these are made for long recordings; roughly how much room an hour of video and an hour of sound take; and what happens at the keep-free amount and at the floor.",
+                "On each Start screen, how long the free room allows (“Room for about 3 h 20 min of video”); warnings in words at about 30 and 10 minutes left.",
+                "Settings → Storage also shows how much Saakshi's recordings take.",
+                "The figures are the rates the recorders are set to, not measured on a phone, so the app says “about”."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "The words are brought in line with the two floors and the new rules.",
+                "The estimates of recording time are tuned from measurements on both phones.",
+                "Android reads the free room exactly, in place of the slightly generous figure it uses today."
+              ],
+              "by": [
+                "stops",
+                "repair-b"
+              ],
+              "adds": true
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "stops-battery-camera",
+          "title": "Battery: the evidence camera",
+          "spec": [
+            "Battery",
+            "E1. Evidence camera with fingerprint"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "Warns at 10% and 5%. At 3% it stops and saves the recording by itself. Not while charging."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "Never stops by itself for the battery. It warns at 10% and 5%, and nothing more."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "stops-battery-long",
+          "title": "Battery: body-cam and Pocket recording",
+          "spec": [
+            "Battery",
+            "Low battery"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "Body-cam warns at 10% and 5%, and at 3% stops and saves by itself. Not while charging.",
+                "Bug mode has no automatic save: its pieces are already short."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "Nothing stops for the battery. At 5% the file in progress closes cleanly and a new file carries on until the phone dies.",
+                "Body-cam's new file uses less power: on iPhone a smaller picture (480p) at 15 frames a second; on Android the same picture size at 15 frames a second and a lower data rate.",
+                "Plugging the phone in: the file in progress carries on as it is, and the next file is at normal quality."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "A battery reserve: body-cam and Pocket recording stop cleanly at a battery level you set, so that the phone is still usable afterwards. It starts at 10%, and is picked from steps between 5% and 50%. It never stops a recording while the phone is charging.",
+                "The reserve can be switched off. Then they record until the phone dies.",
+                "A recording started when the battery is already at or below the reserve starts, with a notice, and records until the phone dies in the same way.",
+                "At 5%, in a recording the reserve does not hold, the file in progress closes cleanly and a new, lower-power file carries on until the phone dies, as in the round 2 build.",
+                "“My phone is being taken” ignores the reserve and records to the end."
+              ],
+              "by": [
+                "stops"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "stops-saving-mode",
+          "title": "Saving mode at 5%: location slows down and your contacts are told",
+          "spec": [
+            "Low battery"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "new",
+              "points": [
+                "When a recording hands over at 5%, a location share that is running sends a position every 5 minutes, at full accuracy.",
+                "Your contacts are told “battery at 5%, location now every 5 minutes”: by text where the phone can send one without a tap (the Android app from our own file), and for everyone on the live page. No text goes from an iPhone.",
+                "Plugging the phone in ends saving mode."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "Saving mode starts at 5% whenever a location share is on, whether or not anything is recording.",
+                "Contacts who have Saakshi are told by a notification."
+              ],
+              "by": [
+                "stops",
+                "part-3"
+              ],
+              "adds": true
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "open": "Whether positions can be coarser in saving mode is revisited after a phone test shows what that would save."
+        },
+        {
+          "id": "stops-efficiency",
+          "title": "Efficiency: stretching the last of the battery and the room",
+          "spec": [
+            "Efficiency"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "none",
+              "points": [
+                "Not in this build. (Only the lower-power file at 5%, above.)"
+              ]
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "Two separate switches in Settings, for body-cam. Both start switched on.",
+                "For the battery: in the last 5% of battery above the reserve, body-cam carries on in a new file that uses less power. With the reserve switched off, the lower-power file starts at 5%.",
+                "For storage: in the last 1 GB of room before the recording would stop, body-cam carries on in a new file at a lower quality, so that the room goes as far as possible.",
+                "With a switch off, body-cam records at the same quality until it stops."
+              ],
+              "by": [
+                "stops"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "stops-time-limit",
+          "title": "A time limit",
+          "spec": [
+            "Time limit"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "Body-cam and Pocket recording each have a time limit, off until you set one, of any number of minutes. At the limit the recording stops cleanly and is saved, so that you can start another.",
+                "Warning: two pulses of vibration at one minute before the end, then a stronger, continuous vibration for the last ten seconds.",
+                "“My phone is being taken” ignores the time limit."
+              ],
+              "by": [
+                "stops"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "stops-why",
+          "title": "Telling you why a recording ended",
+          "spec": [
+            "E5. Evidence locker and export",
+            "When a recording stops by itself"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "The reason is kept in the signed record but not shown in plain words."
+              ]
+            },
+            "r2": {
+              "mark": "new",
+              "points": [
+                "The record's screen says why the recording ended, in plain words (for example: you stopped it, the phone was locked, you left Saakshi, the battery, the storage, an interruption)."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "Words for the new endings: the battery reserve, the time limit and the two efficiency handovers.",
+                "When a recording stops by itself on body-cam's dark screen, the screen lights up and says why it stopped and that the recording is saved. This does not ask for the secret code."
+              ],
+              "by": [
+                "stops"
+              ],
+              "adds": true
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "The line about the screen lighting up is in the builder's brief; the spec does not spell it out."
+        }
+      ]
+    },
+    {
+      "id": "faults",
+      "title": "Recordings that survive a fault",
+      "summary": "The phone forced off, the app killed, the storage full, the phone's key remade: none may lose a recording or make it uncheckable.",
+      "features": [
+        {
+          "id": "faults-index",
+          "title": "The recording's index cannot be lost",
+          "spec": [
+            "Recordings that survive a fault"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "A power-off at the wrong moment could wipe a recording's index (the app's own list of that recording's files and signed records)."
+              ]
+            },
+            "r2": {
+              "mark": "new",
+              "points": [
+                "The index is written so that a readable copy exists at every moment.",
+                "If it is ever lost or unreadable, it is made again from the signed records, which are the truth. The record's screen then says “This recording's index was rebuilt”, and what could not be brought back.",
+                "Notes that a witness message went out are kept in a log that is only ever added to, so they survive a rebuilt index."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "A known fault, listed for repair round B: a recording in progress keeps its own copy of the index and writes that, so a check result noted meanwhile is lost at its next save. Witness-message notes are safe."
+        },
+        {
+          "id": "faults-keys",
+          "title": "One file for each signing key",
+          "spec": [
+            "Recordings that survive a fault"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "One signing key for each install of the app.",
+                "Fault found later: if the phone's key was ever remade, the old key's file was written over, and recordings signed with the old key could no longer be exported as a bundle."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "Each key has its own file, never written over. Each recording is exported with the key that signed it.",
+                "If the phone's key is remade (the usual cause: the app's files moved to a new phone), the next signed record says that the key changed. Recording is never refused because a key changed.",
+                "Old test recordings whose key was written over get no bundle, and the app says why; their files are shared one by one."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "open": "A key the phone still lists but can no longer use: what the app does is decided after it has been tried on a real phone. Until then, recording carries on and the file is signed late."
+        },
+        {
+          "id": "faults-one-step",
+          "title": "Signed records written in one step",
+          "spec": [
+            "Recordings that survive a fault"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "none",
+              "points": [
+                "A power-off at the instant a signed record is written can leave the newest one half-written. The app ignores it, so nothing breaks, but that checkpoint is lost."
+              ]
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "Signed records are written in one step, like the index, so a power-off cannot leave one half-written."
+              ],
+              "by": [
+                "stops"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "faults-late-signing",
+          "title": "A file saved but never signed",
+          "spec": [
+            "Recordings that survive a fault"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not handled."
+              ]
+            },
+            "r2": {
+              "mark": "none",
+              "points": [
+                "Not handled. Such a file stays without a signed record; and if a later file in the same recording is signed, the checking tool fails the bundle."
+              ]
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "At the start of every file the app writes a start note with the start time and position, and keeps it until the signature is written. A file that was saved but not signed is signed when the app next opens, from its note, with its true start time and position.",
+                "Its record says plainly that it was signed late, and when.",
+                "A late signature shows the file has not changed since the late signing. For the time in between, body-cam and Pocket recordings have their checkpoints; a hand-held photo or video has none."
+              ],
+              "by": [
+                "repair-b"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "faults-damaged",
+          "title": "A damaged recording",
+          "spec": [
+            "Recordings that survive a fault"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Nothing built for it."
+              ]
+            },
+            "r2": {
+              "mark": "new",
+              "points": [
+                "A recording whose index is unreadable, with no signed record to rebuild from, is still listed, as “This recording's index is damaged”, with each of its files shareable.",
+                "Nothing recorded is ever deleted automatically. Only half-written leftovers of an interrupted save are removed when the app opens."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "One button, “Share everything that is left”, makes a single ZIP of every surviving file, with a short note inside saying that these files have no signed records, and why.",
+                "The page shows how much room the recording takes, beside its Delete button."
+              ],
+              "by": [
+                "repair-b"
+              ],
+              "adds": true
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "records",
+      "title": "Your records: viewing, sharing and exporting",
+      "summary": "The list of what you have recorded, and what you can do with each record.",
+      "features": [
+        {
+          "id": "records-list",
+          "title": "The records list",
+          "spec": [
+            "E5. Evidence locker and export",
+            "9. Look and feel"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "Each record is a line of text: a date, a time and the number of files."
+              ],
+              "ran": true
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "Each record shows what it is (Photo, Video, Body-cam, Pocket recording), a picture for photos and videos, its start time and its length."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "A gallery, like the gallery apps people already know, with minimal text. The evidence detail of a record is shown only when you ask for it.",
+                "Mocked up first and chosen by you; the mock-ups start with this screen."
+              ],
+              "by": [
+                "design"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "records-playback",
+          "title": "Opening and playing a record",
+          "spec": [
+            "E5. Evidence locker and export"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "A record's screen lists its files with each one's fingerprint and the record's status. A video opens in the phone's own player."
+              ],
+              "ran": true
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "A photo opens full screen; sound files play in the app.",
+                "A body-cam or Pocket recording is one recording: a single player plays its files end to end, with sound, and shows the total length. The files stay listed as the evidence.",
+                "Nothing plays while the app is recording, so the recording does not pick the playback up."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "The viewer is redesigned with the list, on the lines of gallery apps."
+              ],
+              "by": [
+                "design"
+              ],
+              "adds": true
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "records-status",
+          "title": "Each record's status, and checking it on the phone",
+          "spec": [
+            "E5. Evidence locker and export"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "Each record shows its status: fingerprinted and signed, checked on this phone, witness message sent, certificate made.",
+                "“Check files” works out every fingerprint again and checks the chain."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "The status also shows “uploaded”, once copies to your cloud exist."
+              ],
+              "by": [
+                "part-2"
+              ],
+              "adds": true
+            },
+            "public": {
+              "mark": "changed",
+              "points": [
+                "The status also shows “timestamped”."
+              ],
+              "by": [
+                "release"
+              ],
+              "adds": true
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "records-share",
+          "title": "Sharing a photo, video or sound",
+          "spec": [
+            "E5. Evidence locker and export"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "A video can be shared by itself from its record. On Android it asks whether to send the copy or the original."
+              ],
+              "ran": true
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "A clear action on every record: “Share video” (or “Share photo”, “Share sound”) sends a playable file through the phone's share sheet, to WhatsApp, Instagram, YouTube, Mail and so on.",
+                "On iPhone it is the original; on Android the MP4 copy. For a body-cam record with several video files it is a joined copy, labelled as a copy, with its own signed record listing every source file.",
+                "A record with several photos or videos shares each from its own card."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "open": "Built so, to be discussed with the viewer's redesign: “Share sound” for a sound-only record, and each photo or video shared from its own card."
+        },
+        {
+          "id": "records-export",
+          "title": "Exporting the evidence bundle",
+          "spec": [
+            "E5. Evidence locker and export"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "“Export bundle” makes one ZIP and opens the share sheet. It holds the original files, the signed records, the certificate, the hash report and a README.",
+                "Names are machine names, such as “saakshi-2f165c26-20261021-0342”."
+              ],
+              "ran": true
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "“Export evidence bundle” makes one ZIP holding the original files, the signed records, the certificate, the hash report and a README.",
+                "It saves the ZIP to a folder you pick once; later exports go there with one tap, with “Change folder” and the share sheet still available.",
+                "The bundle, its folders and its files have names a person can read, such as “Saakshi 2026-11-05 10-40 IST Body-cam.zip”.",
+                "Its README explains, in English and Hindi, for someone with no technical background, what each file is, why it is there, and how a lawyer or expert checks the bundle."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "changed",
+              "points": [
+                "The bundle also holds each record's timestamp proof."
+              ],
+              "by": [
+                "release"
+              ],
+              "adds": true
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "open": "Built so, to be discussed with the redesign: file and folder names are in English in both languages of the app. Parked by you, for the test results: the words of four new lines about signing keys (in the README and the hash report)."
+        },
+        {
+          "id": "records-delete",
+          "title": "Deleting",
+          "spec": [
+            "E5. Evidence locker and export",
+            "E9 (v1.1). Vault, disguised icon, quick lock"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "You delete one recording at a time, after a confirmation. It removes the media, the records and the certificate."
+              ],
+              "ran": true
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "Quick delete of evidence (a panic wipe) stays held back, pending your decision."
+        }
+      ]
+    },
+    {
+      "id": "proof",
+      "title": "Proof for court",
+      "summary": "What lets a lawyer or expert rely on a recording.",
+      "features": [
+        {
+          "id": "proof-witness",
+          "title": "The witness message",
+          "spec": [
+            "E2. Witness message"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "One tap opens the phone's Messages app with the recording's latest fingerprint, the time (IST) and the place. You pick the recipients there."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "One tap sends it, by text, to the contacts ticked for witness messages.",
+                "It identifies the recording so that a person and software can both read it: a format tag and version, the record's name, its start and end times in IST and its length, the place with a map link, each file's fingerprint (or the chain's latest fingerprint and a count when there are many), and the app version.",
+                "The same labelled times appear in the app, the message, the bundle's name and the certificate's hash report."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "proof-certificate",
+          "title": "The BSA s.63 certificate",
+          "spec": [
+            "E4. BSA s.63 certificate"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "For each recording the app pre-fills Part A of the certificate in the Schedule: device type Mobile, make and model, hash value and algorithm (SHA256), with the hash report attached.",
+                "A form for each certificate takes your name, address and IMEI (the screen shows how: *#06#); you sign.",
+                "The PDF states that s.63(4)(c) also requires Part B signed by an expert.",
+                "Printed in English; the help text on screen is in English and Hindi. It carries a “DRAFT” notice until you sign off its text."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "For each recording the app pre-fills Part A of the certificate in the Schedule: device type Mobile, make and model, hash value and algorithm (SHA256), with the hash report attached.",
+                "The PDF states that s.63(4)(c) also requires Part B signed by an expert.",
+                "Printed in English; the help text on screen is in English and Hindi. It carries a “DRAFT” notice until you sign off its text.",
+                "One profile per phone replaces the per-certificate form: Settings → “Your details for certificates” holds the details of the person who owns, maintains, manages or operates the phone, on the phone only.",
+                "Making a certificate shows no form. If the profile is incomplete, the app says so and opens it; if complete, it says whom Part A is for and makes it with one tap. To make one for anyone else, the profile is changed first."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "Your sign-off of the Part A text, after which the “DRAFT” notice comes off.",
+                "The hash report's line for a file closed at low battery reads “closed by the app at 5% battery; recording carried on in the next file”. Until then it still gives the words of the old 3% stop."
+              ],
+              "by": [
+                "wording",
+                "stops"
+              ],
+              "adds": true
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "The form's wording matched the Gazette of India when it was checked on 21 Oct 2026. The legal text itself is in the spec (E4) and the app; this table only describes the feature."
+        },
+        {
+          "id": "proof-says",
+          "title": "What a bundle says it proves",
+          "spec": [
+            "E3. Public timestamp, and what a bundle proves"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "A README in the bundle explains how to check it."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "The README is rewritten for a reader with no technical background, in English and Hindi."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "changed",
+              "points": [
+                "The app, the README and the checking tool describe a bundle as a set of separate proofs (fingerprint, signature and chain; the key check; checkpoints; witness messages; time proofs; motion readings), each stating exactly what it shows and what it does not.",
+                "Nothing is described as “unimpeachable” or beyond question."
+              ],
+              "by": [
+                "release"
+              ],
+              "adds": true
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "proof-key-check",
+          "title": "The key check",
+          "spec": [
+            "E3. Public timestamp, and what a bundle proves"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "The checking tool does not check the phone's proof about its key. The README and the tool are to say plainly what “OK” covers until it does."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "The checking tool verifies each phone's key attestation: the phone's proof that the signing key came from the genuine app on an untampered phone."
+              ],
+              "by": [
+                "before-beta"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "proof-time",
+          "title": "Time proofs",
+          "spec": [
+            "E3. Public timestamp, and what a bundle proves"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "new",
+              "points": [
+                "A public timestamp: when the phone next has internet, each fingerprint is stamped through OpenTimestamps (a free public service). It shows that a record existed no later than a certain time.",
+                "A “not earlier than” anchor: a value published by an outside source shortly before the recording, put into the recording's first signed record. It shows that the record was not made before it. Which source is used is settled in the design."
+              ],
+              "by": [
+                "release"
+              ]
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "proof-cloud",
+          "title": "Copies to your own cloud",
+          "spec": [
+            "E7. Copies to the user's cloud"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "You connect your own cloud account, and each finished file or part uploads when there is signal. Links can be sent to your emergency contacts. Nothing comes to us.",
+                "Google Drive (with its narrowest permission: only files the app creates) and iCloud Drive (iPhone only, using the phone's own Apple account, with no sign-in in Saakshi).",
+                "A recording uploads in parts that lengthen as it goes on: 10-second parts for the first minute, 30-second parts for the next five minutes, then one-minute parts. The early minutes are the ones most worth getting off the phone at once. Body-cam and Pocket recording use the same schedule. No live audio streaming.",
+                "Whether the copy on the phone is encrypted is your choice. The app tells you that cloud copies can be obtained from the provider through legal process, so the feature is not for private content.",
+                "The app makes no claim on whether a copy rebuilt from uploaded parts is primary or secondary evidence, until that research is done."
+              ],
+              "by": [
+                "part-2"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "changed",
+              "points": [
+                "More cloud services, as you designate them."
+              ],
+              "by": [
+                "v1.1"
+              ],
+              "adds": true
+            }
+          },
+          "notes": "Needs Parts C and D of your setup first (the Google Drive screen and client IDs; the iCloud container). The research question is item 8 in the repository's law notes.",
+          "open": "Built so: body-cam uploads use the same lengthening schedule as Pocket recording."
+        },
+        {
+          "id": "proof-cloud-room",
+          "title": "Making room from the cloud",
+          "spec": [
+            "E7. Copies to the user's cloud",
+            "Storage"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "Built with cloud copies, and switched on only after your research on whether the cloud copy stands as well in court.",
+                "It makes room by removing recordings that are safely in your cloud, oldest first, under four rules: only a recording whose every byte and signed record is confirmed in the cloud; the signed records stay on the phone and only the media file goes, with the list saying where it now is; the removal is itself a signed entry; never the recording in progress, one you marked to keep, or one with a certificate made."
+              ],
+              "by": [
+                "part-2"
+              ],
+              "timing": "The spec gives no build for switching it on: it waits for your research."
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "sos",
+      "title": "The SOS page",
+      "summary": "Calling 112, alerting your own contacts, and sharing your location.",
+      "features": [
+        {
+          "id": "sos-page",
+          "title": "The page itself",
+          "spec": [
+            "5.1 The SOS page: three swipes"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "An SOS tab with a “Call 112” button at the top, a button that sends an SOS alert, your trusted contacts, live location, bug mode, confiscation mode and the quick-trigger settings."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "Three controls, each a swipe, so that it cannot happen by accident: Call 112; I need help; My phone is being taken.",
+                "A swipe counts when the handle is released past about 85% of its track, or reaches the end; released short of that, it springs back. The phone gives a light tap as the handle gets there. A quick flick does nothing.",
+                "“Share my location” is a plain button under the swipes: it is not an alert and should be easy to start.",
+                "With a screen reader on, each swipe can be done by activating it and confirming."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "Saakshi is not an emergency service and never says so. 112 stays one swipe away. You tried the old page on your phone on 6 Nov; this redesign followed.",
+          "open": "Built so: the screen-reader way of swiping, and “Share my location” as a plain button."
+        },
+        {
+          "id": "sos-need-help",
+          "title": "“I need help”",
+          "spec": [
+            "5.2 What each action does"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "Called “SOS alert”: a text to your trusted contacts with a map link, the position's accuracy and the time.",
+                "On iPhone the Messages app opens and you tap Send. In the Android app from our own file it sends by itself after a 3-second countdown."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "One alert to the people ticked for SOS alerts. It carries the time, the battery level when it is 20% or less, the live-location link and the current-location map link.",
+                "Live location starts, for the length set in Settings (4 hours unless changed).",
+                "It goes after a full swipe, with no countdown, but waits up to 8 seconds for the live link.",
+                "How the text leaves the phone is under “How texts are sent”."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "One alert to the people ticked for SOS alerts. It carries the time, the battery level when it is 20% or less, and the current-location map link.",
+                "It goes at once after a full swipe: it does not wait for the live link, which follows in a second message as soon as there is one.",
+                "Live location starts, for the length set in Settings (4 hours unless changed).",
+                "How the text leaves the phone is under “How texts are sent”."
+              ],
+              "by": [
+                "repair-b"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "sos-share-location",
+          "title": "Sharing your location by a link",
+          "spec": [
+            "5.2 What each action does",
+            "S3. Live location by link"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "On the SOS tab: share for 1, 4, 8 or 24 hours. The link is texted to your contacts and opens in any browser, so they need no app.",
+                "The page shows the last position with its age and accuracy, a map, the earlier positions, when sharing ends, and a warning when no position has come for 5 minutes.",
+                "A small server of ours holds the location only while sharing is on and deletes it when sharing ends."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "“Share my location” is a calm action, not an alert: it goes to the people ticked for live location, with a message such as “I'm sharing my location with you” and the link, which opens in any browser.",
+                "The page shows the last position with its age and accuracy, a map, the earlier positions, when sharing ends, and a warning when no position has come for 5 minutes.",
+                "A small server of ours holds the location only while sharing is on and deletes it when sharing ends.",
+                "The length is set in Settings (4 hours unless changed).",
+                "The battery level is sent and shown only when it is 20% or less; above that it is left out, so that nothing unneeded leaves the phone."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "The page also shows the silence warning (see “The silence alarm”).",
+                "The link is on our own web address."
+              ],
+              "by": [
+                "part-3",
+                "address"
+              ],
+              "adds": true
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "The map on the page stays. It is an OpenStreetMap frame, which receives the position being viewed, and the privacy policy says so."
+        },
+        {
+          "id": "sos-quick-trigger",
+          "title": "The quick trigger",
+          "spec": [
+            "5.1 The SOS page: three swipes",
+            "S4. Quick trigger"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "A full-screen code pad: typing your 3-digit code sends at the third digit, with no Send button and no countdown. The code is set to send the SOS alert or to start confiscation mode.",
+                "Reached from the iPhone's Action Button, Back Tap, and Lock Screen and Control Center controls, and from an Android home-screen widget and notification."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "There is no code pad to trigger. The same shortcuts (the iPhone's Action Button, Back Tap, and Lock Screen and Control Center controls; an Android home-screen widget and notification) open the swipe screen.",
+                "On iPhone, opening from a locked phone may ask for the phone's passcode first."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "taken",
+      "title": "“My phone is being taken”",
+      "summary": "One swipe that protects you when the phone is about to leave your hands.",
+      "features": [
+        {
+          "id": "taken-starts",
+          "title": "What one action starts",
+          "spec": [
+            "5.4 \"My phone is being taken\""
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "Called “Confiscation mode”: one button and a confirmation. It starts bug mode and live location (8 hours), and sends the SOS alert with the live link.",
+                "Each part starts even if another fails."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "One swipe starts everything at once: the alert to the people ticked for SOS alerts, with both links; live location until the battery dies; and Pocket recording.",
+                "The location share has no fixed end: it stays alive while the phone checks in, and the server deletes it a week after the last check-in.",
+                "At 5% battery it hands over to a new file and saving mode.",
+                "If no secret code is set, the swipe asks for one, and once it is set the mode starts at once."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "Its recording is uploaded to your cloud as it is made, in parts that lengthen.",
+                "The silence alarm watches over it.",
+                "It records to the end: it ignores the battery reserve and the time limit, and its sound runs to the last floor of storage."
+              ],
+              "by": [
+                "part-2",
+                "part-3",
+                "stops"
+              ],
+              "adds": true
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "open": "Built so: the share with no fixed end, deleted a week after the last check-in."
+        },
+        {
+          "id": "taken-lock",
+          "title": "Locking the phone",
+          "spec": [
+            "5.4 \"My phone is being taken\""
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "new",
+              "points": [
+                "Android: if you switched it on in advance, Saakshi locks the screen. It uses a permission that can only lock the screen (no wipe, nothing else), offered as a plain opt-in in Settings and switched off there as easily. While it is on, Android asks for it to be switched off before Saakshi can be deleted.",
+                "iPhone, and Android without it: no app can lock the screen, so Saakshi shows, large and first, “Now lock your phone” with which button to press.",
+                "Today the lock waits up to 20 seconds, for the location share and the texts."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "Android: if you switched it on in advance, Saakshi locks the screen. It uses a permission that can only lock the screen (no wipe, nothing else), offered as a plain opt-in in Settings and the walkthrough, and switched off there as easily. While it is on, Android asks for it to be switched off before Saakshi can be deleted.",
+                "iPhone, and Android without it: no app can lock the screen, so Saakshi shows, large and first, “Now lock your phone” with which button to press.",
+                "The lock is immediate. It does not wait for the location share or the texts: the phone's own location updates start, the alert is handed to the phone, the screen locks, and the share is then set up on the server.",
+                "The Play listing says that Saakshi locks the screen and states the uninstall step openly. It never presents the lock as a way to stop Saakshi being deleted."
+              ],
+              "by": [
+                "repair-b",
+                "before-beta"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "open": "Waiting for a phone test: whether the app may say that after Saakshi's lock the next unlock needs the PIN, pattern or password."
+        },
+        {
+          "id": "taken-microphone",
+          "title": "The microphone rule",
+          "spec": [
+            "5.4 \"My phone is being taken\""
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "none",
+              "points": [
+                "Not built yet."
+              ]
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "The mode cannot be armed without the microphone: the permission is asked in advance, and the SOS page shows whether the mode is ready.",
+                "At the moment itself, the microphone is retried for about two seconds before the lock. The lock then happens regardless, and the microphone is retried behind the locked screen. The lock never waits for sound."
+              ],
+              "by": [
+                "repair-b"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "taken-restart",
+          "title": "If the app is killed",
+          "spec": [
+            "5.4 \"My phone is being taken\""
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "none",
+              "points": [
+                "The mode does not restart by itself."
+              ]
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "After the app is killed and reopened, the mode restarts by itself whatever the phone allows, without a tap.",
+                "Setup takes you to your phone's battery setting for Saakshi, by maker, so that the phone is less likely to stop it."
+              ],
+              "by": [
+                "repair-b"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "taken-notices-stop",
+          "title": "If its recording stops",
+          "spec": [
+            "5.4 \"My phone is being taken\""
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "none",
+              "points": [
+                "A fault: if its recording stops (at the storage floor, say), its screen still shows the recording as on."
+              ]
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "Its screen says so."
+              ],
+              "by": [
+                "repair-b"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "taken-stopping",
+          "title": "Stopping it, and what the app promises",
+          "spec": [
+            "5.4 \"My phone is being taken\""
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "Anyone holding the phone can stop it: there is no code."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "It cannot be stopped in Saakshi without the secret code.",
+                "Stopping it stops everything it runs, including a Pocket recording or a location share that was already running before it started.",
+                "In this mode Saakshi's own Lock Screen timer is dropped, so the locked screen shows less. Apple's orange dot remains.",
+                "The app never says that recording cannot be stopped by any means: someone can still force-quit the app, switch the phone off or use airplane mode. Its wording says it can only be stopped in Saakshi with the code."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "open": "Built so: the wording “can only be stopped in Saakshi with the code”."
+        },
+        {
+          "id": "taken-silence",
+          "title": "The silence alarm",
+          "spec": [
+            "5.7 The silence alarm"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "While “My phone is being taken” or any location share is on, the phone checks in with our server. If it stops checking in for about 2 minutes, the server warns your contacts: last location, time, battery level and the link to the recordings.",
+                "It fires on switch-off, airplane mode, a signal-blocking pouch or a broken phone.",
+                "Contacts who have Saakshi get a notification. Contacts reached by text see the warning on the live-location page; they get no text, because our server sends none.",
+                "The warning says the phone has stopped reporting, not that anything has happened to you, and a “reporting again” message follows when it comes back.",
+                "The guide and the walkthrough tell users to switch on Share my location for risky stretches, so that the alarm covers them without a swipe."
+              ],
+              "by": [
+                "part-3"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "changed",
+              "points": [
+                "Telegram and email contacts get the warning once those ways of reaching people exist."
+              ],
+              "timing": "The spec names no build for Telegram and email.",
+              "adds": true
+            }
+          },
+          "open": "Built so: the check-in is separate from location updates; the “stopped reporting” wording and the “reporting again” message; no text to SMS contacts."
+        }
+      ]
+    },
+    {
+      "id": "code",
+      "title": "The secret code",
+      "summary": "One code that turns off anything that was turned on.",
+      "features": [
+        {
+          "id": "code-one",
+          "title": "One code on every Stop",
+          "spec": [
+            "5.3 One secret code"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "No secret code. Anyone holding the phone can press Stop. (The 3-digit code of this build only triggers alerts.)"
+              ]
+            },
+            "r2": {
+              "mark": "new",
+              "points": [
+                "One secret code of 4 digits, set in Settings, turns off anything that was turned on: body-cam, “My phone is being taken”, live location and Pocket recording. Nothing else in the app uses a code.",
+                "Every Stop in the app opens the code screen; there is no Stop control outside it.",
+                "A Stop when no code is set: the code screen asks you to set one first, and setting it lets the Stop go through.",
+                "Obviously guessable codes (one digit repeated, straight runs) are refused, with a plain reason."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "open": "Built so: the refusal of guessable codes."
+        },
+        {
+          "id": "code-wrong-tries",
+          "title": "Wrong tries",
+          "spec": [
+            "5.3 One secret code"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "new",
+              "points": [
+                "Waits get longer after each wrong try: two wrong tries cost nothing; then 30 seconds, 1, 2, 5, 15 and 30 minutes, and 1 hour from there. The count survives closing the app and restarting the phone.",
+                "The waits follow the phone's clock."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "Waits get longer after each wrong try: two wrong tries cost nothing; then 30 seconds, 1, 2, 5, 15 and 30 minutes, and 1 hour from there. The count survives closing the app and restarting the phone.",
+                "The waits no longer follow the phone's clock, which a person holding the phone could change: they are counted on the phone's time since restart."
+              ],
+              "by": [
+                "part-3"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "open": "Built so: the lengths of the waits."
+        },
+        {
+          "id": "code-forgotten",
+          "title": "A forgotten code",
+          "spec": [
+            "5.3 One secret code"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "new",
+              "points": [
+                "It is reset with the phone's own passcode, and only the passcode: no face or fingerprint.",
+                "Only while nothing is running. Otherwise whoever holds the phone and its passcode could reset the code and switch off “My phone is being taken”.",
+                "A phone with no screen lock, or on Android 7 to 10, gets a recovery code instead, shown once, for you to keep away from the phone. It resets the secret code under the same rules. Nothing is sent anywhere."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "open": "Built so: the reset only while nothing is running."
+        }
+      ]
+    },
+    {
+      "id": "contacts",
+      "title": "Trusted contacts, and how each is reached",
+      "summary": "The people your alerts, location and witness messages go to.",
+      "features": [
+        {
+          "id": "contacts-list",
+          "title": "The list",
+          "spec": [
+            "5.5 Trusted contacts and how each is reached",
+            "S1. Trusted contacts"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "One list, kept only on the phone, on the SOS tab. People are added from the phone's contact picker or typed in."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "One list, kept only on the phone, in Settings, with three ticks per person: SOS alerts, live location, witness messages, all ticked to begin with.",
+                "Every message fills in the people ticked for it; you never type a recipient at the moment of sending."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "contacts-sms",
+          "title": "How texts are sent",
+          "spec": [
+            "5.5 Trusted contacts and how each is reached",
+            "S2. SOS sends itself on Android"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "iPhone: the Messages app opens and you tap Send once. Apple lets no app send a text by itself.",
+                "Android, installed from our own file: texts go out with no tap."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "A phone with no SIM set for texts (many phones in India hold two and ask each time): Saakshi detects it and guides you to set one, in setup and on the SOS page. No new permission."
+              ],
+              "by": [
+                "repair-b"
+              ],
+              "adds": true
+            },
+            "public": {
+              "mark": "changed",
+              "points": [
+                "The Play Store version keeps tap-to-send until Google approves its exception for emergency alerts; you apply for it early. Once granted, it also sends by itself."
+              ],
+              "by": [
+                "release"
+              ],
+              "timing": "The spec puts the application on the release checklist as an approval to start early; when Google grants it is not ours to set.",
+              "adds": true
+            },
+            "later": {
+              "mark": "changed",
+              "points": [
+                "A phone test of whether an iPhone Shortcut can send the text with no tap."
+              ],
+              "timing": "The spec says “after round 2” and names no build.",
+              "adds": true
+            }
+          }
+        },
+        {
+          "id": "contacts-saakshi",
+          "title": "Contacts who have Saakshi",
+          "spec": [
+            "5.6 Saakshi-to-Saakshi",
+            "5.5 Trusted contacts and how each is reached"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "Contacts who have Saakshi get alerts in the app, not by text.",
+                "Pairing without accounts, for example by a QR code that each phone shows and the other scans. Nobody signs up, and we hold no list of users.",
+                "Alerts reach the contact's phone as a notification through our server, encrypted so that only the contact's phone can read them.",
+                "A received-alerts page: who has alerted you, their locations with times on a map, and the link to their recordings. The map is free and open source, with “Open in Maps” beside it."
+              ],
+              "by": [
+                "part-3"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "The protocol is written down first, for your review, before any of this is built. Testing needs a second phone with the test build.",
+          "open": "Built so (to be confirmed when the protocol comes to you): notifications go directly through Apple and Google from our own server; positions to Saakshi contacts are end-to-end encrypted, while the live link for text contacts stays readable by our server; the recordings link is public to whoever holds it, and is set only for shares you start."
+        },
+        {
+          "id": "contacts-other-ways",
+          "title": "Telegram and email",
+          "spec": [
+            "5.5 Trusted contacts and how each is reached",
+            "7. Later"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "new",
+              "points": [
+                "Contacts reached by Telegram, and by email from your own account (Gmail first, never a Saakshi mailbox)."
+              ],
+              "timing": "The spec says “after round 2” and names no build."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "app",
+      "title": "Settings, first open, language and look",
+      "summary": "The parts of the app that hold the rest together.",
+      "features": [
+        {
+          "id": "app-settings",
+          "title": "Settings",
+          "spec": [
+            "5.8 Settings"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "Language, and light or dark theme. Contacts and the quick trigger are set on the SOS tab."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "Settings holds: the trusted contacts with their ticks; the live-location length (1, 4, 8 or 24 hours; 4 unless changed); the secret code; the quick-trigger setup; the screen lock for “My phone is being taken” (Android); storage (the keep-free amount, and what recordings take); your details for certificates; the export folder; language and theme."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "It gains the battery reserve, the two efficiency switches and the two time limits, each with one plain line saying what it does."
+              ],
+              "by": [
+                "stops"
+              ],
+              "adds": true
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "app-walkthrough",
+          "title": "The first-open walkthrough",
+          "spec": [
+            "5.9 First-open walkthrough"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "Five to seven pages that introduce each feature and set it up at the same time: language; what Saakshi does; the secret code; trusted contacts and how each is reached; the phone's own protections; the quick trigger; the certificate profile.",
+                "Permissions are asked at the step that needs them. “Skip for now” is on every step. Call 112 and the camera work from the first screen."
+              ],
+              "by": [
+                "part-4"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "app-languages",
+          "title": "English and Hindi",
+          "spec": [
+            "G6. Hindi",
+            "3. Platforms and release"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "The whole app and all its content, in English and Hindi. It follows the phone's language, with a switch in Settings. Built so that more languages can be added."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "Every Hindi and English string read by you in one wording round."
+              ],
+              "by": [
+                "wording"
+              ],
+              "adds": true
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "app-look",
+          "title": "Look and feel",
+          "spec": [
+            "9. Look and feel"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "No visual design yet: plain screens, light and dark, with a placeholder icon."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "One consistent look on Android and iPhone, built on the lines of the most-used camera, sound-recorder and gallery apps, with far less text.",
+                "Each screen is mocked up and chosen by you before it is built, starting with the records list.",
+                "A real app icon and launch screen."
+              ],
+              "by": [
+                "design"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "app-backups",
+          "title": "Backups",
+          "spec": [
+            "2. Ground rules"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "Nothing is backed up automatically, the phone's own automatic backups included. Nothing comes to us."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "You may choose a cloud service of your own as a destination (see “Copies to your own cloud”)."
+              ],
+              "by": [
+                "part-2"
+              ],
+              "adds": true
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "guides",
+      "title": "Guides and help",
+      "summary": "What the app teaches, and the numbers it lists.",
+      "features": [
+        {
+          "id": "guides-helplines",
+          "title": "Helplines",
+          "spec": [
+            "G3. Helplines"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "The Help tab lists verified public numbers (112, 108, 102 and the legal-aid line 15100), each with a Call button and its official sources.",
+                "The numbers download automatically each time the Help tab opens, so the list updates without a new app release.",
+                "A section for lawyers and medics who consent to be listed, empty for now."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "changed",
+              "points": [
+                "The list is sealed: signed, so that a change to the repository alone cannot change the numbers on every phone."
+              ],
+              "by": [
+                "release"
+              ],
+              "adds": true
+            },
+            "later": {
+              "mark": "changed",
+              "points": [
+                "The list of volunteer lawyers and medics, with its open questions (whether a registration number is published; who collects consent and where it is kept)."
+              ],
+              "timing": "Parked by you until after the beta; no build is named.",
+              "adds": true
+            }
+          },
+          "notes": "Still to do on our side: 112, 108 and 102 are not yet confirmed from a current official page."
+        },
+        {
+          "id": "guides-chest-mount",
+          "title": "The chest-mount guide",
+          "spec": [
+            "G4. Chest-mount guide"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "A harness with a phone clamp, a no-tools lanyard method, a backpack-strap clip, and links to open 3D-printable mounts under their licences. It teaches the body-cam unlock (volume-down twice).",
+                "The do-it-yourself methods show “Not yet tested by the Saakshi team” until each is tested."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "A harness with a phone clamp, a no-tools lanyard method, a backpack-strap clip, and links to open 3D-printable mounts under their licences. It teaches the body-cam unlock: volume-up twice.",
+                "The do-it-yourself methods show “Not yet tested by the Saakshi team” until each is tested."
+              ]
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "guides-digital-safety",
+          "title": "The digital-safety guide, and setting up the phone",
+          "spec": [
+            "G5. Digital safety and preparedness"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "Turn off Face ID and fingerprint unlock before going out, and how to force passcode-only at the moment; what to take and what to leave at home; setting up contacts and the app in advance. Adapted from EFF Surveillance Self-Defense.",
+                "“What police may ask of a phone” is left out until it has been researched from statutes and judgments."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "The walkthrough gains phone-setup pages: passcode only; on iPhone, Control Center off on the Lock Screen; the phone's own Emergency SOS, set up with the same trusted people; Find My on iPhone; and the maker's own “require password to power off” where it exists.",
+                "It names only the settings tested on a real phone."
+              ],
+              "by": [
+                "part-4"
+              ],
+              "adds": true
+            },
+            "public": {
+              "mark": "changed",
+              "points": [
+                "The release notes say that a power-off lock is an essential safety feature that phones lack, which phones offer one, and that we have asked Apple, Google and phone makers to add it. The requests are filed at release."
+              ],
+              "by": [
+                "release"
+              ],
+              "adds": true
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "No app can put a code on power-off; only the phone's maker can. The research is in the repository (power-off-locks.md).",
+          "open": "Parked by you, for the test results: whether the “what to take” list tells people to carry a photo ID. The research on what police may ask of a phone is done with the next on-phone review cycle."
+        },
+        {
+          "id": "guides-offline",
+          "title": "If the network goes down",
+          "spec": [
+            "O1. Offline communication"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "Briar for Android users. No mesh app is recommended for iPhone, because no audited one exists in India. Everyone gets the same alternatives: agree meeting points, a check-in time and a plan for texts before going out."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "guides-rights",
+          "title": "Know-your-rights cards, physical safety, and the unlawful-detention card",
+          "spec": [
+            "G1 (v1.1). Know your rights",
+            "G2 (v1.1). Physical safety",
+            "Unlawful detention"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "new",
+              "points": [
+                "Short cards on your rights when stopped, searched, detained or arrested, each citing its statute or judgment (G1).",
+                "Physical safety: before, during and after (G2).",
+                "The unlawful-detention card, read before going out."
+              ],
+              "by": [
+                "v1.1"
+              ]
+            }
+          },
+          "notes": "The legal content of these cards is set out only in the spec (section 6) and the repository's law notes, with its sources. It is not restated in this table.",
+          "open": "You decide whether these join the beta. Parked by you, for the test results: the spec's sentence on BNS s.37, and how to cite D.K. Basu and Arnesh Kumar."
+        }
+      ]
+    },
+    {
+      "id": "release",
+      "title": "Getting the app, and behind the scenes",
+      "summary": "How the app reaches people, the one server we run, and what is kept for later.",
+      "features": [
+        {
+          "id": "release-how",
+          "title": "How people get the app",
+          "spec": [
+            "3. Platforms and release",
+            "2. Ground rules"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "iPhone only, through TestFlight (Apple's test channel), on your phone."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "iPhone through TestFlight, once you make the build. Android builds are made by the build robot, but the Android app has not yet run on any phone."
+              ]
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "About 50 testers: a TestFlight public link (after Apple's beta review) and a Google Play closed test. Google needs 12 or more testers for 14 days before a new account can publish."
+              ],
+              "by": [
+                "before-beta"
+              ]
+            },
+            "public": {
+              "mark": "changed",
+              "points": [
+                "The App Store, Google Play, and a signed Android file on GitHub Releases and on mirrors.",
+                "Every release is published with its checksum and signing fingerprint, on more than one host, so that it survives a block."
+              ],
+              "by": [
+                "release"
+              ]
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "Native apps only, from one codebase; there is no web version."
+        },
+        {
+          "id": "release-server",
+          "title": "The one server we run",
+          "spec": [
+            "8. Tech",
+            "2. Ground rules"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "A small server in Mumbai (Supabase). It holds only location shares that are running, and deletes each one when it ends."
+              ]
+            },
+            "r2": {
+              "mark": "changed",
+              "points": [
+                "A “My phone is being taken” share is kept while the phone reports, and deleted a week after its last check-in.",
+                "Each position carries the battery level when it is 20% or less."
+              ],
+              "adds": true
+            },
+            "beta": {
+              "mark": "changed",
+              "points": [
+                "For contacts who have Saakshi it also holds encrypted alerts it cannot read and the notification addresses of paired phones; for the silence alarm, each share's last check-in.",
+                "The server's plan is reviewed before the beta: the free plan pauses a project after a quiet week."
+              ],
+              "by": [
+                "part-3",
+                "before-beta"
+              ],
+              "adds": true
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          },
+          "notes": "No server of ours holds your recordings. Copies go only to your own cloud account."
+        },
+        {
+          "id": "release-address",
+          "title": "Our own web address",
+          "spec": [
+            "8. Tech"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "The app talks to a supabase.co address, and contacts open a github.io page."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "new",
+              "points": [
+                "The server and the live page sit behind saakshiapp.org and saakshiapp.in, and the app carries a short list of addresses to try in order, so that a block on one host does not need a new release.",
+                "The names are bought before the beta build goes to testers."
+              ],
+              "by": [
+                "address"
+              ]
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "release-privacy",
+          "title": "Privacy rules",
+          "spec": [
+            "2. Ground rules",
+            "8. Tech"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "new",
+              "points": [
+                "Nothing of yours (recordings, contacts, location) leaves the phone unless you turn on the feature that sends it.",
+                "No analytics, advertising or crash-reporting software. The app asks only for the permissions a feature needs."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "same"
+            }
+          }
+        },
+        {
+          "id": "release-later",
+          "title": "Kept for later",
+          "spec": [
+            "7. Later",
+            "E9 (v1.1). Vault, disguised icon, quick lock"
+          ],
+          "builds": {
+            "r1": {
+              "mark": "none",
+              "points": [
+                "Not in this build."
+              ]
+            },
+            "r2": {
+              "mark": "same"
+            },
+            "beta": {
+              "mark": "same"
+            },
+            "public": {
+              "mark": "same"
+            },
+            "later": {
+              "mark": "new",
+              "points": [
+                "Version 1.1: a vault, a disguised icon and a quick lock; WhatsApp and Signal.",
+                "Version 2: a request-help network for lawyers and medics, with verified volunteers.",
+                "Parked: offline mesh messaging, as a separate companion app.",
+                "Ideas, not to build now: a second device that carries on when the phone is off (a Bluetooth tag, a cellular Apple Watch, or a second phone running Saakshi). Snatch detection is not wanted for now."
+              ],
+              "by": [
+                "v1.1",
+                "v2",
+                "parked"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
