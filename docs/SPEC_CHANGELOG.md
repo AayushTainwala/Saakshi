@@ -4,6 +4,15 @@
 >
 > **When the spec changes:** change the sentence in SPEC.md, add a line here under a new date, and update the owner's features-by-build table in the same pull request.
 
+## 14 Nov 2026: the owner's answers to the five small points
+
+The review session had filled in five points the owner's decisions did not cover (SPEC section 10 as it then stood). His answers, on the open-items page:
+
+- **The battery reserve can be switched off** (SPEC section 4, "Battery"). The review session had written fixed steps with no "off". With it off, body-cam and Pocket recording record until the phone dies, handing over at 5%.
+- **Saving mode starts at 5% whenever a location share is on,** whether or not anything is recording (SPEC section 4, "Low battery"). It was the review session's proposal; the owner accepted it. It is built with "when a recording stops by itself".
+- Confirmed as the review session had written them: the evidence camera is not stopped at the keep-free amount (it warns, and its video stops at the 300 MB floor); a body-cam or Pocket recording started at or below the reserve starts with a notice and records until the phone dies; the failing-camera alert is five long vibrations.
+- Section 10 no longer lists these five.
+
 ## 14 Nov 2026: the spec rewritten as settled text
 
 - SPEC.md was rewritten so that each feature is stated once, with its state (built, to build, later). The dated layers ("decided on, then changed on") moved to this file. Section numbers and module codes did not change.
