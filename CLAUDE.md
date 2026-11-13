@@ -5,7 +5,7 @@ Saakshi ("witness") is a free, open-source (MIT) iPhone and Android app that hel
 ## Read first, every session
 
 1. `docs/BUILD_HANDOFF.md`: your stream's status and next steps. Update it before you finish.
-2. `docs/SPEC.md`: every product decision. Don't change scope without the owner; raise questions in the handoff.
+2. `docs/SPEC.md`: every product decision, each stated once with its state (built, to build, later). Don't change scope without the owner; raise questions in the handoff. A change to the spec gets a line in `docs/SPEC_CHANGELOG.md` in the same pull request.
 3. `docs/BUILD_PLAN.md`: releases, architecture, streams.
 4. `AGENTS.md`: Expo's own rules for this codebase (use versioned Expo docs, `npx expo install`, never hand-edit `ios/` or `android/`).
 
