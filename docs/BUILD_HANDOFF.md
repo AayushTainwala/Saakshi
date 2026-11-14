@@ -11,6 +11,14 @@ The pickup file for build sessions: where things stand, what is next, and the qu
 - **New feature code is otherwise paused** (owner, 10 Nov) until repairs 1 to 4 below are done. Group 3.1 (documents only) may go ahead. Parts 2, 3 and 4 of round 2 wait.
 - **Pace:** no deadline. The next goal is a beta for about 50 testers on iPhone and Android ([BUILD_PLAN.md](BUILD_PLAN.md), "Road to the beta").
 
+## The owner's features-by-build table
+
+- **What it is.** The owner's easy-to-read mirror of the spec: every feature down the side, five builds across the top (the round 1 test build, the round 2 test build, the beta, the public release, later). Its data is one file, [spec/features-by-build.json](spec/features-by-build.json). The page he reads is made from it: https://claude.ai/artifact/UEKk72G3KJvVYGpZpxmEfM.
+- **The spec is the master.** If the two disagree, the spec is right and the table is fixed.
+- **When you change the spec,** change the table's data in the same pull request. For a feature you have built, that usually means moving its text from the box of a planned build into the round 2 column (the code on `main`), and marking the box `new` or `changed`. Write for the owner: plain words, what happens to a user, no file or function names. Each row names the spec heading it mirrors (`spec`), each box has a `mark` (`new`, `changed`, `same`, `none`), and a `changed` box with `"adds": true` keeps the text of the build before and adds to it.
+- **Check it:** `node tools/features-table/check.mjs`. It fails if a row points at a heading the spec no longer has, or if a feature heading in the spec has no row. The tests run it.
+- **The page** is republished by the review session, at the same address: `node tools/features-table/build.mjs <file>` makes the page from the data.
+
 ## How work is merged
 
 - **Every change to `main` goes through a pull request**, and GitHub refuses the merge until the `check` job passes (ruleset `main`, active from 10 Nov). Nobody can push to `main` directly.
@@ -30,7 +38,7 @@ The repairs come from the review of `main` on 10 Nov. Each round gets a brief in
 | 3 | **Repair round B: safety that keeps running** | Body-cam's start check; a camera that keeps failing part-way (the owner's design of 14 Nov); "My phone is being taken" restarting by itself after the app is killed, locking at once, its microphone rule, and noticing when its recording stops; the alert sent at once with the link following; time limits on server calls; a phone with no SIM set for texts; a file saved but never signed, signed late; the "Share everything that is left" ZIP and the size of a damaged recording; Android's exact free-space reading; the items under "Found in repair round A" below. | Brief to be written by the review session; every decision it needs is made. May run beside row 2b where the two do not touch the same files. |
 | 4 | **Our own web address** | A `.org` and a `.in` name in front of the server and the live page, with a short list of addresses for the app to try. | The owner chose `saakshiapp.org` and `saakshiapp.in`, to be bought before the beta build goes to testers. Before that: a comparison of Supabase's custom-domain add-on with a relay of our own, and the brief. |
 | 5 | **Tidy-ups** | The small batch (dependencies listed, `.gitignore`, the server's migration record, pinned build tools), and native builds on every pull request so the merge rule can require them. | Brief to be written. |
-| 6 | **Documents** | [SPEC.md](SPEC.md) rewritten as settled text with a separate change log; the owner's features-by-build table; a note on what each proof in a bundle shows. | The spec and its change log are done (14 Nov). The table is the review session's next piece. The note on proofs is not started. |
+| 6 | **Documents** | [SPEC.md](SPEC.md) rewritten as settled text with a separate change log; the owner's features-by-build table; a note on what each proof in a bundle shows. | The spec, its change log and the table are done (14 Nov). The note on proofs is not started. |
 | 7 | **Group 3.1, the alerts protocol** | Documents only. Its brief gains: our own web address, limits per caller on the server, the secret code's waits off the phone's clock, and phone tests of the silence alarm's two assumptions. | Brief to be revised, then 3.1. |
 | 8 | **Look and feel** | A review of the most-used camera, sound-recorder and gallery apps, then mock-ups for the owner to choose from, the records list first (SPEC section 9). | The review session's work, beside the repairs. Nothing visual is built until the owner has chosen. |
 

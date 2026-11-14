@@ -1,6 +1,6 @@
 # Saakshi v1 Spec
 
-> Every product decision for v1, each stated once, as it stands today (14 Nov 2026). This document is the master, for the review session and the builders. The owner's features-by-build table is a mirror of it, and both are updated at every change.
+> Every product decision for v1, each stated once, as it stands today (14 Nov 2026). This document is the master, for the review session and the builders. The owner's features-by-build table ([spec/features-by-build.json](spec/features-by-build.json)) is a mirror of it, and both are updated at every change.
 >
 > - **Where the decisions came from:** Aayush's picks on the [V1 scope board](https://claude.ai/artifact/SApsbjwDz8sQA55CxX5fH9) and his decisions since. Who decided what, on which date, and what each decision replaced: [SPEC_CHANGELOG.md](SPEC_CHANGELOG.md).
 > - **How the build is sequenced:** [BUILD_PLAN.md](BUILD_PLAN.md). **Where the build stands:** [BUILD_HANDOFF.md](BUILD_HANDOFF.md).

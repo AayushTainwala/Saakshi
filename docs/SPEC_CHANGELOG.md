@@ -2,7 +2,12 @@
 
 > The history of [SPEC.md](SPEC.md): who decided what, when, and what each decision replaced. The spec itself states each feature once, as it stands today, with no dates. Decisions are the owner's (Aayush) unless marked otherwise. Newest first.
 >
-> **When the spec changes:** change the sentence in SPEC.md, add a line here under a new date, and update the owner's features-by-build table in the same pull request.
+> **When the spec changes:** change the sentence in SPEC.md, add a line here under a new date, and update the owner's features-by-build table ([spec/features-by-build.json](spec/features-by-build.json)) in the same pull request. `node tools/features-table/check.mjs` checks the table against the spec.
+
+## 14 Nov 2026: the features-by-build table
+
+- The owner's table was built from the settled spec: [spec/features-by-build.json](spec/features-by-build.json), 79 rows in 14 groups, five builds across the top. No decision in the spec changed. Where the spec names no build for a decided feature (the stamped copy; Telegram and email; the iPhone Shortcut test; the lawyers and medics list; switching on "making room from the cloud"), the table says so in the box.
+- The round 1 test build is the build of commit `9b81f92`: the owner's seven exported bundles are all in bundle format 0.2, which only that build wrote.
 
 ## 14 Nov 2026: the owner's answers to the five small points
 
