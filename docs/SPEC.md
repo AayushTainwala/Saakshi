@@ -21,7 +21,7 @@ Each feature ends with its **state**:
 Two other marks:
 
 - **Built so** means a detail the builder or the review session chose where the owner's decision was silent. Each one that still waits for the owner's word is listed in section 10.
-- **Proposed** means the owner has not decided. Section 10 lists these too.
+- **Proposed** means the owner has not decided. Section 10 lists these too; there are none at present.
 
 ## 1. What it is
 
@@ -201,7 +201,7 @@ Body-cam and Pocket recording are made for long recordings nobody is watching, s
 - **A body-cam video that started above the keep-free amount stops at that amount.** One that started below it runs to the safety floor.
 - **A running sound recording does not stop at the keep-free amount.** Pocket recording runs to the last floor.
 - **Body-cam never drops to sound only to save room.** Body-cam continues both video and sound, and Pocket recording continues sound, until one of the limits in this part is reached.
-- **The evidence camera** is held in the user's hand, so the keep-free amount does not stop it: it shows the warnings, says once when the phone is below the keep-free amount, stops a video at the safety floor, and takes photos down to the last floor (built so, section 10).
+- **The evidence camera** is held in the user's hand, so the keep-free amount does not stop it: it shows the warnings, says once when the phone is below the keep-free amount, stops a video at the safety floor, and takes photos down to the last floor.
 - **"My phone is being taken"** is not held by the keep-free amount: its sound recording runs to the last floor.
 - **A clean stop.** A recording stopped for room is closed and signed in the ordinary way, with the end reason `storage-full`.
 - **What the user is told:** the first time they open body-cam or Pocket recording, and always under Settings → Storage: that these are made for long recordings; roughly how much room an hour of video and an hour of sound take; and what happens at the keep-free amount and at the floors.
@@ -214,14 +214,16 @@ Body-cam and Pocket recording are made for long recordings nobody is watching, s
 #### Battery
 
 - **The evidence camera never stops by itself:** warnings at 10% and 5% only.
-- **A battery reserve.** Body-cam and Pocket recording stop cleanly at a battery level the user sets, so that the phone is still usable afterwards. It starts at **10%**. It never stops a recording while the phone is charging.
+- **A battery reserve.** Body-cam and Pocket recording stop cleanly at a battery level the user sets, so that the phone is still usable afterwards. It starts at **10%**, and is picked from steps between 5% and 50%. It never stops a recording while the phone is charging.
+- **The reserve can be switched off.** With it off, body-cam and Pocket recording record until the phone dies, handing over at 5% as under "Low battery", below.
+- **A recording started when the battery is already at or below the reserve** starts, with a notice saying so. The reserve does not stop that recording: it records until the phone dies, handing over at 5% in the same way.
 - **"My phone is being taken" ignores the reserve** and records to the end (below, "Low battery").
 
 #### Efficiency
 
 Two separate switches in Settings, for body-cam. Both start switched on.
 
-- **For the battery:** in the last **5%** of battery above the reserve, body-cam carries on in a new file that uses less power (as in "Low battery", below).
+- **For the battery:** in the last **5%** of battery above the reserve, body-cam carries on in a new file that uses less power (as in "Low battery", below). With the reserve switched off there is no reserve to measure from, and the lower-power file starts at the 5% handover.
 - **For storage:** in the last stretch of room before the recording would stop (**1 GB**), body-cam carries on in a new file at a lower quality, so that the room goes as far as possible. The lower quality is whatever is cleanest to build on both phones; it reuses the low-battery file.
 
 With a switch off, body-cam records at the same quality until it stops.
@@ -234,7 +236,7 @@ With a switch off, body-cam records at the same quality until it stops.
 
 #### Low battery
 
-At **5%** battery, in a recording that the battery reserve does not hold ("My phone is being taken"; and, built so, a body-cam or Pocket recording that the user started when the battery was already below the reserve):
+At **5%** battery, in a recording that the battery reserve does not hold ("My phone is being taken"; a body-cam or Pocket recording that the user started when the battery was already at or below the reserve; and every body-cam or Pocket recording when the reserve is switched off):
 
 - the current file closes cleanly with the end reason `low-battery`, and a **new file continues** until the phone dies;
 - **saving mode**: location every 5 minutes, and uploads in the same bursts, with positions at full accuracy (to be revisited after a phone test shows what a coarser position would save); the contacts are told "battery at 5%, location now every 5 minutes": by text where the phone can send one without a tap (the Android APK now, and the Play Store build once Google grants the SMS permission), and by notification to contacts who have Saakshi (Part 3). No text goes from an iPhone, which lets no app send one without a tap; the live page shows the warning for everyone;
@@ -243,7 +245,9 @@ At **5%** battery, in a recording that the battery reserve does not hold ("My ph
 
 The bundle format records the handover (bundle spec 0.9).
 
-*State: built (the 5% handover, saving mode and the lower-power file, for every body-cam and Pocket recording). To build: the reserve, which stops ordinary recordings before 5%.*
+**Saving mode when nothing is recording.** Whenever a location share is on and the battery falls to 5%, saving mode starts in the same way (location every 5 minutes, and the contacts told as above), whether or not anything is recording. Plugging the phone in ends it. Without this, a location share whose recording the reserve had already stopped would never slow down.
+
+*State: built (the 5% handover, saving mode and the lower-power file, for every body-cam and Pocket recording). To build ([briefs/2026-11-14-when-a-recording-stops.md](briefs/2026-11-14-when-a-recording-stops.md)): the reserve, which stops ordinary recordings before 5%, and saving mode when nothing is recording.*
 
 ### E9 (v1.1). Vault, disguised icon, quick lock
 
@@ -482,13 +486,5 @@ Nothing in this section is decided. The builders build what the sections above s
 - With a screen reader on, a swipe is done by activating and confirming; "Share my location" is a plain button under the swipes (section 5.1).
 - The secret code's waits, and the refusal of guessable codes (section 5.3).
 - The live share of "My phone is being taken" has no fixed end and is deleted a week after the last check-in (section 5.4).
-- The evidence camera is not held by the keep-free amount (section 4, "Storage").
-- A body-cam or Pocket recording started when the battery is already below the reserve starts with a notice, is not stopped by the reserve, and hands over at 5% (section 4, "Low battery").
-- The battery reserve is chosen from fixed steps and cannot be switched off altogether (the brief for "when a recording stops by itself").
-
-**Proposed, not decided:**
-- **Saving mode when no recording is running.** Today saving mode (location every 5 minutes, and the "battery at 5%" notice) starts only when a recording hands over at 5%. Once the battery reserve stops ordinary recordings before 5%, a location share with no recording beside it would never enter saving mode. Proposed: saving mode starts at 5% whenever a location share is on.
-
-**One reading to confirm:** in the failing-camera design (section 4, body-cam mode), the owner's note says "5 long vibrations" in step 2 and "the long 5 second vibration" in step 3. The spec reads both as five long vibrations; the brief for repair round B confirms it with him.
 
 **Owed to the owner for reading and sign-off:** the certificate's Part A text; the rights prompts; every string marked for review, English and Hindi, in one wording round; the alerts protocol before any Part 3 code. The list is kept in [release/checklist.md](release/checklist.md) and the owner's notes.
